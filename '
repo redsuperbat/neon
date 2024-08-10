@@ -1,0 +1,125 @@
+#[derive(Debug)]
+pub struct Lexer {
+    text: String,
+    col: u32,
+    row: u32,
+    offset: usize,
+}
+
+#[derive(Debug)]
+pub enum Token {
+    FnKeyword,  // fn
+    LetKeyword, // let
+
+    EqualsOperator, // =
+    PlusOperator,   // +
+
+    OpenCurlyBrace,   // {
+    ClosedCurlyBrace, // }
+
+    IntegerLiteral(i32), // 5 -3 etc.
+
+    Symbol(String), // abc
+    Newline,        // \n
+
+    Unknown,
+}
+
+impl Lexer {
+    pub fn lex(&self) -> Vec<Token> {
+        let mut tokens = vec![];
+        while !self.is_at_end() {
+            tokens.push(self.next_token())
+        }
+        tokens
+    }
+
+    pub fn new(text: &str) -> Lexer {
+        return Lexer {
+            text: text.to_string(),
+            col: 1,
+            row: 1,
+            offset: 1,
+        };
+    }
+
+    fn is_at_end(&self) -> bool {
+        self.text.len() < self.offset
+    }
+
+    fn next_token(&self) -> Token {
+        let token = self.peek();
+        match token {
+            '=' => Token::EqualsOperator,
+            '+' => Token::PlusOperator,
+            '{' => Token::OpenCurlyBrace,
+            '}' => Token::ClosedCurlyBrace,
+            '\n' => Token::Newline,
+
+            'A'..='z' => self.symbol_or_keyword(),
+            '0'..='9' => self.integer_literal(),
+
+            _ => Token::Unknown,
+        }
+    }
+
+    fn next(&mut self) -> char {
+        let next = self.text.chars().nth(self.offset);
+        let char = next.unwrap();
+        self.col += 1;
+
+        if char == '\n' {
+            self.row += 1;
+            self.col = 1;
+        }
+
+        char
+    }
+
+    fn integer_literal(&self) -> Token {
+        let mut str = String::from("");
+        while ('0'..='9').contains(&self.peek()) {
+            str += &self.next().to_string();
+        }
+        Token::IntegerLiteral(str.parse::<i32>().unwrap())
+    }
+
+    fn peek(&self) -> char {
+        let next = self.text.chars().nth(self.offset);
+        next.unwrap()
+    }
+
+    fn symbol_or_keyword(&self) -> Token {
+        let mut str = String::from("");
+
+        while ('A'..='z').contains(&self.peek()) {
+            str += &self.next().to_string();
+        }
+
+        match str.as_str() {
+            "let" => Token::LetKeyword,
+            "fn" => Token::FnKeyword,
+            _ => Token::Symbol(str),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn swap_nibbles_ext() {
+        let code = String::from(
+            "
+             fn test() {
+              3
+             }
+",
+        );
+        let lexer = Lexer::new(&code);
+
+        let tokens = lexer.lex();
+        println!("{:?}", tokens);
+    }
+}
