@@ -1,11 +1,13 @@
+mod interpreter;
 mod lexer;
 mod parser;
 mod symbol_table;
 
+use interpreter::{EvaluationContext, Interpreter};
 use lexer::Lexer;
 use parser::{Parser, ParserError};
 use std::io::{self, BufRead, Write};
-use symbol_table::SymbolTable;
+use symbol_table::{SymbolError, SymbolTable};
 
 fn print(str: &str) -> () {
     print!("{str}");
@@ -21,17 +23,16 @@ fn main() {
         let line = line.expect("Failed to read line") + "\n";
 
         let tokens = Lexer::new(line).vec();
-        let ast = Parser::new(tokens).parse_expression();
+        let interpreter = Interpreter::new();
+        let ast = Parser::new(tokens).parse_program();
 
         let ast = match ast {
             Ok(ast) => ast,
             Err(e) => {
                 match e {
                     ParserError::InvalidInteger { lexeme } => println!("invalid integer {lexeme}"),
-                    ParserError::EmptyExpression { start, end } => {
-                        println!("Empty expressions are not allowed {:?}:{:?}", start, end)
-                    }
-                    ParserError::UnexpectedEOF => println!("Unexpected end of file in expression"),
+                    ParserError::EmptyProgram => println!("Program cannot be empty"),
+                    ParserError::UnexpectedEOF => println!("Unexpected end of program"),
                     ParserError::UnexpectedToken { expected, found } => {
                         let found = found.lexeme;
                         let expected = expected
@@ -50,17 +51,25 @@ fn main() {
         println!("{:?}", ast);
 
         let mut symbol_table = SymbolTable::new();
-        match symbol_table.visit_expression(ast) {
+        match symbol_table.visit_expression(&ast) {
             Ok(_) => (),
             Err(err) => match err {
-                symbol_table::ReferenceError::ExitGlobalError => {
+                SymbolError::ExitGlobal => {
                     println!("Cannot move out of global scope")
                 }
-                symbol_table::ReferenceError::UndefinedReference { name } => {
+                SymbolError::UndefinedReference { name } => {
                     println!("Reference {name} is not defined")
+                }
+                SymbolError::ReDeclaration { name } => {
+                    println!("Cannot redeclare symbol {name} in current scope")
                 }
             },
         };
+
+        let mut ctx = EvaluationContext {};
+        let result = interpreter.evaluate_expression(ast, &mut ctx);
+
+        println!("{:?}", result);
 
         print("> ");
     }

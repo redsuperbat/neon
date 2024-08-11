@@ -90,10 +90,7 @@ impl Lexer {
     }
 
     fn next_token(&mut self) -> Option<Token> {
-        let next_char = self.peek();
-        let Some(next_char) = next_char else {
-            return Option::None;
-        };
+        let next_char = self.peek()?;
 
         match next_char {
             '=' => self.single_char(TokenKind::EqualsOperator),
@@ -117,10 +114,7 @@ impl Lexer {
     }
 
     fn next(&mut self) -> Option<char> {
-        let next = self.peek();
-        let Some(char) = next else {
-            return Option::None;
-        };
+        let char = self.peek()?;
 
         self.col += 1;
 
@@ -185,7 +179,11 @@ impl Lexer {
         let mut lexeme = String::new();
 
         loop {
-            match self.peek()? {
+            let Some(char) = self.peek() else {
+                break;
+            };
+
+            match char {
                 'a'..='z' | 'A'..='Z' | '_' | '0'..='9' => {
                     lexeme += &self.next()?.to_string();
                 }
@@ -213,15 +211,17 @@ impl Lexer {
 mod tests {
     use super::*;
 
+    fn lex(code: &str) -> Vec<Token> {
+        Lexer::new(code).collect::<Vec<_>>()
+    }
+
     #[test]
     fn lexing() {
-        let code = String::from(
-            "fn test() {
-3
-}",
-        );
-        for token in Lexer::new(code) {
-            println!("{:?}", token);
-        }
+        let tokens = lex("fn test() {3}");
+        assert_eq!(tokens.len(), 9);
+        let tokens = lex("a");
+        assert_eq!(tokens.len(), 1);
+        let tokens = lex("fn test() {3}; test(); let a = 123");
+        assert_eq!(tokens.len(), 22);
     }
 }
