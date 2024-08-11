@@ -8,21 +8,26 @@ pub struct Parser {
 
 #[derive(Debug)]
 pub struct Expression {
-    start: Pos,
-    end: Pos,
-    kind: ExpressionKind,
+    pub start: Pos,
+    pub end: Pos,
+    pub kind: ExpressionKind,
 }
 
 #[derive(Debug)]
 pub enum ExpressionKind {
     Fn {
         name: String,
-        parameters: Vec<Expression>,
-        body: Box<Expression>,
+        parameters: Vec<String>,
+        body: Vec<Expression>,
     },
 
     Identifier {
         name: String,
+    },
+
+    Invocation {
+        name: String,
+        arguments: Vec<Expression>,
     },
 
     LetBinding {
@@ -87,6 +92,22 @@ impl Parser {
         self.tokens.pop_front().ok_or(ParserError::UnexpectedEOF)
     }
 
+    pub fn parse_program(&mut self) -> Result<Vec<Expression>, ParserError> {
+        let mut program = vec![];
+        loop {
+            program.push(self.parse_expression()?);
+
+            let Ok(token) = self.peek() else {
+                break;
+            };
+
+            if token.kind != TokenKind::Newline {
+                break;
+            }
+        }
+        Ok(program)
+    }
+
     fn assert_next(&mut self, kind: TokenKind) -> Result<Token, ParserError> {
         let next = self.next()?;
         if next.kind == kind {
@@ -97,21 +118,19 @@ impl Parser {
     }
 
     fn peek(&self) -> Result<&Token, ParserError> {
-        self.tokens.get(0).ok_or(ParserError::UnexpectedEOF)
+        self.peek_at_offset(0)
     }
 
-    fn assert_peek(&self, kind: TokenKind) -> Result<&Token, ParserError> {
-        let next = self.peek()?;
-        if next.kind == kind {
-            Ok(next)
-        } else {
-            ParserError::new(vec![kind], next)
-        }
+    fn peek_at_offset(&self, i: usize) -> Result<&Token, ParserError> {
+        self.tokens.get(i).ok_or(ParserError::UnexpectedEOF)
     }
 
     pub fn parse_expression(&mut self) -> Result<Expression, ParserError> {
         let mut expression = self.parse_leaf_expression()?;
-        let next = self.peek()?;
+
+        let Some(next) = self.peek().ok() else {
+            return Ok(expression);
+        };
 
         match next.kind {
             TokenKind::EqualsOperator => {
@@ -142,6 +161,17 @@ impl Parser {
         }
     }
 
+    fn parse_identifier(&mut self) -> Result<Expression, ParserError> {
+        let Token {
+            lexeme, start, end, ..
+        } = self.assert_next(TokenKind::Symbol)?;
+        Ok(Expression {
+            kind: ExpressionKind::Identifier { name: lexeme },
+            end,
+            start,
+        })
+    }
+
     fn parse_leaf_expression(&mut self) -> Result<Expression, ParserError> {
         let next = self.peek()?;
 
@@ -152,6 +182,17 @@ impl Parser {
             TokenKind::Newline => {
                 self.next()?;
                 self.parse_expression()
+            }
+            TokenKind::SemiColon => {
+                self.next()?;
+                self.parse_expression()
+            }
+            TokenKind::Symbol => {
+                if self.peek_at_offset(1)?.kind == TokenKind::OpenParen {
+                    self.parse_invokation()
+                } else {
+                    self.parse_identifier()
+                }
             }
             TokenKind::ClosedCurlyBrace => Err(ParserError::EmptyExpression {
                 start: next.start,
@@ -166,6 +207,40 @@ impl Parser {
                 next,
             ),
         }
+    }
+
+    fn parse_invokation(&mut self) -> Result<Expression, ParserError> {
+        let Token {
+            lexeme, start, end, ..
+        } = self.assert_next(TokenKind::Symbol)?;
+
+        let mut arguments = vec![];
+        self.assert_next(TokenKind::OpenParen)?;
+
+        loop {
+            // Handle immediately closed parens
+            if self.peek()?.kind == TokenKind::ClosedParen {
+                break;
+            }
+
+            arguments.push(self.parse_expression()?);
+
+            // Handle function arguments
+            if self.peek()?.kind == TokenKind::ClosedParen {
+                break;
+            } else {
+                self.assert_next(TokenKind::Comma)?;
+            }
+        }
+
+        Ok(Expression {
+            start,
+            end,
+            kind: ExpressionKind::Invocation {
+                name: lexeme,
+                arguments,
+            },
+        })
     }
 
     fn parse_integer(&mut self) -> Result<Expression, ParserError> {
@@ -194,23 +269,25 @@ impl Parser {
         })
     }
 
-    fn parse_parameters(&mut self) -> Result<Vec<Expression>, ParserError> {
+    fn parse_parameters(&mut self) -> Result<Vec<String>, ParserError> {
         self.assert_next(TokenKind::OpenParen)?;
         let mut params = vec![];
 
         loop {
+            // Handle immediately closed parens
             if self.peek()?.kind == TokenKind::ClosedParen {
                 break;
-            } else {
-                self.assert_peek(TokenKind::Comma)?;
             }
 
             let name = self.assert_next(TokenKind::Symbol)?;
-            params.push(Expression {
-                start: name.start,
-                end: name.end,
-                kind: ExpressionKind::Identifier { name: name.lexeme },
-            });
+            params.push(name.lexeme);
+
+            // Handle function parameters
+            if self.peek()?.kind == TokenKind::ClosedParen {
+                break;
+            } else {
+                self.assert_next(TokenKind::Comma)?;
+            }
         }
 
         self.assert_next(TokenKind::ClosedParen)?;
@@ -223,7 +300,20 @@ impl Parser {
         let parameters = self.parse_parameters()?;
 
         self.assert_next(TokenKind::OpenCurlyBrace)?;
-        let body = self.parse_expression()?;
+        let mut body = vec![];
+
+        loop {
+            if self.peek()?.kind == TokenKind::ClosedCurlyBrace {
+                break;
+            }
+            body.push(self.parse_expression()?);
+
+            if self.peek()?.kind == TokenKind::ClosedCurlyBrace {
+                break;
+            } else {
+                self.assert_next(TokenKind::Newline)?;
+            }
+        }
 
         let Token { end, .. } = self.assert_next(TokenKind::ClosedCurlyBrace)?;
 
@@ -233,7 +323,7 @@ impl Parser {
             kind: ExpressionKind::Fn {
                 name: name.lexeme,
                 parameters,
-                body: Box::from(body),
+                body,
             },
         })
     }
@@ -247,13 +337,16 @@ mod tests {
     #[test]
     fn parsing() {
         let code = String::from(
-            "fn test() {
-3
+            "
+let a = 3
+let b = 4
+fn test() {
+a + b
 }",
         );
         let tokens = Lexer::new(code).collect::<Vec<_>>();
 
-        let ast = Parser::new(tokens).parse_expression();
+        let ast = Parser::new(tokens).parse_program();
         println!("{:?}", ast);
     }
 }

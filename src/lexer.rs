@@ -34,9 +34,33 @@ pub enum TokenKind {
 
     Symbol,     // abc
     Newline,    // \n
+    SemiColon,  // ;
     WhiteSpace, // ' '
 
     Unknown,
+}
+
+impl ToString for TokenKind {
+    fn to_string(&self) -> String {
+        let s = match self {
+            TokenKind::FnKeyword => "fn",
+            TokenKind::LetKeyword => "let",
+            TokenKind::SemiColon => ";",
+            TokenKind::EqualsOperator => "=",
+            TokenKind::PlusOperator => "+",
+            TokenKind::OpenCurlyBrace => "{",
+            TokenKind::ClosedCurlyBrace => "}",
+            TokenKind::OpenParen => "(",
+            TokenKind::ClosedParen => ")",
+            TokenKind::Comma => ",",
+            TokenKind::Newline => "newline",
+            TokenKind::IntegerLiteral => "integer",
+            TokenKind::Symbol => "symbol",
+            TokenKind::WhiteSpace => "whitespace",
+            TokenKind::Unknown => "unknown",
+        };
+        s.to_string()
+    }
 }
 
 impl Iterator for Lexer {
@@ -71,9 +95,10 @@ impl Lexer {
             return Option::None;
         };
 
-        let token = match next_char {
+        match next_char {
             '=' => self.single_char(TokenKind::EqualsOperator),
             '+' => self.single_char(TokenKind::PlusOperator),
+            ';' => self.single_char(TokenKind::SemiColon),
             '{' => self.single_char(TokenKind::OpenCurlyBrace),
             '}' => self.single_char(TokenKind::ClosedCurlyBrace),
             '(' => self.single_char(TokenKind::OpenParen),
@@ -84,12 +109,11 @@ impl Lexer {
 
             '\n' => self.single_char(TokenKind::Newline),
 
-            'A'..='z' => self.symbol_or_keyword()?,
-            '0'..='9' => self.integer_literal()?,
+            'a'..='z' | 'A'..='Z' => self.symbol_or_keyword(),
+            '0'..='9' => self.integer_literal(),
 
             _ => self.single_char(TokenKind::Unknown),
-        };
-        Some(token)
+        }
     }
 
     fn next(&mut self) -> Option<char> {
@@ -129,40 +153,46 @@ impl Lexer {
         self.text.chars().nth(self.offset)
     }
 
-    fn whitespace(&mut self) -> Token {
+    fn whitespace(&mut self) -> Option<Token> {
         let start = self.get_pos();
         let mut lexeme = String::new();
-        while ' ' == self.peek().unwrap() {
-            lexeme += &self.next().unwrap().to_string();
+        while ' ' == self.peek()? {
+            lexeme += &self.next()?.to_string();
         }
         let end = self.get_pos();
-        Token {
+        Some(Token {
             end,
             lexeme,
             kind: TokenKind::WhiteSpace,
             start,
-        }
+        })
     }
 
-    fn single_char(&mut self, kind: TokenKind) -> Token {
+    fn single_char(&mut self, kind: TokenKind) -> Option<Token> {
         let start = self.get_pos();
-        let lexeme = String::from(self.next().unwrap());
+        let lexeme = String::from(self.next()?);
         let end = self.get_pos();
-        Token {
+        Some(Token {
             kind,
             end,
             lexeme,
             start,
-        }
+        })
     }
 
     fn symbol_or_keyword(&mut self) -> Option<Token> {
         let start = self.get_pos();
         let mut lexeme = String::new();
 
-        while ('A'..='z').contains(&self.peek()?) {
-            lexeme += &self.next()?.to_string();
+        loop {
+            match self.peek()? {
+                'a'..='z' | 'A'..='Z' | '_' | '0'..='9' => {
+                    lexeme += &self.next()?.to_string();
+                }
+                _ => break,
+            }
         }
+
         let end = self.get_pos();
 
         let kind = match lexeme.as_str() {
