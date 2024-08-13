@@ -19,6 +19,7 @@ pub enum ExpressionKind {
         name: String,
         parameters: Vec<String>,
         body: Vec<Expression>,
+        return_val: Box<Expression>,
     },
 
     Identifier {
@@ -43,10 +44,6 @@ pub enum ExpressionKind {
         left: Box<Expression>,
         right: Box<Expression>,
     },
-
-    Program {
-        body: Vec<Expression>,
-    },
 }
 
 #[derive(Debug)]
@@ -55,9 +52,9 @@ pub enum ParserError {
         lexeme: String,
     },
 
-    UnexpectedEOF,
+    UnexpectedEndOfFunction,
 
-    EmptyProgram,
+    UnexpectedEndOfFile,
 
     UnexpectedToken {
         expected: Vec<TokenKind>,
@@ -85,29 +82,40 @@ impl Parser {
     }
 
     fn next(&mut self) -> Result<Token, ParserError> {
-        self.tokens.pop_front().ok_or(ParserError::UnexpectedEOF)
+        self.tokens
+            .pop_front()
+            .ok_or(ParserError::UnexpectedEndOfFile)
     }
 
-    pub fn parse_program(&mut self) -> Result<Expression, ParserError> {
+    pub fn parse_program(&mut self, name: &str) -> Result<Expression, ParserError> {
         let mut expressions = vec![];
+        let mut return_val = None;
+
         loop {
             let expression = self.parse_expression()?;
 
-            println!("{:?}", &expression.kind);
-
-            expressions.push(expression);
-
             if self.next_is(TokenKind::SemiColon) {
+                expressions.push(expression);
                 self.next()?;
             } else {
+                return_val = Some(expression);
                 break;
             }
         }
 
+        let Some(return_val) = return_val else {
+            return Err(ParserError::UnexpectedEndOfFunction);
+        };
+
         Ok(Expression {
-            start: expressions.first().ok_or(ParserError::EmptyProgram)?.start,
-            end: expressions.last().ok_or(ParserError::EmptyProgram)?.end,
-            kind: ExpressionKind::Program { body: expressions },
+            start: expressions.first().unwrap_or(&return_val).start,
+            end: return_val.end,
+            kind: ExpressionKind::Fn {
+                body: expressions,
+                parameters: vec![],
+                name: name.to_string(),
+                return_val: Box::new(return_val),
+            },
         })
     }
 
@@ -171,7 +179,7 @@ impl Parser {
     }
 
     fn parse_leaf_expression(&mut self) -> Result<Expression, ParserError> {
-        let next = self.peek().ok_or(ParserError::UnexpectedEOF)?;
+        let next = self.peek().ok_or(ParserError::UnexpectedEndOfFile)?;
 
         match next.kind {
             TokenKind::FnKeyword => self.parse_fn(),
@@ -298,19 +306,26 @@ impl Parser {
 
         self.assert_next(TokenKind::OpenCurlyBrace)?;
         let mut body = vec![];
+        let mut return_val = None;
 
         loop {
             if self.next_is(TokenKind::ClosedCurlyBrace) {
                 break;
             }
-            body.push(self.parse_expression()?);
+            let expression = self.parse_expression()?;
 
             if self.next_is(TokenKind::ClosedCurlyBrace) {
+                return_val = Some(expression);
                 break;
             } else {
-                self.assert_next(TokenKind::Newline)?;
+                body.push(expression);
+                self.assert_next(TokenKind::SemiColon)?;
             }
         }
+
+        let Some(return_val) = return_val else {
+            return Err(ParserError::UnexpectedEndOfFunction);
+        };
 
         let Token { end, .. } = self.assert_next(TokenKind::ClosedCurlyBrace)?;
 
@@ -321,6 +336,7 @@ impl Parser {
                 name: name.lexeme,
                 parameters,
                 body,
+                return_val: Box::new(return_val),
             },
         })
     }
@@ -333,7 +349,9 @@ mod tests {
 
     fn parse(str: &str) -> Expression {
         let tokens = Lexer::new(str).collect::<Vec<_>>();
-        Parser::new(tokens).parse_program().expect("Should work")
+        Parser::new(tokens)
+            .parse_program("test")
+            .expect("Should work")
     }
 
     #[test]
@@ -346,16 +364,18 @@ fn test() {
 a + b
 }",
         );
-        assert!(matches!(ast.kind, ExpressionKind::Program { .. }));
+        assert!(matches!(ast.kind, ExpressionKind::Fn { .. }));
         let ast = parse("let a = 3; fn t() { 3 + 4 }; t();");
-        assert!(matches!(ast.kind, ExpressionKind::Program { .. }));
+        assert!(matches!(ast.kind, ExpressionKind::Fn { .. }));
         let ast = parse("let a = 4; let b = a + a; fn test() { b + b }");
-        assert!(matches!(ast.kind, ExpressionKind::Program { .. }));
+        assert!(matches!(ast.kind, ExpressionKind::Fn { .. }));
+        let ast = parse("a");
+        assert!(matches!(ast.kind, ExpressionKind::Fn { .. }));
     }
 
     #[test]
-    fn only_symbol() {
-        let ast = parse("a");
-        assert!(matches!(ast.kind, ExpressionKind::Program { .. }));
+    fn single() {
+        let ast = parse("let a = d");
+        assert!(matches!(ast.kind, ExpressionKind::Fn { .. }));
     }
 }

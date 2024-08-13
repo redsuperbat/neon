@@ -4,7 +4,7 @@ use std::{
     mem,
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Scope {
     parent: Option<Box<Scope>>,
     declarations: HashSet<String>,
@@ -42,7 +42,7 @@ impl Scope {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SymbolTable {
     scope: Scope,
     declarations_by_reference: HashMap<String, String>,
@@ -63,13 +63,18 @@ impl SymbolTable {
         }
     }
 
+    pub fn get_declaration(&self, reference: &str) -> Option<&String> {
+        self.declarations_by_reference.get(reference)
+    }
+
     pub fn visit_expression(&mut self, expression: &Expression) -> Result<(), SymbolError> {
         match &expression.kind {
             ExpressionKind::Fn {
                 name,
+                return_val,
                 parameters,
                 body,
-            } => self.visit_fn(name, parameters, body),
+            } => self.visit_fn(name, parameters, body, return_val),
             ExpressionKind::Identifier { name } => self.visit_identifier(name),
             ExpressionKind::Invocation { name, arguments } => {
                 self.visit_invocation(name, arguments)
@@ -77,15 +82,7 @@ impl SymbolTable {
             ExpressionKind::LetBinding { name, right } => self.visit_let(name, right),
             ExpressionKind::Int { value } => self.visit_int(value),
             ExpressionKind::BinaryAdd { left, right } => self.visit_binary_add(left, right),
-            ExpressionKind::Program { body } => self.visit_program(body),
         }
-    }
-
-    fn visit_program(&mut self, body: &Vec<Expression>) -> Result<(), SymbolError> {
-        for exp in body {
-            self.visit_expression(exp)?;
-        }
-        Ok(())
     }
 
     fn enter_scope(&mut self, identifiers: &Vec<String>) {
@@ -120,12 +117,14 @@ impl SymbolTable {
         name: &str,
         parameters: &Vec<String>,
         body: &Vec<Expression>,
+        return_val: &Expression,
     ) -> Result<(), SymbolError> {
         self.scope.declare(name)?;
         self.enter_scope(parameters);
         for exp in body {
             self.visit_expression(exp)?;
         }
+        self.visit_expression(return_val)?;
         self.exit_scope()?;
         Ok(())
     }
@@ -185,7 +184,7 @@ mod tests {
     fn visit_ok() {
         let code = String::from("let a = 3; fn t(){ 3 + 4 }; t();");
         let tokens = Lexer::new(code).collect::<Vec<_>>();
-        let ast = Parser::new(tokens).parse_program().expect("Should work");
+        let ast = Parser::new(tokens).parse_expression().expect("Should work");
         let mut st = SymbolTable::new();
 
         let res = st.visit_expression(&ast);
@@ -196,7 +195,9 @@ mod tests {
     fn visit_fail() {
         let code = String::from("fn t() {}; f();");
         let tokens = Lexer::new(code).collect::<Vec<_>>();
-        let ast = Parser::new(tokens).parse_program().expect("Should work");
+        let ast = Parser::new(tokens)
+            .parse_program("visit_fail")
+            .expect("Should work");
         let mut st = SymbolTable::new();
 
         let res = st.visit_expression(&ast);
