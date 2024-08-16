@@ -22,6 +22,7 @@ pub enum RuntimeError {
 
 pub struct Interpreter {}
 
+#[derive(Debug)]
 pub struct EvaluationContext {
     pub symbol_table: SymbolTable,
     pub bindings: HashMap<String, Value>,
@@ -38,6 +39,8 @@ impl Interpreter {
         expression: &Expression,
         ctx: &mut EvaluationContext,
     ) -> Result<Value, RuntimeError> {
+        println!("{:?}", ctx);
+
         match &expression.kind {
             ExpressionKind::Fn {
                 name,
@@ -109,7 +112,6 @@ impl Interpreter {
 
         let mut bindings = ctx.bindings.clone();
 
-        // Map the evaluated arguments to the function parameters
         for (param, arg_value) in parameters.iter().zip(value_args.iter()) {
             bindings.insert(param.clone(), arg_value.clone());
         }
@@ -145,10 +147,12 @@ impl Interpreter {
 
     fn evaluate_let(
         &self,
-        _name: &str,
+        name: &str,
         right: &Expression,
         ctx: &mut EvaluationContext,
     ) -> Result<Value, RuntimeError> {
+        let value = self.evaluate_expression(right, ctx)?;
+        ctx.bindings.insert(name.to_string(), value);
         Ok(Value::Unit)
     }
 

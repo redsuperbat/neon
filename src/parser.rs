@@ -213,9 +213,7 @@ impl Parser {
     }
 
     fn parse_invokation(&mut self) -> Result<Expression, ParserError> {
-        let Token {
-            lexeme, start, end, ..
-        } = self.assert_next(TokenKind::Symbol)?;
+        let Token { lexeme, start, .. } = self.assert_next(TokenKind::Symbol)?;
 
         let mut arguments = vec![];
         self.assert_next(TokenKind::OpenParen)?;
@@ -233,6 +231,7 @@ impl Parser {
                 self.assert_next(TokenKind::Comma)?;
             }
         }
+        let Token { end, .. } = self.assert_next(TokenKind::ClosedParen)?;
 
         Ok(Expression {
             start,
