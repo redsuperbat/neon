@@ -53,6 +53,7 @@ impl ProgramError {
                 RuntimeError::UndefinedReference => println!("Undefined reference"),
                 RuntimeError::UninitializedVariable => println!("Uninitialized variable"),
                 RuntimeError::IllegalInvocation => println!("Illegal invocation"),
+                _ => println!("{:?}", e),
             },
             ProgramError::SymbolError(e) => match e {
                 SymbolError::ExitGlobal => {
@@ -64,6 +65,7 @@ impl ProgramError {
                 SymbolError::ReDeclaration { name } => {
                     println!("Cannot redeclare symbol {name} in current scope")
                 }
+                _ => println!("{:?}", e),
             },
         }
     }
@@ -92,24 +94,37 @@ fn execute_program(name: Option<String>, source: &str) -> Result<Value, ProgramE
     println!("{:#?}", ast);
 
     let mut symbol_table = SymbolTable::new();
+    let callee = Expression {
+        end: (0, 0),
+        start: (0, 0),
+        kind: ExpressionKind::Identifier { name: program_name },
+    };
+
     symbol_table
         .visit_expression(&ast)
         .map_err(|e| ProgramError::SymbolError(e))?;
+
+    symbol_table
+        .visit_expression(&callee)
+        .map_err(|e| ProgramError::SymbolError(e))?;
+
     let mut ctx = EvaluationContext {
         symbol_table,
         bindings: HashMap::new(),
         call_stack: vec![],
     };
+
     interpreter
         .evaluate_expression(&ast, &mut ctx)
         .expect("Should evaluate to a function expression properly");
+
     interpreter
         .evaluate_expression(
             &Expression {
                 start: (0, 0),
                 end: (0, 0),
                 kind: ExpressionKind::Invocation {
-                    name: program_name,
+                    callee: Box::new(callee),
                     arguments: vec![],
                 },
             },

@@ -31,7 +31,7 @@ pub enum ExpressionKind {
     },
 
     Invocation {
-        name: String,
+        callee: Box<Expression>,
         arguments: Vec<Expression>,
     },
 
@@ -81,6 +81,8 @@ pub enum ParserError {
 
     UnexpectedEndOfBlock,
 
+    UnexpectedEndOfProgram,
+
     UnexpectedEndOfFile,
 
     UnexpectedToken {
@@ -100,6 +102,7 @@ impl ParserError {
 
 impl Parser {
     pub fn new(tokens: Vec<Token>) -> Parser {
+        println!("{:#?}", tokens);
         Parser {
             tokens: tokens
                 .into_iter()
@@ -115,7 +118,7 @@ impl Parser {
     }
 
     pub fn parse_block(&mut self) -> Result<Expression, ParserError> {
-        self.assert_next(TokenKind::OpenCurlyBrace)?;
+        let Token { start, .. } = self.assert_next(TokenKind::OpenCurlyBrace)?;
         let mut body = vec![];
         let mut return_val = None;
 
@@ -135,11 +138,11 @@ impl Parser {
             return Err(ParserError::UnexpectedEndOfBlock);
         };
 
-        self.assert_next(TokenKind::ClosedCurlyBrace)?;
+        let Token { end, .. } = self.assert_next(TokenKind::ClosedCurlyBrace)?;
 
         Ok(Expression {
-            start: body.first().unwrap_or(&return_val).start,
-            end: return_val.end,
+            start,
+            end,
             kind: ExpressionKind::Block {
                 return_val: Box::new(return_val),
                 body,
@@ -164,7 +167,7 @@ impl Parser {
         }
 
         let Some(return_val) = return_val else {
-            return Err(ParserError::UnexpectedEndOfExpression);
+            return Err(ParserError::UnexpectedEndOfProgram);
         };
 
         let block = Box::new(Expression {
@@ -226,6 +229,17 @@ impl Parser {
         };
 
         match next.kind {
+            TokenKind::OpenParen => {
+                expression = Expression {
+                    start: expression.start,
+                    end: expression.end,
+                    kind: ExpressionKind::Invocation {
+                        callee: Box::from(expression),
+                        arguments: self.parse_arguments()?,
+                    },
+                };
+                Ok(expression)
+            }
             TokenKind::PlusOperator => {
                 self.assert_next(TokenKind::PlusOperator)?;
                 expression = Expression {
@@ -303,17 +317,7 @@ impl Parser {
             TokenKind::IntegerLiteral => self.parse_integer(),
             TokenKind::IfKeyword => self.parse_if(),
             TokenKind::LetKeyword => self.parse_let(),
-            TokenKind::Symbol => {
-                let Some(token) = self.peek_at_offset(1) else {
-                    return self.parse_identifier();
-                };
-
-                if token.kind == TokenKind::OpenParen {
-                    return self.parse_invokation();
-                };
-
-                self.parse_identifier()
-            }
+            TokenKind::Symbol => self.parse_identifier(),
             _ => ParserError::new(
                 vec![
                     TokenKind::FnKeyword,
@@ -350,10 +354,9 @@ impl Parser {
         })
     }
 
-    fn parse_invokation(&mut self) -> Result<Expression, ParserError> {
-        let Token { lexeme, start, .. } = self.assert_next(TokenKind::Symbol)?;
-
+    fn parse_arguments(&mut self) -> Result<Vec<Expression>, ParserError> {
         let mut arguments = vec![];
+
         self.assert_next(TokenKind::OpenParen)?;
 
         loop {
@@ -369,16 +372,8 @@ impl Parser {
                 self.assert_next(TokenKind::Comma)?;
             }
         }
-        let Token { end, .. } = self.assert_next(TokenKind::ClosedParen)?;
-
-        Ok(Expression {
-            start,
-            end,
-            kind: ExpressionKind::Invocation {
-                name: lexeme,
-                arguments,
-            },
-        })
+        self.assert_next(TokenKind::ClosedParen)?;
+        return Ok(arguments);
     }
 
     fn parse_integer(&mut self) -> Result<Expression, ParserError> {

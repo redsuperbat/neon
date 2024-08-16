@@ -23,7 +23,7 @@ pub enum RuntimeError {
 
 pub struct Interpreter {}
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct EvaluationContext {
     pub symbol_table: SymbolTable,
     pub bindings: HashMap<String, Value>,
@@ -47,8 +47,8 @@ impl Interpreter {
                 body: block,
             } => self.evaluate_fn(name, parameters, block, ctx),
             ExpressionKind::Identifier { name } => self.evaluate_identifier(name, ctx),
-            ExpressionKind::Invocation { name, arguments } => {
-                self.evaluate_invocation(name, arguments, ctx)
+            ExpressionKind::Invocation { callee, arguments } => {
+                self.evaluate_invocation(callee, arguments, ctx)
             }
             ExpressionKind::LetBinding { name, right } => self.evaluate_let(name, right, ctx),
             ExpressionKind::Int { value } => self.evaluate_int(value),
@@ -190,15 +190,13 @@ impl Interpreter {
 
     fn evaluate_invocation(
         &self,
-        callee: &str,
+        callee: &Expression,
         arguments: &Vec<Expression>,
         ctx: &mut EvaluationContext,
     ) -> Result<Value, RuntimeError> {
-        let value = ctx
-            .bindings
-            .get(callee)
-            .ok_or(RuntimeError::UninitializedVariable)
-            .map(|c| c.clone())?;
+        println!("{:#?}", callee);
+        println!("{:#?}", ctx);
+        let value = self.evaluate_expression(callee, ctx)?;
 
         let Value::Fn { function } = value else {
             return Err(RuntimeError::IllegalInvocation);
@@ -219,19 +217,13 @@ impl Interpreter {
             value_args.push(self.evaluate_expression(arg, ctx)?);
         }
 
-        let mut bindings = ctx.bindings.clone();
+        let mut func_ctx = ctx.clone();
 
         for (param, arg_value) in parameters.iter().zip(value_args.iter()) {
-            bindings.insert(param.clone(), arg_value.clone());
+            func_ctx.bindings.insert(param.clone(), arg_value.clone());
         }
 
-        let mut function_ctx = EvaluationContext {
-            bindings,
-            call_stack: ctx.call_stack.clone(),
-            symbol_table: ctx.symbol_table.clone(),
-        };
-
-        self.evaluate_expression(&block, &mut function_ctx)
+        self.evaluate_expression(&block, &mut func_ctx)
     }
 
     fn evaluate_identifier(

@@ -75,8 +75,8 @@ impl SymbolTable {
                 body,
             } => self.visit_fn(name, parameters, body),
             ExpressionKind::Identifier { name } => self.visit_identifier(name),
-            ExpressionKind::Invocation { name, arguments } => {
-                self.visit_invocation(name, arguments)
+            ExpressionKind::Invocation { callee, arguments } => {
+                self.visit_invocation(callee, arguments)
             }
             ExpressionKind::LetBinding { name, right } => self.visit_let(name, right),
             ExpressionKind::Int { value } => self.visit_int(value),
@@ -160,10 +160,10 @@ impl SymbolTable {
 
     fn visit_invocation(
         &mut self,
-        name: &str,
+        callee: &Expression,
         arguments: &Vec<Expression>,
     ) -> Result<(), SymbolError> {
-        self.visit_identifier(name)?;
+        self.visit_expression(callee)?;
         for arg in arguments {
             self.visit_expression(arg)?;
         }
