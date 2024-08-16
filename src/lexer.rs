@@ -18,8 +18,10 @@ pub struct Token {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum TokenKind {
-    FnKeyword,  // fn
-    LetKeyword, // let
+    FnKeyword,   // fn
+    LetKeyword,  // let
+    IfKeyword,   // if
+    ElseKeyword, // else
 
     EqualsOperator, // =
     PlusOperator,   // +
@@ -58,6 +60,8 @@ impl ToString for TokenKind {
             TokenKind::Symbol => "symbol",
             TokenKind::WhiteSpace => "whitespace",
             TokenKind::Unknown => "unknown",
+            TokenKind::IfKeyword => "if",
+            TokenKind::ElseKeyword => "else",
         };
         s.to_string()
     }
@@ -196,6 +200,9 @@ impl Lexer {
         let kind = match lexeme.as_str() {
             "let" => TokenKind::LetKeyword,
             "fn" => TokenKind::FnKeyword,
+            "if" => TokenKind::IfKeyword,
+            "else" => TokenKind::ElseKeyword,
+
             _ => TokenKind::Symbol,
         };
         Some(Token {
