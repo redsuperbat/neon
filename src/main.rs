@@ -89,7 +89,7 @@ fn execute_program(name: Option<String>, source: &str) -> Result<Value, ProgramE
         .parse_program(&program_name)
         .map_err(|e| ProgramError::ParserError(e))?;
 
-    println!("{:?}", ast);
+    println!("{:#?}", ast);
 
     let mut symbol_table = SymbolTable::new();
     symbol_table

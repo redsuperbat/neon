@@ -18,7 +18,7 @@ pub enum ExpressionKind {
     Fn {
         name: String,
         parameters: Vec<String>,
-        block: Box<Expression>,
+        body: Box<Expression>,
     },
 
     Block {
@@ -42,7 +42,8 @@ pub enum ExpressionKind {
 
     If {
         predicate: Box<Expression>,
-        block: Box<Expression>,
+        if_block: Box<Expression>,
+        else_block: Box<Option<Expression>>,
     },
 
     Int {
@@ -175,7 +176,7 @@ impl Parser {
             kind: ExpressionKind::Fn {
                 parameters: vec![],
                 name: name.to_string(),
-                block,
+                body: block,
             },
         })
     }
@@ -312,14 +313,21 @@ impl Parser {
         let Token { start, .. } = self.assert_next(TokenKind::IfKeyword)?;
         let predicate = self.parse_expression()?;
 
-        let block = self.parse_block()?;
+        let if_block = self.parse_block()?;
+        let mut else_block = None;
+
+        if self.next_is(TokenKind::ElseKeyword) {
+            self.assert_next(TokenKind::ElseKeyword)?;
+            else_block = Some(self.parse_block()?);
+        }
 
         Ok(Expression {
             start,
-            end: block.end,
+            end: if_block.end,
             kind: ExpressionKind::If {
                 predicate: Box::new(predicate),
-                block: Box::from(block),
+                if_block: Box::from(if_block),
+                else_block: Box::from(else_block),
             },
         })
     }
@@ -423,7 +431,7 @@ impl Parser {
             kind: ExpressionKind::Fn {
                 name: name.lexeme,
                 parameters,
-                block: Box::from(block),
+                body: Box::from(block),
             },
         })
     }

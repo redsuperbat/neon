@@ -44,7 +44,7 @@ impl Interpreter {
             ExpressionKind::Fn {
                 name,
                 parameters,
-                block,
+                body: block,
             } => self.evaluate_fn(name, parameters, block, ctx),
             ExpressionKind::Identifier { name } => self.evaluate_identifier(name, ctx),
             ExpressionKind::Invocation { name, arguments } => {
@@ -56,7 +56,11 @@ impl Interpreter {
             ExpressionKind::Block { body, return_val } => {
                 self.evaluate_block(body, return_val, ctx)
             }
-            ExpressionKind::If { block, predicate } => self.evaluate_if(block, predicate, ctx),
+            ExpressionKind::If {
+                predicate,
+                if_block,
+                else_block,
+            } => self.evaluate_if(predicate, if_block, else_block, ctx),
             ExpressionKind::BinaryNe { left, right } => self.evaluate_binary_ne(left, right, ctx),
             ExpressionKind::BinaryEq { left, right } => self.evaluate_binary_eq(left, right, ctx),
         }
@@ -110,19 +114,25 @@ impl Interpreter {
 
     fn evaluate_if(
         &self,
-        block: &Expression,
         predicate: &Expression,
+        if_block: &Expression,
+        else_block: &Option<Expression>,
         ctx: &mut EvaluationContext,
     ) -> Result<Value, RuntimeError> {
         let value = self.evaluate_expression(predicate, ctx)?;
         let Value::Bool { value } = value else {
             return Err(RuntimeError::TypeError);
         };
+
         if value {
-            self.evaluate_expression(block, ctx)
-        } else {
-            Ok(Value::Unit)
-        }
+            return self.evaluate_expression(if_block, ctx);
+        };
+
+        if let Some(else_block) = else_block {
+            return self.evaluate_expression(else_block, ctx);
+        };
+
+        Ok(Value::Unit)
     }
 
     fn evaluate_block(
@@ -148,7 +158,7 @@ impl Interpreter {
             function: ExpressionKind::Fn {
                 name: name.to_string(),
                 parameters: parameters.clone(),
-                block: Box::new(block.clone()),
+                body: Box::new(block.clone()),
             },
         };
         ctx.bindings.insert(name.to_string(), value.clone());
@@ -172,7 +182,9 @@ impl Interpreter {
         };
 
         let ExpressionKind::Fn {
-            parameters, block, ..
+            parameters,
+            body: block,
+            ..
         } = function
         else {
             return Err(RuntimeError::TypeError);
@@ -213,6 +225,7 @@ impl Interpreter {
             .bindings
             .get(declaration)
             .ok_or(RuntimeError::UninitializedVariable)?;
+        println!("eval symbol {declaration} {:?}", value);
 
         return Ok(value.clone());
     }

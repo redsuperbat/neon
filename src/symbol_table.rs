@@ -72,8 +72,8 @@ impl SymbolTable {
             ExpressionKind::Fn {
                 name,
                 parameters,
-                block,
-            } => self.visit_fn(name, parameters, block),
+                body,
+            } => self.visit_fn(name, parameters, body),
             ExpressionKind::Identifier { name } => self.visit_identifier(name),
             ExpressionKind::Invocation { name, arguments } => {
                 self.visit_invocation(name, arguments)
@@ -82,15 +82,28 @@ impl SymbolTable {
             ExpressionKind::Int { value } => self.visit_int(value),
             ExpressionKind::BinaryAdd { left, right } => self.visit_binary(left, right),
             ExpressionKind::Block { body, return_val } => self.visit_block(body, return_val),
-            ExpressionKind::If { predicate, block } => self.visit_if(predicate, block),
+            ExpressionKind::If {
+                predicate,
+                if_block,
+                else_block,
+            } => self.visit_if(predicate, if_block, else_block),
             ExpressionKind::BinaryNe { left, right } => self.visit_binary(left, right),
             ExpressionKind::BinaryEq { left, right } => self.visit_binary(left, right),
         }
     }
 
-    fn visit_if(&mut self, predicate: &Expression, block: &Expression) -> Result<(), SymbolError> {
+    fn visit_if(
+        &mut self,
+        predicate: &Expression,
+        if_block: &Expression,
+        else_block: &Option<Expression>,
+    ) -> Result<(), SymbolError> {
         self.visit_expression(predicate)?;
-        self.visit_expression(block)
+        self.visit_expression(if_block)?;
+        if let Some(else_block) = else_block {
+            self.visit_expression(else_block)?;
+        };
+        Ok(())
     }
 
     fn enter_scope(&mut self, identifiers: &Vec<String>) {
