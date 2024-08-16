@@ -31,8 +31,8 @@ impl ProgramError {
             ProgramError::ParserError(e) => match e {
                 ParserError::InvalidInteger { lexeme } => println!("invalid integer {lexeme}"),
                 ParserError::UnexpectedEndOfFile => println!("Unexpected end of program"),
-                ParserError::UnexpectedEndOfFunction => {
-                    println!("Function did not end with expression")
+                ParserError::UnexpectedEndOfBlock => {
+                    println!("Block did not end with expression")
                 }
                 ParserError::UnexpectedToken { expected, found } => {
                     let expected = expected
@@ -45,6 +45,8 @@ impl ProgramError {
                         found.lexeme, found.start, found.end, expected
                     )
                 }
+                ParserError::UnexpectedEndOfExpression => println!("Unexpected end of expression"),
+                _ => println!("{:?}", e),
             },
             ProgramError::RuntimeError(e) => match e {
                 RuntimeError::TypeError => println!("Invalid type"),

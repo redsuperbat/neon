@@ -71,18 +71,26 @@ impl SymbolTable {
         match &expression.kind {
             ExpressionKind::Fn {
                 name,
-                return_val,
                 parameters,
-                body,
-            } => self.visit_fn(name, parameters, body, return_val),
+                block,
+            } => self.visit_fn(name, parameters, block),
             ExpressionKind::Identifier { name } => self.visit_identifier(name),
             ExpressionKind::Invocation { name, arguments } => {
                 self.visit_invocation(name, arguments)
             }
             ExpressionKind::LetBinding { name, right } => self.visit_let(name, right),
             ExpressionKind::Int { value } => self.visit_int(value),
-            ExpressionKind::BinaryAdd { left, right } => self.visit_binary_add(left, right),
+            ExpressionKind::BinaryAdd { left, right } => self.visit_binary(left, right),
+            ExpressionKind::Block { body, return_val } => self.visit_block(body, return_val),
+            ExpressionKind::If { predicate, block } => self.visit_if(predicate, block),
+            ExpressionKind::BinaryNe { left, right } => self.visit_binary(left, right),
+            ExpressionKind::BinaryEq { left, right } => self.visit_binary(left, right),
         }
+    }
+
+    fn visit_if(&mut self, predicate: &Expression, block: &Expression) -> Result<(), SymbolError> {
+        self.visit_expression(predicate)?;
+        self.visit_expression(block)
     }
 
     fn enter_scope(&mut self, identifiers: &Vec<String>) {
@@ -116,17 +124,24 @@ impl SymbolTable {
         &mut self,
         name: &str,
         parameters: &Vec<String>,
-        body: &Vec<Expression>,
-        return_val: &Expression,
+        block: &Expression,
     ) -> Result<(), SymbolError> {
         self.scope.declare(name)?;
         self.enter_scope(parameters);
+        self.visit_expression(block)?;
+        self.exit_scope()?;
+        Ok(())
+    }
+
+    fn visit_block(
+        &mut self,
+        body: &Vec<Expression>,
+        return_val: &Expression,
+    ) -> Result<(), SymbolError> {
         for exp in body {
             self.visit_expression(exp)?;
         }
-        self.visit_expression(return_val)?;
-        self.exit_scope()?;
-        Ok(())
+        self.visit_expression(return_val)
     }
 
     fn visit_invocation(
@@ -163,11 +178,7 @@ impl SymbolTable {
         Ok(())
     }
 
-    fn visit_binary_add(
-        &mut self,
-        left: &Expression,
-        right: &Expression,
-    ) -> Result<(), SymbolError> {
+    fn visit_binary(&mut self, left: &Expression, right: &Expression) -> Result<(), SymbolError> {
         self.visit_expression(left)?;
         self.visit_expression(right)?;
         Ok(())

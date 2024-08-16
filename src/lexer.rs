@@ -2,7 +2,7 @@
 pub struct Lexer {
     text: String,
     col: usize,
-    row: usize,
+    line: usize,
     offset: usize,
 }
 
@@ -23,8 +23,10 @@ pub enum TokenKind {
     IfKeyword,   // if
     ElseKeyword, // else
 
-    EqualsOperator, // =
-    PlusOperator,   // +
+    Bang,   // !
+    Equals, // =
+
+    PlusOperator, // +
 
     OpenCurlyBrace,   // {
     ClosedCurlyBrace, // }
@@ -48,7 +50,8 @@ impl ToString for TokenKind {
             TokenKind::FnKeyword => "fn",
             TokenKind::LetKeyword => "let",
             TokenKind::SemiColon => ";",
-            TokenKind::EqualsOperator => "=",
+            TokenKind::Equals => "=",
+            TokenKind::Bang => "!",
             TokenKind::PlusOperator => "+",
             TokenKind::OpenCurlyBrace => "{",
             TokenKind::ClosedCurlyBrace => "}",
@@ -80,7 +83,7 @@ impl Lexer {
         return Lexer {
             text: text.as_ref().to_string(),
             col: 1,
-            row: 1,
+            line: 1,
             offset: 0,
         };
     }
@@ -90,18 +93,22 @@ impl Lexer {
     }
 
     fn get_pos(&self) -> Pos {
-        (self.row, self.col)
+        (self.line, self.col)
     }
 
     fn next_token(&mut self) -> Option<Token> {
         let next_char = self.peek()?;
 
         match next_char {
-            '=' => self.single_char(TokenKind::EqualsOperator),
+            '=' => self.single_char(TokenKind::Equals),
             '+' => self.single_char(TokenKind::PlusOperator),
+            '!' => self.single_char(TokenKind::Bang),
+
             ';' => self.single_char(TokenKind::SemiColon),
+
             '{' => self.single_char(TokenKind::OpenCurlyBrace),
             '}' => self.single_char(TokenKind::ClosedCurlyBrace),
+
             '(' => self.single_char(TokenKind::OpenParen),
             ')' => self.single_char(TokenKind::ClosedParen),
             ',' => self.single_char(TokenKind::Comma),
@@ -124,7 +131,7 @@ impl Lexer {
 
         if char == '\n' {
             self.col = 1;
-            self.row += 1;
+            self.line += 1;
         }
         self.offset += 1;
 
@@ -133,11 +140,13 @@ impl Lexer {
 
     fn integer_literal(&mut self) -> Option<Token> {
         let start = self.get_pos();
-        let mut lexeme = String::new();
-        while ('0'..='9').contains(&self.peek()?) {
+        let mut lexeme = self.next()?.to_string();
+
+        while self.peek().is_some() && ('0'..='9').contains(&self.peek()?) {
             let next = self.next()?.to_string();
             lexeme += &next
         }
+
         let end = self.get_pos();
         Some(Token {
             start,
@@ -222,6 +231,16 @@ mod tests {
         Lexer::new(code).collect::<Vec<_>>()
     }
 
+    fn assert_tokens(code: &str, tokens: Vec<TokenKind>) {
+        let lexed = Lexer::new(code).collect::<Vec<_>>();
+        for (i, expected) in tokens.iter().enumerate() {
+            let got = lexed
+                .get(i)
+                .expect(&format!("Should find token {:?}", expected));
+            assert_eq!(got.kind, *expected)
+        }
+    }
+
     #[test]
     fn lexing() {
         let tokens = lex("fn test() {3}");
@@ -229,6 +248,30 @@ mod tests {
         let tokens = lex("a");
         assert_eq!(tokens.len(), 1);
         let tokens = lex("fn test() {3}; test(); let a = 123");
-        assert_eq!(tokens.len(), 22);
+        assert_eq!(tokens.len(), 23);
+        assert_tokens(
+            "if let else fn",
+            vec![
+                TokenKind::IfKeyword,
+                TokenKind::WhiteSpace,
+                TokenKind::LetKeyword,
+                TokenKind::WhiteSpace,
+                TokenKind::ElseKeyword,
+                TokenKind::WhiteSpace,
+                TokenKind::FnKeyword,
+            ],
+        );
+
+        assert_tokens(
+            "15 == 9",
+            vec![
+                TokenKind::IntegerLiteral,
+                TokenKind::WhiteSpace,
+                TokenKind::Equals,
+                TokenKind::Equals,
+                TokenKind::WhiteSpace,
+                TokenKind::IntegerLiteral,
+            ],
+        );
     }
 }

@@ -18,6 +18,10 @@ pub enum ExpressionKind {
     Fn {
         name: String,
         parameters: Vec<String>,
+        block: Box<Expression>,
+    },
+
+    Block {
         body: Vec<Expression>,
         return_val: Box<Expression>,
     },
@@ -36,11 +40,25 @@ pub enum ExpressionKind {
         right: Box<Expression>,
     },
 
+    If {
+        predicate: Box<Expression>,
+        block: Box<Expression>,
+    },
+
     Int {
         value: i64,
     },
 
     BinaryAdd {
+        left: Box<Expression>,
+        right: Box<Expression>,
+    },
+
+    BinaryNe {
+        left: Box<Expression>,
+        right: Box<Expression>,
+    },
+    BinaryEq {
         left: Box<Expression>,
         right: Box<Expression>,
     },
@@ -52,7 +70,9 @@ pub enum ParserError {
         lexeme: String,
     },
 
-    UnexpectedEndOfFunction,
+    UnexpectedEndOfExpression,
+
+    UnexpectedEndOfBlock,
 
     UnexpectedEndOfFile,
 
@@ -87,6 +107,39 @@ impl Parser {
             .ok_or(ParserError::UnexpectedEndOfFile)
     }
 
+    pub fn parse_block(&mut self) -> Result<Expression, ParserError> {
+        self.assert_next(TokenKind::OpenCurlyBrace)?;
+        let mut body = vec![];
+        let mut return_val = None;
+
+        loop {
+            let expression = self.parse_expression()?;
+
+            if self.next_is(TokenKind::ClosedCurlyBrace) {
+                return_val = Some(expression);
+                break;
+            } else {
+                body.push(expression);
+                self.assert_next(TokenKind::SemiColon)?;
+            }
+        }
+
+        let Some(return_val) = return_val else {
+            return Err(ParserError::UnexpectedEndOfBlock);
+        };
+
+        self.assert_next(TokenKind::ClosedCurlyBrace)?;
+
+        Ok(Expression {
+            start: body.first().unwrap_or(&return_val).start,
+            end: return_val.end,
+            kind: ExpressionKind::Block {
+                return_val: Box::new(return_val),
+                body,
+            },
+        })
+    }
+
     pub fn parse_program(&mut self, name: &str) -> Result<Expression, ParserError> {
         let mut expressions = vec![];
         let mut return_val = None;
@@ -104,17 +157,25 @@ impl Parser {
         }
 
         let Some(return_val) = return_val else {
-            return Err(ParserError::UnexpectedEndOfFunction);
+            return Err(ParserError::UnexpectedEndOfExpression);
         };
 
-        Ok(Expression {
+        let block = Box::new(Expression {
             start: expressions.first().unwrap_or(&return_val).start,
             end: return_val.end,
-            kind: ExpressionKind::Fn {
+            kind: ExpressionKind::Block {
                 body: expressions,
+                return_val: Box::new(return_val),
+            },
+        });
+
+        Ok(Expression {
+            start: block.start,
+            end: block.end,
+            kind: ExpressionKind::Fn {
                 parameters: vec![],
                 name: name.to_string(),
-                return_val: Box::new(return_val),
+                block,
             },
         })
     }
@@ -143,6 +204,13 @@ impl Parser {
         }
     }
 
+    fn at_offet_is(&self, offset: usize, kind: TokenKind) -> bool {
+        match self.peek_at_offset(offset) {
+            Some(token) => token.kind == kind,
+            None => false,
+        }
+    }
+
     pub fn parse_expression(&mut self) -> Result<Expression, ParserError> {
         let mut expression = self.parse_leaf_expression()?;
 
@@ -161,7 +229,37 @@ impl Parser {
                         right: Box::from(self.parse_expression()?),
                     },
                 };
-                return Ok(expression);
+                Ok(expression)
+            }
+            TokenKind::Bang => {
+                self.assert_next(TokenKind::Bang)?;
+                self.assert_next(TokenKind::Equals)?;
+                expression = Expression {
+                    start: expression.start,
+                    end: expression.end,
+                    kind: ExpressionKind::BinaryNe {
+                        left: Box::from(expression),
+                        right: Box::from(self.parse_expression()?),
+                    },
+                };
+                Ok(expression)
+            }
+            TokenKind::Equals => {
+                if self.at_offet_is(1, TokenKind::Equals) {
+                    self.assert_next(TokenKind::Equals)?;
+                    self.assert_next(TokenKind::Equals)?;
+                    expression = Expression {
+                        start: expression.start,
+                        end: expression.end,
+                        kind: ExpressionKind::BinaryEq {
+                            left: Box::from(expression),
+                            right: Box::from(self.parse_expression()?),
+                        },
+                    };
+                    Ok(expression)
+                } else {
+                    Ok(expression)
+                }
             }
             _ => Ok(expression),
         }
@@ -184,11 +282,8 @@ impl Parser {
         match next.kind {
             TokenKind::FnKeyword => self.parse_fn(),
             TokenKind::IntegerLiteral => self.parse_integer(),
+            TokenKind::IfKeyword => self.parse_if(),
             TokenKind::LetKeyword => self.parse_let(),
-            TokenKind::SemiColon => {
-                self.next()?;
-                self.parse_expression()
-            }
             TokenKind::Symbol => {
                 let Some(token) = self.peek_at_offset(1) else {
                     return self.parse_identifier();
@@ -202,14 +297,31 @@ impl Parser {
             }
             _ => ParserError::new(
                 vec![
-                    TokenKind::LetKeyword,
                     TokenKind::FnKeyword,
                     TokenKind::IntegerLiteral,
+                    TokenKind::IfKeyword,
+                    TokenKind::LetKeyword,
                     TokenKind::Symbol,
                 ],
                 next,
             ),
         }
+    }
+
+    fn parse_if(&mut self) -> Result<Expression, ParserError> {
+        let Token { start, .. } = self.assert_next(TokenKind::IfKeyword)?;
+        let predicate = self.parse_expression()?;
+
+        let block = self.parse_block()?;
+
+        Ok(Expression {
+            start,
+            end: block.end,
+            kind: ExpressionKind::If {
+                predicate: Box::new(predicate),
+                block: Box::from(block),
+            },
+        })
     }
 
     fn parse_invokation(&mut self) -> Result<Expression, ParserError> {
@@ -262,7 +374,7 @@ impl Parser {
     fn parse_let(&mut self) -> Result<Expression, ParserError> {
         let Token { start, .. } = self.assert_next(TokenKind::LetKeyword)?;
         let Token { end, lexeme, .. } = self.assert_next(TokenKind::Symbol)?;
-        self.assert_next(TokenKind::EqualsOperator)?;
+        self.assert_next(TokenKind::Equals)?;
         let right = self.parse_expression().map(Box::new)?;
 
         Ok(Expression {
@@ -303,39 +415,15 @@ impl Parser {
         let name = self.assert_next(TokenKind::Symbol)?;
         let parameters = self.parse_parameters()?;
 
-        self.assert_next(TokenKind::OpenCurlyBrace)?;
-        let mut body = vec![];
-        let mut return_val = None;
-
-        loop {
-            if self.next_is(TokenKind::ClosedCurlyBrace) {
-                break;
-            }
-            let expression = self.parse_expression()?;
-
-            if self.next_is(TokenKind::ClosedCurlyBrace) {
-                return_val = Some(expression);
-                break;
-            } else {
-                body.push(expression);
-                self.assert_next(TokenKind::SemiColon)?;
-            }
-        }
-
-        let Some(return_val) = return_val else {
-            return Err(ParserError::UnexpectedEndOfFunction);
-        };
-
-        let Token { end, .. } = self.assert_next(TokenKind::ClosedCurlyBrace)?;
+        let block = self.parse_block()?;
 
         Ok(Expression {
             start,
-            end,
+            end: block.end,
             kind: ExpressionKind::Fn {
                 name: name.lexeme,
                 parameters,
-                body,
-                return_val: Box::new(return_val),
+                block: Box::from(block),
             },
         })
     }
@@ -350,25 +438,22 @@ mod tests {
         let tokens = Lexer::new(str).collect::<Vec<_>>();
         Parser::new(tokens)
             .parse_program("test")
-            .expect("Should work")
+            .expect(&format!("{str}"))
     }
 
     #[test]
     fn parsing() {
-        let ast = parse(
-            "
-let a = 3;
-let b = 4;
-fn test() {
-a + b
-}",
-        );
+        let ast = parse("let a = 3; let b = 4; fn test() { a + b }");
         assert!(matches!(ast.kind, ExpressionKind::Fn { .. }));
-        let ast = parse("let a = 3; fn t() { 3 + 4 }; t();");
+        let ast = parse("let a = 3; fn t() { 3 + 4 }; t()");
         assert!(matches!(ast.kind, ExpressionKind::Fn { .. }));
         let ast = parse("let a = 4; let b = a + a; fn test() { b + b }");
         assert!(matches!(ast.kind, ExpressionKind::Fn { .. }));
         let ast = parse("a");
+        assert!(matches!(ast.kind, ExpressionKind::Fn { .. }));
+        let ast = parse("3 == 3");
+        assert!(matches!(ast.kind, ExpressionKind::Fn { .. }));
+        let ast = parse("3 != 3");
         assert!(matches!(ast.kind, ExpressionKind::Fn { .. }));
     }
 
