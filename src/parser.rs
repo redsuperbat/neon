@@ -55,10 +55,16 @@ pub enum ExpressionKind {
         right: Box<Expression>,
     },
 
+    BinarySubtract {
+        left: Box<Expression>,
+        right: Box<Expression>,
+    },
+
     BinaryNe {
         left: Box<Expression>,
         right: Box<Expression>,
     },
+
     BinaryEq {
         left: Box<Expression>,
         right: Box<Expression>,
@@ -226,6 +232,18 @@ impl Parser {
                     start: expression.start,
                     end: expression.end,
                     kind: ExpressionKind::BinaryAdd {
+                        left: Box::from(expression),
+                        right: Box::from(self.parse_expression()?),
+                    },
+                };
+                Ok(expression)
+            }
+            TokenKind::MinusOperator => {
+                self.assert_next(TokenKind::MinusOperator)?;
+                expression = Expression {
+                    start: expression.start,
+                    end: expression.end,
+                    kind: ExpressionKind::BinarySubtract {
                         left: Box::from(expression),
                         right: Box::from(self.parse_expression()?),
                     },

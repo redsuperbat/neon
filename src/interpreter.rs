@@ -63,7 +63,30 @@ impl Interpreter {
             } => self.evaluate_if(predicate, if_block, else_block, ctx),
             ExpressionKind::BinaryNe { left, right } => self.evaluate_binary_ne(left, right, ctx),
             ExpressionKind::BinaryEq { left, right } => self.evaluate_binary_eq(left, right, ctx),
+            ExpressionKind::BinarySubtract { left, right } => {
+                self.evaluate_binary_subtract(left, right, ctx)
+            }
         }
+    }
+
+    fn evaluate_binary_subtract(
+        &self,
+        left: &Expression,
+        right: &Expression,
+        ctx: &mut EvaluationContext,
+    ) -> Result<Value, RuntimeError> {
+        let left = self.evaluate_expression(left, ctx)?;
+        let right = self.evaluate_expression(right, ctx)?;
+
+        let result = match left {
+            Value::Int { value: l } => match right {
+                Value::Int { value: r } => l - r,
+                _ => return Err(RuntimeError::TypeError),
+            },
+            _ => return Err(RuntimeError::TypeError),
+        };
+
+        Ok(Value::Int { value: result })
     }
 
     fn evaluate_binary_ne(
@@ -225,7 +248,6 @@ impl Interpreter {
             .bindings
             .get(declaration)
             .ok_or(RuntimeError::UninitializedVariable)?;
-        println!("eval symbol {declaration} {:?}", value);
 
         return Ok(value.clone());
     }

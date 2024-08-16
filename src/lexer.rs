@@ -26,7 +26,8 @@ pub enum TokenKind {
     Bang,   // !
     Equals, // =
 
-    PlusOperator, // +
+    PlusOperator,  // +
+    MinusOperator, // -
 
     OpenCurlyBrace,   // {
     ClosedCurlyBrace, // }
@@ -49,6 +50,7 @@ impl ToString for TokenKind {
         let s = match self {
             TokenKind::FnKeyword => "fn",
             TokenKind::LetKeyword => "let",
+            TokenKind::MinusOperator => "-",
             TokenKind::SemiColon => ";",
             TokenKind::Equals => "=",
             TokenKind::Bang => "!",
@@ -102,6 +104,7 @@ impl Lexer {
         match next_char {
             '=' => self.single_char(TokenKind::Equals),
             '+' => self.single_char(TokenKind::PlusOperator),
+            '-' => self.single_char(TokenKind::MinusOperator),
             '!' => self.single_char(TokenKind::Bang),
 
             ';' => self.single_char(TokenKind::SemiColon),

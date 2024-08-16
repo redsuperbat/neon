@@ -89,6 +89,7 @@ impl SymbolTable {
             } => self.visit_if(predicate, if_block, else_block),
             ExpressionKind::BinaryNe { left, right } => self.visit_binary(left, right),
             ExpressionKind::BinaryEq { left, right } => self.visit_binary(left, right),
+            ExpressionKind::BinarySubtract { left, right } => self.visit_binary(left, right),
         }
     }
 
