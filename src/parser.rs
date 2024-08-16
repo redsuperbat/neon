@@ -50,6 +50,10 @@ pub enum ExpressionKind {
         value: i64,
     },
 
+    Bool {
+        value: bool,
+    },
+
     BinaryAdd {
         left: Box<Expression>,
         right: Box<Expression>,
@@ -77,8 +81,6 @@ pub enum ParserError {
         lexeme: String,
     },
 
-    UnexpectedEndOfExpression,
-
     UnexpectedEndOfBlock,
 
     UnexpectedEndOfProgram,
@@ -102,7 +104,6 @@ impl ParserError {
 
 impl Parser {
     pub fn new(tokens: Vec<Token>) -> Parser {
-        println!("{:#?}", tokens);
         Parser {
             tokens: tokens
                 .into_iter()
@@ -120,7 +121,7 @@ impl Parser {
     pub fn parse_block(&mut self) -> Result<Expression, ParserError> {
         let Token { start, .. } = self.assert_next(TokenKind::OpenCurlyBrace)?;
         let mut body = vec![];
-        let mut return_val = None;
+        let return_val;
 
         loop {
             let expression = self.parse_expression()?;
@@ -150,9 +151,9 @@ impl Parser {
         })
     }
 
-    pub fn parse_program(&mut self, name: &str) -> Result<Expression, ParserError> {
+    pub fn parse_program(&mut self) -> Result<Expression, ParserError> {
         let mut expressions = vec![];
-        let mut return_val = None;
+        let return_val;
 
         loop {
             let expression = self.parse_expression()?;
@@ -170,22 +171,12 @@ impl Parser {
             return Err(ParserError::UnexpectedEndOfProgram);
         };
 
-        let block = Box::new(Expression {
+        Ok(Expression {
             start: expressions.first().unwrap_or(&return_val).start,
             end: return_val.end,
             kind: ExpressionKind::Block {
                 body: expressions,
                 return_val: Box::new(return_val),
-            },
-        });
-
-        Ok(Expression {
-            start: block.start,
-            end: block.end,
-            kind: ExpressionKind::Fn {
-                parameters: vec![],
-                name: name.to_string(),
-                body: block,
             },
         })
     }
@@ -314,6 +305,8 @@ impl Parser {
 
         match next.kind {
             TokenKind::FnKeyword => self.parse_fn(),
+            TokenKind::FalseKeyword => self.parse_false_keyword(),
+            TokenKind::TrueKeyword => self.parse_true_keyword(),
             TokenKind::IntegerLiteral => self.parse_integer(),
             TokenKind::IfKeyword => self.parse_if(),
             TokenKind::LetKeyword => self.parse_let(),
@@ -329,6 +322,23 @@ impl Parser {
                 next,
             ),
         }
+    }
+
+    fn parse_true_keyword(&mut self) -> Result<Expression, ParserError> {
+        let Token { start, end, .. } = self.assert_next(TokenKind::TrueKeyword)?;
+        Ok(Expression {
+            kind: ExpressionKind::Bool { value: true },
+            start,
+            end,
+        })
+    }
+    fn parse_false_keyword(&mut self) -> Result<Expression, ParserError> {
+        let Token { start, end, .. } = self.assert_next(TokenKind::FalseKeyword)?;
+        Ok(Expression {
+            kind: ExpressionKind::Bool { value: false },
+            start,
+            end,
+        })
     }
 
     fn parse_if(&mut self) -> Result<Expression, ParserError> {
@@ -458,29 +468,29 @@ mod tests {
     fn parse(str: &str) -> Expression {
         let tokens = Lexer::new(str).collect::<Vec<_>>();
         Parser::new(tokens)
-            .parse_program("test")
+            .parse_program()
             .expect(&format!("{str}"))
     }
 
     #[test]
     fn parsing() {
         let ast = parse("let a = 3; let b = 4; fn test() { a + b }");
-        assert!(matches!(ast.kind, ExpressionKind::Fn { .. }));
+        assert!(matches!(ast.kind, ExpressionKind::Block { .. }));
         let ast = parse("let a = 3; fn t() { 3 + 4 }; t()");
-        assert!(matches!(ast.kind, ExpressionKind::Fn { .. }));
+        assert!(matches!(ast.kind, ExpressionKind::Block { .. }));
         let ast = parse("let a = 4; let b = a + a; fn test() { b + b }");
-        assert!(matches!(ast.kind, ExpressionKind::Fn { .. }));
+        assert!(matches!(ast.kind, ExpressionKind::Block { .. }));
         let ast = parse("a");
-        assert!(matches!(ast.kind, ExpressionKind::Fn { .. }));
+        assert!(matches!(ast.kind, ExpressionKind::Block { .. }));
         let ast = parse("3 == 3");
-        assert!(matches!(ast.kind, ExpressionKind::Fn { .. }));
+        assert!(matches!(ast.kind, ExpressionKind::Block { .. }));
         let ast = parse("3 != 3");
-        assert!(matches!(ast.kind, ExpressionKind::Fn { .. }));
+        assert!(matches!(ast.kind, ExpressionKind::Block { .. }));
     }
 
     #[test]
     fn single() {
         let ast = parse("let a = d");
-        assert!(matches!(ast.kind, ExpressionKind::Fn { .. }));
+        assert!(matches!(ast.kind, ExpressionKind::Block { .. }));
     }
 }

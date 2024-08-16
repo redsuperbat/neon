@@ -5,11 +5,10 @@ mod symbol_table;
 
 use interpreter::{EvaluationContext, Interpreter, RuntimeError, Value};
 use lexer::Lexer;
-use parser::{Expression, ExpressionKind, Parser, ParserError};
+use parser::{Parser, ParserError};
 use std::{
     collections::HashMap,
     env, fs,
-    hash::{DefaultHasher, Hash, Hasher},
     io::{self, BufRead, Write},
 };
 use symbol_table::{SymbolError, SymbolTable};
@@ -45,7 +44,6 @@ impl ProgramError {
                         found.lexeme, found.start, found.end, expected
                     )
                 }
-                ParserError::UnexpectedEndOfExpression => println!("Unexpected end of expression"),
                 _ => println!("{:?}", e),
             },
             ProgramError::RuntimeError(e) => match e {
@@ -71,41 +69,17 @@ impl ProgramError {
     }
 }
 
-fn program_name(name: Option<String>, source: &str) -> String {
-    if let Some(name) = name {
-        name
-    } else {
-        let mut hasher = DefaultHasher::new();
-        source.hash(&mut hasher);
-        hasher.finish().to_string()
-    }
-}
-
-fn execute_program(name: Option<String>, source: &str) -> Result<Value, ProgramError> {
-    let program_name = program_name(name, source);
-    println!("Program name {program_name}");
-
+fn execute_program(source: &str) -> Result<Value, ProgramError> {
     let tokens = Lexer::new(source).vec();
     let interpreter = Interpreter::new();
     let ast = Parser::new(tokens)
-        .parse_program(&program_name)
+        .parse_program()
         .map_err(|e| ProgramError::ParserError(e))?;
 
-    println!("{:#?}", ast);
-
     let mut symbol_table = SymbolTable::new();
-    let callee = Expression {
-        end: (0, 0),
-        start: (0, 0),
-        kind: ExpressionKind::Identifier { name: program_name },
-    };
 
     symbol_table
         .visit_expression(&ast)
-        .map_err(|e| ProgramError::SymbolError(e))?;
-
-    symbol_table
-        .visit_expression(&callee)
         .map_err(|e| ProgramError::SymbolError(e))?;
 
     let mut ctx = EvaluationContext {
@@ -116,20 +90,6 @@ fn execute_program(name: Option<String>, source: &str) -> Result<Value, ProgramE
 
     interpreter
         .evaluate_expression(&ast, &mut ctx)
-        .expect("Should evaluate to a function expression properly");
-
-    interpreter
-        .evaluate_expression(
-            &Expression {
-                start: (0, 0),
-                end: (0, 0),
-                kind: ExpressionKind::Invocation {
-                    callee: Box::new(callee),
-                    arguments: vec![],
-                },
-            },
-            &mut ctx,
-        )
         .map_err(|e| ProgramError::RuntimeError(e))
 }
 
@@ -140,7 +100,7 @@ fn repl() {
     for line in handle.lines() {
         let line = line.expect("Failed to read line") + "\n";
 
-        match execute_program(None, &line) {
+        match execute_program(&line) {
             Ok(result) => println!("{:?}", result),
             Err(e) => e.print(),
         }
@@ -152,7 +112,7 @@ fn repl() {
 fn file(path: &str) {
     let src = fs::read_to_string(path).expect("File not found");
     println!("{src}");
-    match execute_program(Some(path.to_string()), &src) {
+    match execute_program(&src) {
         Ok(result) => println!("{:?}", result),
         Err(e) => e.print(),
     }

@@ -66,6 +66,7 @@ impl Interpreter {
             ExpressionKind::BinarySubtract { left, right } => {
                 self.evaluate_binary_subtract(left, right, ctx)
             }
+            ExpressionKind::Bool { value } => Ok(Value::Bool { value: *value }),
         }
     }
 
@@ -194,8 +195,6 @@ impl Interpreter {
         arguments: &Vec<Expression>,
         ctx: &mut EvaluationContext,
     ) -> Result<Value, RuntimeError> {
-        println!("{:#?}", callee);
-        println!("{:#?}", ctx);
         let value = self.evaluate_expression(callee, ctx)?;
 
         let Value::Fn { function } = value else {
@@ -204,7 +203,8 @@ impl Interpreter {
 
         let ExpressionKind::Fn {
             parameters,
-            body: block,
+            body,
+            name,
             ..
         } = function
         else {
@@ -218,12 +218,15 @@ impl Interpreter {
         }
 
         let mut func_ctx = ctx.clone();
+        func_ctx.call_stack.push(name);
 
         for (param, arg_value) in parameters.iter().zip(value_args.iter()) {
             func_ctx.bindings.insert(param.clone(), arg_value.clone());
         }
 
-        self.evaluate_expression(&block, &mut func_ctx)
+        let result = self.evaluate_expression(&body, &mut func_ctx);
+        func_ctx.call_stack.pop();
+        result
     }
 
     fn evaluate_identifier(

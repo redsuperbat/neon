@@ -79,17 +79,20 @@ impl SymbolTable {
                 self.visit_invocation(callee, arguments)
             }
             ExpressionKind::LetBinding { name, right } => self.visit_let(name, right),
-            ExpressionKind::Int { value } => self.visit_int(value),
-            ExpressionKind::BinaryAdd { left, right } => self.visit_binary(left, right),
             ExpressionKind::Block { body, return_val } => self.visit_block(body, return_val),
             ExpressionKind::If {
                 predicate,
                 if_block,
                 else_block,
             } => self.visit_if(predicate, if_block, else_block),
+
+            ExpressionKind::BinaryAdd { left, right } => self.visit_binary(left, right),
             ExpressionKind::BinaryNe { left, right } => self.visit_binary(left, right),
             ExpressionKind::BinaryEq { left, right } => self.visit_binary(left, right),
             ExpressionKind::BinarySubtract { left, right } => self.visit_binary(left, right),
+
+            ExpressionKind::Int { .. } => Ok(()),
+            ExpressionKind::Bool { .. } => Ok(()),
         }
     }
 
@@ -188,10 +191,6 @@ impl SymbolTable {
         Ok(())
     }
 
-    fn visit_int(&mut self, _value: &i64) -> Result<(), SymbolError> {
-        Ok(())
-    }
-
     fn visit_binary(&mut self, left: &Expression, right: &Expression) -> Result<(), SymbolError> {
         self.visit_expression(left)?;
         self.visit_expression(right)?;
@@ -220,9 +219,7 @@ mod tests {
     fn visit_fail() {
         let code = String::from("fn t() {}; f();");
         let tokens = Lexer::new(code).collect::<Vec<_>>();
-        let ast = Parser::new(tokens)
-            .parse_program("visit_fail")
-            .expect("Should work");
+        let ast = Parser::new(tokens).parse_program().expect("Should work");
         let mut st = SymbolTable::new();
 
         let res = st.visit_expression(&ast);
