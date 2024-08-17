@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "zx scripts/build.mjs",
+    "pages": "gh-pages publish -d dist",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -15,6 +16,7 @@
     "solid-js": "1.8.20"
   },
   "devDependencies": {
+    "gh-pages": "^6.1.1",
     "typescript": "5.5.3",
     "vite": "5.4.1",
     "vite-plugin-solid": "2.10.2",

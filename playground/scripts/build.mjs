@@ -1,4 +1,5 @@
-import { within, $, cd } from "zx";
+import { within, $, cd, fs } from "zx";
+import pages from "gh-pages";
 
 within(async () => {
   cd("../crates/neon_web");
@@ -6,4 +7,10 @@ within(async () => {
 });
 
 await $`tsc -b && vite build`;
-await $`mv dist ../docs`;
+
+await fs.stat("dist");
+await new Promise((res) =>
+  pages.publish("dist", () => {
+    res();
+  }),
+);
