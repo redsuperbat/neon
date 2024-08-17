@@ -1,4 +1,7 @@
-use crate::parser::{Expression, ExpressionKind};
+use crate::{
+    lexer::Pos,
+    parser::{Expression, ExpressionKind},
+};
 use std::{
     collections::{HashMap, HashSet},
     mem,
@@ -18,10 +21,14 @@ impl Scope {
         }
     }
 
-    pub fn declare(&mut self, id: &str) -> Result<(), SymbolError> {
+    pub fn declare(&mut self, id: &str, start: &Pos, end: &Pos) -> Result<(), SymbolError> {
         if self.has_identifier(id).is_some() {
-            return Err(SymbolError::ReDeclaration {
-                name: id.to_string(),
+            return Err(SymbolError {
+                start: start.clone(),
+                end: end.clone(),
+                kind: SymbolErrorKind::ReDeclaration {
+                    name: id.to_string(),
+                },
             });
         }
 
@@ -49,8 +56,20 @@ pub struct SymbolTable {
 }
 
 #[derive(Debug)]
-pub enum SymbolError {
-    ExitGlobal,
+pub struct SymbolError {
+    pub kind: SymbolErrorKind,
+    pub start: Pos,
+    pub end: Pos,
+}
+
+impl ToString for SymbolErrorKind {
+    fn to_string(&self) -> String {
+        format!("{:?}", self)
+    }
+}
+
+#[derive(Debug)]
+pub enum SymbolErrorKind {
     UndefinedReference { name: String },
     ReDeclaration { name: String },
 }
@@ -68,17 +87,18 @@ impl SymbolTable {
     }
 
     pub fn visit_expression(&mut self, expression: &Expression) -> Result<(), SymbolError> {
+        let Expression { start, end, .. } = &expression;
         match &expression.kind {
             ExpressionKind::Fn {
                 name,
                 parameters,
                 body,
-            } => self.visit_fn(name, parameters, body),
-            ExpressionKind::Identifier { name } => self.visit_identifier(name),
+            } => self.visit_fn(name, parameters, body, start, end),
+            ExpressionKind::Identifier { name } => self.visit_identifier(name, start, end),
             ExpressionKind::Invocation { callee, arguments } => {
                 self.visit_invocation(callee, arguments)
             }
-            ExpressionKind::LetBinding { name, right } => self.visit_let(name, right),
+            ExpressionKind::LetBinding { name, right } => self.visit_let(name, right, start, end),
             ExpressionKind::Block { body, return_val } => self.visit_block(body, return_val),
             ExpressionKind::If {
                 predicate,
@@ -133,7 +153,7 @@ impl SymbolTable {
                 self.scope = *current;
                 Ok(())
             }
-            None => Err(SymbolError::ExitGlobal),
+            None => panic!("Internal neon error"),
         }
     }
 
@@ -142,8 +162,10 @@ impl SymbolTable {
         name: &str,
         parameters: &Vec<String>,
         block: &Expression,
+        start: &Pos,
+        end: &Pos,
     ) -> Result<(), SymbolError> {
-        self.scope.declare(name)?;
+        self.scope.declare(name, start, end)?;
         self.enter_scope(parameters);
         self.visit_expression(block)?;
         self.exit_scope()?;
@@ -173,21 +195,31 @@ impl SymbolTable {
         Ok(())
     }
 
-    fn visit_identifier(&mut self, name: &str) -> Result<(), SymbolError> {
+    fn visit_identifier(&mut self, name: &str, start: &Pos, end: &Pos) -> Result<(), SymbolError> {
         if let Some(reference) = self.scope.has_identifier(name) {
             self.declarations_by_reference
                 .insert(name.to_string(), reference.to_string());
             Ok(())
         } else {
-            Err(SymbolError::UndefinedReference {
-                name: name.to_string(),
+            Err(SymbolError {
+                kind: SymbolErrorKind::UndefinedReference {
+                    name: name.to_string(),
+                },
+                start: start.clone(),
+                end: end.clone(),
             })
         }
     }
 
-    fn visit_let(&mut self, name: &str, right: &Expression) -> Result<(), SymbolError> {
+    fn visit_let(
+        &mut self,
+        name: &str,
+        right: &Expression,
+        start: &Pos,
+        end: &Pos,
+    ) -> Result<(), SymbolError> {
         self.visit_expression(right)?;
-        self.scope.declare(name)?;
+        self.scope.declare(name, start, end)?;
         Ok(())
     }
 
@@ -217,7 +249,7 @@ mod tests {
 
     #[test]
     fn visit_fail() {
-        let code = String::from("fn t() {}; f();");
+        let code = String::from("fn t() {5}; f()");
         let tokens = Lexer::new(code).collect::<Vec<_>>();
         let ast = Parser::new(tokens).parse_program().expect("Should work");
         let mut st = SymbolTable::new();

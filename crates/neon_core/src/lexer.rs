@@ -6,8 +6,8 @@ pub struct Lexer {
     offset: usize,
 }
 
-#[derive(Debug, Clone)]
-pub struct Pos(usize, usize);
+#[derive(Debug, Clone, Copy)]
+pub struct Pos(pub usize, pub usize);
 
 impl Pos {
     pub fn empty() -> Pos {

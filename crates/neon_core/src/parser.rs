@@ -96,6 +96,12 @@ pub enum SyntaxErrorKind {
     },
 }
 
+impl ToString for SyntaxErrorKind {
+    fn to_string(&self) -> String {
+        format!("{:?}", self)
+    }
+}
+
 impl SyntaxError {
     fn new<R>(expected: Vec<TokenKind>, found: &Token) -> Result<R, SyntaxError> {
         Err(SyntaxError {

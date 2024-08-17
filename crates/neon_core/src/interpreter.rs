@@ -2,6 +2,7 @@ use core::panic;
 use std::{collections::HashMap, fmt::Display};
 
 use crate::{
+    lexer::Pos,
     parser::{Expression, ExpressionKind},
     symbol_table::SymbolTable,
 };
@@ -31,11 +32,41 @@ impl Display for Value {
 }
 
 #[derive(Debug)]
-pub enum RuntimeError {
+pub enum RuntimeErrorKind {
     TypeError,
     UndefinedReference,
     UninitializedVariable,
     IllegalInvocation,
+}
+
+impl ToString for RuntimeErrorKind {
+    fn to_string(&self) -> String {
+        format!("{:?}", self)
+    }
+}
+
+#[derive(Debug)]
+pub struct RuntimeError {
+    pub kind: RuntimeErrorKind,
+    pub start: Pos,
+    pub end: Pos,
+}
+
+impl RuntimeError {
+    fn type_error(start: &Pos, end: &Pos) -> RuntimeError {
+        RuntimeError {
+            kind: RuntimeErrorKind::TypeError,
+            end: end.clone(),
+            start: start.clone(),
+        }
+    }
+    fn illegal_invocation(start: &Pos, end: &Pos) -> RuntimeError {
+        RuntimeError {
+            kind: RuntimeErrorKind::IllegalInvocation,
+            end: end.clone(),
+            start: start.clone(),
+        }
+    }
 }
 
 pub struct Interpreter {}
@@ -63,7 +94,9 @@ impl Interpreter {
                 parameters,
                 body: block,
             } => self.evaluate_fn(name, parameters, block, ctx),
-            ExpressionKind::Identifier { name } => self.evaluate_identifier(name, ctx),
+            ExpressionKind::Identifier { name } => {
+                self.evaluate_identifier(name, &expression.start, &expression.end, ctx)
+            }
             ExpressionKind::Invocation { callee, arguments } => {
                 self.evaluate_invocation(callee, arguments, ctx)
             }
@@ -93,15 +126,17 @@ impl Interpreter {
         right: &Expression,
         ctx: &mut EvaluationContext,
     ) -> Result<Value, RuntimeError> {
+        let start = &left.start;
+        let end = &right.end;
         let left = self.evaluate_expression(left, ctx)?;
         let right = self.evaluate_expression(right, ctx)?;
 
         let result = match left {
             Value::Int { value: l } => match right {
                 Value::Int { value: r } => l - r,
-                _ => return Err(RuntimeError::TypeError),
+                _ => return Err(RuntimeError::type_error(start, end)),
             },
-            _ => return Err(RuntimeError::TypeError),
+            _ => return Err(RuntimeError::type_error(start, end)),
         };
 
         Ok(Value::Int { value: result })
@@ -113,19 +148,21 @@ impl Interpreter {
         right: &Expression,
         ctx: &mut EvaluationContext,
     ) -> Result<Value, RuntimeError> {
+        let start = &left.start;
+        let end = &right.end;
         let left = self.evaluate_expression(left, ctx)?;
         let right = self.evaluate_expression(right, ctx)?;
 
         let result = match left {
             Value::Int { value: l } => match right {
                 Value::Int { value: r } => l != r,
-                _ => return Err(RuntimeError::TypeError),
+                _ => return Err(RuntimeError::type_error(start, end)),
             },
             Value::Bool { value: l } => match right {
                 Value::Bool { value: r } => l != r,
-                _ => return Err(RuntimeError::TypeError),
+                _ => return Err(RuntimeError::type_error(start, end)),
             },
-            _ => return Err(RuntimeError::TypeError),
+            _ => return Err(RuntimeError::type_error(start, end)),
         };
         Ok(Value::Bool { value: result })
     }
@@ -136,19 +173,21 @@ impl Interpreter {
         right: &Expression,
         ctx: &mut EvaluationContext,
     ) -> Result<Value, RuntimeError> {
+        let start = &left.start;
+        let end = &right.end;
         let left = self.evaluate_expression(left, ctx)?;
         let right = self.evaluate_expression(right, ctx)?;
 
         let result = match left {
             Value::Int { value: l } => match right {
                 Value::Int { value: r } => l == r,
-                _ => return Err(RuntimeError::TypeError),
+                _ => return Err(RuntimeError::type_error(start, end)),
             },
             Value::Bool { value: l } => match right {
                 Value::Bool { value: r } => l == r,
-                _ => return Err(RuntimeError::TypeError),
+                _ => return Err(RuntimeError::type_error(start, end)),
             },
-            _ => return Err(RuntimeError::TypeError),
+            _ => return Err(RuntimeError::type_error(start, end)),
         };
         Ok(Value::Bool { value: result })
     }
@@ -160,9 +199,11 @@ impl Interpreter {
         else_block: &Option<Expression>,
         ctx: &mut EvaluationContext,
     ) -> Result<Value, RuntimeError> {
+        let start = &predicate.start;
+        let end = &predicate.end;
         let value = self.evaluate_expression(predicate, ctx)?;
         let Value::Bool { value } = value else {
-            return Err(RuntimeError::TypeError);
+            return Err(RuntimeError::type_error(start, end));
         };
 
         if value {
@@ -212,10 +253,12 @@ impl Interpreter {
         arguments: &Vec<Expression>,
         ctx: &mut EvaluationContext,
     ) -> Result<Value, RuntimeError> {
+        let start = &callee.start;
+        let end = &callee.end;
         let value = self.evaluate_expression(callee, ctx)?;
 
         let Value::Fn { function } = value else {
-            return Err(RuntimeError::IllegalInvocation);
+            return Err(RuntimeError::illegal_invocation(start, end));
         };
 
         let ExpressionKind::Fn {
@@ -225,7 +268,7 @@ impl Interpreter {
             ..
         } = function
         else {
-            return Err(RuntimeError::TypeError);
+            return Err(RuntimeError::type_error(start, end));
         };
 
         let mut value_args = vec![];
@@ -249,17 +292,21 @@ impl Interpreter {
     fn evaluate_identifier(
         &self,
         name: &str,
+        start: &Pos,
+        end: &Pos,
         ctx: &mut EvaluationContext,
     ) -> Result<Value, RuntimeError> {
-        let declaration = ctx
-            .symbol_table
-            .get_declaration(name)
-            .ok_or(RuntimeError::UndefinedReference)?;
+        let declaration = ctx.symbol_table.get_declaration(name).ok_or(RuntimeError {
+            end: *end,
+            start: *start,
+            kind: RuntimeErrorKind::UndefinedReference,
+        })?;
 
-        let value = ctx
-            .bindings
-            .get(declaration)
-            .ok_or(RuntimeError::UninitializedVariable)?;
+        let value = ctx.bindings.get(declaration).ok_or(RuntimeError {
+            kind: RuntimeErrorKind::UninitializedVariable,
+            end: *end,
+            start: *start,
+        })?;
 
         return Ok(value.clone());
     }
@@ -285,14 +332,16 @@ impl Interpreter {
         right: &Expression,
         ctx: &mut EvaluationContext,
     ) -> Result<Value, RuntimeError> {
+        let start = &left.start;
+        let end = &right.end;
         let left = self.evaluate_expression(left, ctx)?;
         let right = self.evaluate_expression(right, ctx)?;
 
         let Value::Int { value: l } = left else {
-            return Err(RuntimeError::TypeError);
+            return Err(RuntimeError::type_error(start, end));
         };
         let Value::Int { value: r } = right else {
-            return Err(RuntimeError::TypeError);
+            return Err(RuntimeError::type_error(start, end));
         };
 
         Ok(Value::Int { value: l + r })

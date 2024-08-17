@@ -1,10 +1,10 @@
 use std::{collections::HashMap, fmt::Display};
 
 use crate::{
-    interpreter::{EvaluationContext, Interpreter, RuntimeError, Value},
+    interpreter::{EvaluationContext, Interpreter, RuntimeError, RuntimeErrorKind, Value},
     lexer::Lexer,
     parser::{Parser, SyntaxError, SyntaxErrorKind},
-    symbol_table::{SymbolError, SymbolTable},
+    symbol_table::{SymbolError, SymbolErrorKind, SymbolTable},
 };
 
 pub enum ProgramError {
@@ -36,20 +36,17 @@ impl Display for ProgramError {
                 }
                 _ => write!(f, "{:?}", e),
             },
-            ProgramError::RuntimeError(e) => match e {
-                RuntimeError::TypeError => write!(f, "Invalid type"),
-                RuntimeError::UndefinedReference => write!(f, "Undefined reference"),
-                RuntimeError::UninitializedVariable => write!(f, "Uninitialized variable"),
-                RuntimeError::IllegalInvocation => write!(f, "Illegal invocation"),
+            ProgramError::RuntimeError(e) => match &e.kind {
+                RuntimeErrorKind::TypeError => write!(f, "Invalid type"),
+                RuntimeErrorKind::UndefinedReference => write!(f, "Undefined reference"),
+                RuntimeErrorKind::UninitializedVariable => write!(f, "Uninitialized variable"),
+                RuntimeErrorKind::IllegalInvocation => write!(f, "Illegal invocation"),
             },
-            ProgramError::SymbolError(e) => match e {
-                SymbolError::ExitGlobal => {
-                    write!(f, "Cannot move out of global scope")
-                }
-                SymbolError::UndefinedReference { name } => {
+            ProgramError::SymbolError(e) => match &e.kind {
+                SymbolErrorKind::UndefinedReference { name } => {
                     write!(f, "Reference {name} is not defined")
                 }
-                SymbolError::ReDeclaration { name } => {
+                SymbolErrorKind::ReDeclaration { name } => {
                     write!(f, "Cannot redeclare symbol {name} in current scope")
                 }
             },
