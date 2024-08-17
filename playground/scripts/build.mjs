@@ -6,4 +6,4 @@ within(async () => {
 });
 
 await $`tsc -b && vite build`;
-await $`mv dist gh-pages`;
+await $`mv dist ../docs`;
