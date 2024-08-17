@@ -45,6 +45,7 @@ pub enum TokenKind {
     Comma,            // ,
 
     IntegerLiteral, // 5 -3 etc.
+    StringLiteral,  // "hello world" etc.
 
     Symbol,     // abc
     Newline,    // \n
@@ -76,11 +77,10 @@ impl ToString for TokenKind {
             TokenKind::Comma => ",",
             TokenKind::Newline => "newline",
             TokenKind::IntegerLiteral => "integer",
+            TokenKind::StringLiteral => "string",
             TokenKind::Symbol => "symbol",
             TokenKind::WhiteSpace => "whitespace",
             TokenKind::Unknown => "unknown",
-
-            _ => &format!("{:?}", self),
         };
         s.to_string()
     }
@@ -129,6 +129,7 @@ impl Lexer {
             '(' => self.single_char(TokenKind::OpenParen),
             ')' => self.single_char(TokenKind::ClosedParen),
             ',' => self.single_char(TokenKind::Comma),
+            '"' => self.string_literal(),
 
             ' ' => self.whitespace(),
 
@@ -153,6 +154,25 @@ impl Lexer {
         self.offset += 1;
 
         Some(char)
+    }
+
+    fn string_literal(&mut self) -> Option<Token> {
+        let start = self.get_pos();
+        self.next()?; // remove first "
+        let mut lexeme = String::new();
+
+        while self.peek().is_some() && self.peek()? != '"' {
+            lexeme.push(self.next()?);
+        }
+        self.next()?;
+
+        let end = self.get_pos();
+        Some(Token {
+            end,
+            lexeme,
+            start,
+            kind: TokenKind::StringLiteral,
+        })
     }
 
     fn integer_literal(&mut self) -> Option<Token> {
@@ -318,5 +338,15 @@ mod tests {
                 TokenKind::ClosedParen,
             ],
         );
+        assert_significant_tokens(
+            "\"hello()\" + hello()",
+            vec![
+                TokenKind::StringLiteral,
+                TokenKind::PlusOperator,
+                TokenKind::Symbol,
+                TokenKind::OpenParen,
+                TokenKind::ClosedParen,
+            ],
+        )
     }
 }

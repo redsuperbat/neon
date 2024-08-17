@@ -50,6 +50,10 @@ pub enum ExpressionKind {
         value: i64,
     },
 
+    String {
+        value: String,
+    },
+
     Bool {
         value: bool,
     },
@@ -353,6 +357,7 @@ impl Parser {
             TokenKind::FalseKeyword => self.parse_false_keyword(),
             TokenKind::TrueKeyword => self.parse_true_keyword(),
             TokenKind::IntegerLiteral => self.parse_integer(),
+            TokenKind::StringLiteral => self.parse_string(),
             TokenKind::IfKeyword => self.parse_if(),
             TokenKind::LetKeyword => self.parse_let(),
             TokenKind::Symbol => self.parse_identifier(),
@@ -367,6 +372,17 @@ impl Parser {
                 next,
             ),
         }
+    }
+
+    fn parse_string(&mut self) -> Result<Expression, SyntaxError> {
+        let Token {
+            start, end, lexeme, ..
+        } = self.assert_next(TokenKind::StringLiteral)?;
+        Ok(Expression {
+            kind: ExpressionKind::String { value: lexeme },
+            start,
+            end,
+        })
     }
 
     fn parse_true_keyword(&mut self) -> Result<Expression, SyntaxError> {

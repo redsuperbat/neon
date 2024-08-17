@@ -10,6 +10,7 @@ use crate::{
 #[derive(Debug, Clone)]
 pub enum Value {
     Int { value: i64 },
+    String { value: String },
     Bool { value: bool },
     Fn { function: ExpressionKind },
     Unit,
@@ -27,6 +28,7 @@ impl Display for Value {
                 write!(f, "Function: {}", name)
             }
             Value::Unit => write!(f, "Unit"),
+            Value::String { value } => write!(f, "{}", value),
         }
     }
 }
@@ -117,6 +119,9 @@ impl Interpreter {
                 self.evaluate_binary_subtract(left, right, ctx)
             }
             ExpressionKind::Bool { value } => Ok(Value::Bool { value: *value }),
+            ExpressionKind::String { value } => Ok(Value::String {
+                value: value.clone(),
+            }),
         }
     }
 
@@ -162,6 +167,10 @@ impl Interpreter {
                 Value::Bool { value: r } => l != r,
                 _ => return Err(RuntimeError::type_error(start, end)),
             },
+            Value::String { value: l } => match right {
+                Value::String { value: r } => l != r,
+                _ => return Err(RuntimeError::type_error(start, end)),
+            },
             _ => return Err(RuntimeError::type_error(start, end)),
         };
         Ok(Value::Bool { value: result })
@@ -185,6 +194,10 @@ impl Interpreter {
             },
             Value::Bool { value: l } => match right {
                 Value::Bool { value: r } => l == r,
+                _ => return Err(RuntimeError::type_error(start, end)),
+            },
+            Value::String { value: l } => match right {
+                Value::String { value: r } => l == r,
                 _ => return Err(RuntimeError::type_error(start, end)),
             },
             _ => return Err(RuntimeError::type_error(start, end)),
@@ -337,13 +350,18 @@ impl Interpreter {
         let left = self.evaluate_expression(left, ctx)?;
         let right = self.evaluate_expression(right, ctx)?;
 
-        let Value::Int { value: l } = left else {
-            return Err(RuntimeError::type_error(start, end));
-        };
-        let Value::Int { value: r } = right else {
-            return Err(RuntimeError::type_error(start, end));
+        let result = match left {
+            Value::Int { value: l } => match right {
+                Value::Int { value: r } => Value::Int { value: l + r },
+                _ => return Err(RuntimeError::type_error(start, end)),
+            },
+            Value::String { value: l } => match right {
+                Value::String { value: r } => Value::String { value: l + &r },
+                _ => return Err(RuntimeError::type_error(start, end)),
+            },
+            _ => return Err(RuntimeError::type_error(start, end)),
         };
 
-        Ok(Value::Int { value: l + r })
+        Ok(result)
     }
 }

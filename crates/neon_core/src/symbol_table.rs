@@ -113,6 +113,7 @@ impl SymbolTable {
 
             ExpressionKind::Int { .. } => Ok(()),
             ExpressionKind::Bool { .. } => Ok(()),
+            ExpressionKind::String { .. } => Ok(()),
         }
     }
 

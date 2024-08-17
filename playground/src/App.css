@@ -2,7 +2,9 @@
   color: #9cbacf !important;
 }
 
-.integer {
+.integer,
+.true,
+.false {
   color: orange !important;
 }
 
