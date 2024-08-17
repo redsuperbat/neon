@@ -8,6 +8,8 @@ The language has a nice small set of features:
 - Addition and subtraction
 - If statements
 - Recursion
+- Immutable variables
+- Dynamically typed
 
 Feel free to try it out in the [playground](https://redsuperbat.github.io/neon/)
 
