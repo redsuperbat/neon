@@ -122,6 +122,12 @@ impl Interpreter {
             ExpressionKind::String { value } => Ok(Value::String {
                 value: value.clone(),
             }),
+            ExpressionKind::BinaryCompareLt { left, right } => {
+                self.evaluate_binary_lt(left, right, ctx)
+            }
+            ExpressionKind::BinaryCompareGt { left, right } => {
+                self.evaluate_binary_gt(left, right, ctx)
+            }
         }
     }
 
@@ -198,6 +204,48 @@ impl Interpreter {
             },
             Value::String { value: l } => match right {
                 Value::String { value: r } => l == r,
+                _ => return Err(RuntimeError::type_error(start, end)),
+            },
+            _ => return Err(RuntimeError::type_error(start, end)),
+        };
+        Ok(Value::Bool { value: result })
+    }
+
+    fn evaluate_binary_gt(
+        &self,
+        left: &Expression,
+        right: &Expression,
+        ctx: &mut EvaluationContext,
+    ) -> Result<Value, RuntimeError> {
+        let start = &left.start;
+        let end = &right.end;
+        let left = self.evaluate_expression(left, ctx)?;
+        let right = self.evaluate_expression(right, ctx)?;
+
+        let result = match left {
+            Value::Int { value: l } => match right {
+                Value::Int { value: r } => l > r,
+                _ => return Err(RuntimeError::type_error(start, end)),
+            },
+            _ => return Err(RuntimeError::type_error(start, end)),
+        };
+        Ok(Value::Bool { value: result })
+    }
+
+    fn evaluate_binary_lt(
+        &self,
+        left: &Expression,
+        right: &Expression,
+        ctx: &mut EvaluationContext,
+    ) -> Result<Value, RuntimeError> {
+        let start = &left.start;
+        let end = &right.end;
+        let left = self.evaluate_expression(left, ctx)?;
+        let right = self.evaluate_expression(right, ctx)?;
+
+        let result = match left {
+            Value::Int { value: l } => match right {
+                Value::Int { value: r } => l < r,
                 _ => return Err(RuntimeError::type_error(start, end)),
             },
             _ => return Err(RuntimeError::type_error(start, end)),

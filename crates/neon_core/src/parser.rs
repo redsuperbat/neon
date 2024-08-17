@@ -68,6 +68,16 @@ pub enum ExpressionKind {
         right: Box<Expression>,
     },
 
+    BinaryCompareLt {
+        left: Box<Expression>,
+        right: Box<Expression>,
+    },
+
+    BinaryCompareGt {
+        left: Box<Expression>,
+        right: Box<Expression>,
+    },
+
     BinaryNe {
         left: Box<Expression>,
         right: Box<Expression>,
@@ -259,6 +269,30 @@ impl Parser {
                     start: expression.start.clone(),
                     end: expression.end.clone(),
                     kind: ExpressionKind::BinaryAdd {
+                        left: Box::from(expression),
+                        right: Box::from(self.parse_expression()?),
+                    },
+                };
+                Ok(expression)
+            }
+            TokenKind::LessThanComparator => {
+                self.assert_next(TokenKind::LessThanComparator)?;
+                expression = Expression {
+                    start: expression.start.clone(),
+                    end: expression.end.clone(),
+                    kind: ExpressionKind::BinaryCompareLt {
+                        left: Box::from(expression),
+                        right: Box::from(self.parse_expression()?),
+                    },
+                };
+                Ok(expression)
+            }
+            TokenKind::GreaterThanComparator => {
+                self.assert_next(TokenKind::GreaterThanComparator)?;
+                expression = Expression {
+                    start: expression.start.clone(),
+                    end: expression.end.clone(),
+                    kind: ExpressionKind::BinaryCompareGt {
                         left: Box::from(expression),
                         right: Box::from(self.parse_expression()?),
                     },

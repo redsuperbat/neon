@@ -105,15 +105,16 @@ impl SymbolTable {
                 if_block,
                 else_block,
             } => self.visit_if(predicate, if_block, else_block),
-
-            ExpressionKind::BinaryAdd { left, right } => self.visit_binary(left, right),
-            ExpressionKind::BinaryNe { left, right } => self.visit_binary(left, right),
-            ExpressionKind::BinaryEq { left, right } => self.visit_binary(left, right),
-            ExpressionKind::BinarySubtract { left, right } => self.visit_binary(left, right),
-
             ExpressionKind::Int { .. } => Ok(()),
             ExpressionKind::Bool { .. } => Ok(()),
             ExpressionKind::String { .. } => Ok(()),
+
+            ExpressionKind::BinaryAdd { left, right } => self.visit_binary(left, right),
+            ExpressionKind::BinarySubtract { left, right } => self.visit_binary(left, right),
+            ExpressionKind::BinaryNe { left, right } => self.visit_binary(left, right),
+            ExpressionKind::BinaryEq { left, right } => self.visit_binary(left, right),
+            ExpressionKind::BinaryCompareLt { left, right } => self.visit_binary(left, right),
+            ExpressionKind::BinaryCompareGt { left, right } => self.visit_binary(left, right),
         }
     }
 

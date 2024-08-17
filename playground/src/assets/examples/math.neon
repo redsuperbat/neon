@@ -14,5 +14,17 @@ fn multiply(a, b) {
   }
 };
 
-multiply(3, 15)
+fn divide(dividend, divisor) {
+  fn helper(dividend, divisor, quotient) {
+    if minus(dividend, divisor) < 0 {
+      quotient
+    } else {
+      helper(minus(dividend, divisor), divisor, plus(quotient, 1))
+    }
+  };
+  helper(dividend, divisor, 0)
+};
+
+
+multiply(3, 15) - divide(10, 2)
 

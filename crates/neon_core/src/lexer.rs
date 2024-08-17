@@ -1,3 +1,5 @@
+use std::fmt::write;
+
 #[derive(Debug)]
 pub struct Lexer {
     text: String,
@@ -35,8 +37,10 @@ pub enum TokenKind {
     Bang,   // !
     Equals, // =
 
-    PlusOperator,  // +
-    MinusOperator, // -
+    PlusOperator,          // +
+    MinusOperator,         // -
+    LessThanComparator,    // <
+    GreaterThanComparator, // >
 
     OpenCurlyBrace,   // {
     ClosedCurlyBrace, // }
@@ -65,11 +69,14 @@ impl ToString for TokenKind {
             TokenKind::TrueKeyword => "true",
             TokenKind::FalseKeyword => "false",
 
+            TokenKind::LessThanComparator => "<",
+            TokenKind::GreaterThanComparator => ">",
             TokenKind::MinusOperator => "-",
+            TokenKind::PlusOperator => "+",
+
             TokenKind::SemiColon => ";",
             TokenKind::Equals => "=",
             TokenKind::Bang => "!",
-            TokenKind::PlusOperator => "+",
             TokenKind::OpenCurlyBrace => "{",
             TokenKind::ClosedCurlyBrace => "}",
             TokenKind::OpenParen => "(",
@@ -117,9 +124,12 @@ impl Lexer {
 
         match next_char {
             '=' => self.single_char(TokenKind::Equals),
+            '!' => self.single_char(TokenKind::Bang),
+
+            '<' => self.single_char(TokenKind::LessThanComparator),
+            '>' => self.single_char(TokenKind::GreaterThanComparator),
             '+' => self.single_char(TokenKind::PlusOperator),
             '-' => self.single_char(TokenKind::MinusOperator),
-            '!' => self.single_char(TokenKind::Bang),
 
             ';' => self.single_char(TokenKind::SemiColon),
 
@@ -347,6 +357,13 @@ mod tests {
                 TokenKind::OpenParen,
                 TokenKind::ClosedParen,
             ],
-        )
+        );
+        assert_significant_tokens(
+            "<>",
+            vec![
+                TokenKind::LessThanComparator,
+                TokenKind::GreaterThanComparator,
+            ],
+        );
     }
 }
