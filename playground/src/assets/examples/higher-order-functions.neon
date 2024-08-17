@@ -1,0 +1,9 @@
+fn create_five() {
+  fn five(){
+    5
+  }
+};
+let five = create_five();
+
+five() + five()
+

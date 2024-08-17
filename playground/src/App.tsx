@@ -12,9 +12,13 @@ import {
   onMount,
   Switch,
   onCleanup,
+  For,
 } from "solid-js";
 import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
 import init_script from "./assets/init.neon?raw";
+import math from "./assets/examples/math.neon?raw";
+import recursion from "./assets/examples/recursion.neon?raw";
+import higherOrderFunctions from "./assets/examples/higher-order-functions.neon?raw";
 
 function LoadingPage() {
   return <div aria-busy="true"></div>;
@@ -23,8 +27,32 @@ function ErrorPage({ error }: { error: string }) {
   return <article>{error}</article>;
 }
 
+const examples: { label: string; value: string }[] = [
+  {
+    label: "Math",
+    value: math,
+  },
+  {
+    label: "Recursion",
+    value: recursion,
+  },
+  {
+    label: "Higher order functions",
+    value: higherOrderFunctions,
+  },
+];
+
+type Output =
+  | {
+      type: "error";
+      message: string;
+    }
+  | {
+      type: "ok";
+      message: string;
+    };
 function ExecutionPage() {
-  const [output, setOutput] = createSignal("");
+  const [output, setOutput] = createSignal<Output>();
   let monacoEl: HTMLDivElement | undefined;
   let editor: monaco.editor.IStandaloneCodeEditor | undefined;
   let decorations: monaco.editor.IEditorDecorationsCollection | undefined;
@@ -53,6 +81,10 @@ function ExecutionPage() {
     decorations?.clear();
     renderSyntaxHighlighting(src);
     renderDiagnostics(src);
+  }
+
+  function setEditorContent(src: string) {
+    editor?.setValue(src);
   }
 
   function renderDiagnostics(src: string) {
@@ -111,14 +143,21 @@ function ExecutionPage() {
     if (!src) return;
     try {
       const res = interpret_src(src);
-      setOutput(res.result);
+      setOutput({
+        type: "ok",
+        message: res.result,
+      });
     } catch (e) {
-      console.error(e);
+      if (!(e instanceof ProgramErr)) return;
+      setOutput({
+        type: "error",
+        message: e.message,
+      });
     }
   }
 
   return (
-    <div>
+    <main class="container">
       <h1>Neon Playground</h1>
       <div
         style={{
@@ -129,10 +168,42 @@ function ExecutionPage() {
         }}
         ref={monacoEl}
       ></div>
-      <button onclick={() => exec()}>Execute</button>
 
-      <p>{output()}</p>
-    </div>
+      <div role="group">
+        <select
+          onchange={(e) => setEditorContent(e.target.value)}
+          name="select"
+          aria-label="Select"
+          required
+        >
+          <option selected disabled value="">
+            Examples
+          </option>
+          <For each={examples}>
+            {({ value, label }) => <option value={value}>{label}</option>}
+          </For>
+        </select>
+
+        <button onclick={() => exec()}>Execute</button>
+      </div>
+      <div
+        style={{
+          display: "grid",
+          "place-items": "center",
+          "grid-template-columns": "auto 1fr",
+          padding: "10px",
+        }}
+      >
+        <span>Result:</span>
+        <span
+          style={{
+            color: output()?.type === "error" ? "red" : "green",
+          }}
+        >
+          {output()?.message}
+        </span>
+      </div>
+    </main>
   );
 }
 

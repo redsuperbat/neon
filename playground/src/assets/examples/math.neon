@@ -1,0 +1,18 @@
+fn minus(a, b){
+  a - b
+};
+
+fn plus(a, b) {
+  a + b
+};
+
+fn multiply(a, b) {
+  if b == 0 {
+    0
+  } else {
+    plus(a, multiply(a, b - 1))
+  }
+};
+
+multiply(3, 15)
+
