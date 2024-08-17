@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 wasm-bindgen = { version = "*" }
+js-sys = { version = "*" }
 neon_core = { path = "../neon_core" }
 
 [lib]

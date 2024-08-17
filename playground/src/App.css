@@ -1,0 +1,25 @@
+.symbol {
+  color: #9cbacf !important;
+}
+
+.integer {
+  color: orange !important;
+}
+
+.string {
+  color: #9fcca5 !important;
+}
+
+.if,
+.else,
+.let,
+.fn {
+  color: #b599b5 !important;
+}
+.diagnostic {
+  color: red !important;
+}
+
+.diagnostic-container {
+  background: rgba(255, 102, 102, 0.1) !important;
+}

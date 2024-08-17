@@ -1,4 +1,10 @@
-import init, { interpret_src } from "neon-web";
+import init, {
+  interpret_src,
+  JsToken,
+  tokenize,
+  compile,
+  ProgramErr,
+} from "neon-web";
 import {
   createResource,
   createSignal,
@@ -21,11 +27,21 @@ function ExecutionPage() {
   const [output, setOutput] = createSignal("");
   let monacoEl: HTMLDivElement | undefined;
   let editor: monaco.editor.IStandaloneCodeEditor | undefined;
+  let decorations: monaco.editor.IEditorDecorationsCollection | undefined;
 
   onMount(() => {
     if (!monacoEl) return;
     editor = monaco.editor.create(monacoEl, {
       value: init_script,
+      theme: "vs-dark",
+    });
+    decorations = editor.createDecorationsCollection();
+
+    onContentChange(editor.getValue());
+    editor.getModel()?.onDidChangeContent(() => {
+      const value = editor?.getValue();
+      if (!value) return;
+      onContentChange(value);
     });
   });
 
@@ -33,11 +49,72 @@ function ExecutionPage() {
     editor?.dispose();
   });
 
+  function onContentChange(src: string) {
+    decorations?.clear();
+    renderSyntaxHighlighting(src);
+    renderDiagnostics(src);
+  }
+
+  function renderDiagnostics(src: string) {
+    try {
+      compile(src);
+    } catch (e) {
+      if (!(e instanceof ProgramErr)) return;
+      const model = editor?.getModel();
+      if (!model) return;
+      const lineNumber = e.start[0];
+
+      const col = model.getLineMaxColumn(lineNumber);
+
+      const decoration: monaco.editor.IModelDeltaDecoration = {
+        range: {
+          startLineNumber: e.start[0],
+          endLineNumber: e.start[0],
+          startColumn: col,
+          endColumn: e.end[1],
+        },
+        options: {
+          isWholeLine: true,
+          inlineClassName: "diagnostic-container",
+          after: {
+            inlineClassName: "diagnostic",
+            content: e.message,
+          },
+        },
+      };
+      decorations?.append([decoration]);
+    }
+  }
+
+  function renderSyntaxHighlighting(src: string) {
+    if (!decorations) return;
+
+    const tokens: JsToken[] = tokenize(src);
+    const highlights: monaco.editor.IModelDeltaDecoration[] = tokens.map(
+      (it) => ({
+        range: {
+          startColumn: it.start[1],
+          endColumn: it.end[1],
+          startLineNumber: it.start[0],
+          endLineNumber: it.end[0],
+        },
+        options: {
+          inlineClassName: it.kind,
+        },
+      }),
+    );
+    decorations.append(highlights);
+  }
+
   function exec() {
     const src = editor?.getValue();
     if (!src) return;
-    const res = interpret_src(src);
-    setOutput(res);
+    try {
+      const res = interpret_src(src);
+      setOutput(res.result);
+    } catch (e) {
+      console.error(e);
+    }
   }
 
   return (
