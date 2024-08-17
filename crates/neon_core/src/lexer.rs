@@ -6,7 +6,14 @@ pub struct Lexer {
     offset: usize,
 }
 
-pub type Pos = (usize, usize);
+#[derive(Debug, Clone)]
+pub struct Pos(usize, usize);
+
+impl Pos {
+    pub fn empty() -> Pos {
+        Pos(0, 0)
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct Token {
@@ -102,7 +109,7 @@ impl Lexer {
     }
 
     fn get_pos(&self) -> Pos {
-        (self.line, self.col)
+        Pos(self.line, self.col)
     }
 
     fn next_token(&mut self) -> Option<Token> {
@@ -253,6 +260,19 @@ mod tests {
         }
     }
 
+    fn assert_significant_tokens(code: &str, tokens: Vec<TokenKind>) {
+        let lexed = Lexer::new(code)
+            .filter(|t| t.kind != TokenKind::WhiteSpace)
+            .filter(|t| t.kind != TokenKind::Newline)
+            .collect::<Vec<_>>();
+        for (i, expected) in tokens.iter().enumerate() {
+            let got = lexed
+                .get(i)
+                .expect(&format!("Should find token {:?}", expected));
+            assert_eq!(got.kind, *expected)
+        }
+    }
+
     #[test]
     fn lexing() {
         let tokens = lex("fn test() {3}");
@@ -283,6 +303,19 @@ mod tests {
                 TokenKind::Equals,
                 TokenKind::WhiteSpace,
                 TokenKind::IntegerLiteral,
+            ],
+        );
+
+        assert_significant_tokens(
+            "hello() + hello()",
+            vec![
+                TokenKind::Symbol,
+                TokenKind::OpenParen,
+                TokenKind::ClosedParen,
+                TokenKind::PlusOperator,
+                TokenKind::Symbol,
+                TokenKind::OpenParen,
+                TokenKind::ClosedParen,
             ],
         );
     }

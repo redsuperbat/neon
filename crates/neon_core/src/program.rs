@@ -3,12 +3,12 @@ use std::{collections::HashMap, fmt::Display};
 use crate::{
     interpreter::{EvaluationContext, Interpreter, RuntimeError, Value},
     lexer::Lexer,
-    parser::{Parser, ParserError},
+    parser::{Parser, SyntaxError, SyntaxErrorKind},
     symbol_table::{SymbolError, SymbolTable},
 };
 
 pub enum ProgramError {
-    ParserError(ParserError),
+    SyntaxError(SyntaxError),
     SymbolError(SymbolError),
     RuntimeError(RuntimeError),
 }
@@ -16,13 +16,12 @@ pub enum ProgramError {
 impl Display for ProgramError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ProgramError::ParserError(e) => match e {
-                ParserError::InvalidInteger { lexeme } => write!(f, "invalid integer {lexeme}"),
-                ParserError::UnexpectedEndOfFile => write!(f, "Unexpected end of program"),
-                ParserError::UnexpectedEndOfBlock => {
+            ProgramError::SyntaxError(e) => match &e.kind {
+                SyntaxErrorKind::UnexpectedEndOfFile => write!(f, "Unexpected end of program"),
+                SyntaxErrorKind::UnexpectedEndOfBlock => {
                     write!(f, "Block did not end with expression")
                 }
-                ParserError::UnexpectedToken { expected, found } => {
+                SyntaxErrorKind::UnexpectedToken { expected, found } => {
                     let expected = expected
                         .into_iter()
                         .map(|t| t.to_string())
@@ -30,8 +29,9 @@ impl Display for ProgramError {
                         .join(", ");
                     write!(
                         f,
-                        "Unexpected token '{}' {:?}:{:?} expected any of {:?}",
-                        found.lexeme, found.start, found.end, expected
+                        "Unexpected token '{}'  expected any of {:?}",
+                        found.to_string(),
+                        expected.to_string()
                     )
                 }
                 _ => write!(f, "{:?}", e),
@@ -41,7 +41,6 @@ impl Display for ProgramError {
                 RuntimeError::UndefinedReference => write!(f, "Undefined reference"),
                 RuntimeError::UninitializedVariable => write!(f, "Uninitialized variable"),
                 RuntimeError::IllegalInvocation => write!(f, "Illegal invocation"),
-                _ => write!(f, "{:?}", e),
             },
             ProgramError::SymbolError(e) => match e {
                 SymbolError::ExitGlobal => {
@@ -53,7 +52,6 @@ impl Display for ProgramError {
                 SymbolError::ReDeclaration { name } => {
                     write!(f, "Cannot redeclare symbol {name} in current scope")
                 }
-                _ => write!(f, "{:?}", e),
             },
         }
     }
@@ -64,7 +62,7 @@ pub fn execute_program(source: &str) -> Result<Value, ProgramError> {
     let interpreter = Interpreter::new();
     let ast = Parser::new(tokens)
         .parse_program()
-        .map_err(|e| ProgramError::ParserError(e))?;
+        .map_err(|e| ProgramError::SyntaxError(e))?;
 
     let mut symbol_table = SymbolTable::new();
 

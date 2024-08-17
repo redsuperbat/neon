@@ -34,7 +34,7 @@ fn repl() {
         let ast = match Parser::new(tokens).parse_program() {
             Ok(ast) => ast,
             Err(e) => {
-                println!("{}", ProgramError::ParserError(e));
+                println!("{}", ProgramError::SyntaxError(e));
                 print("> ");
                 continue;
             }
