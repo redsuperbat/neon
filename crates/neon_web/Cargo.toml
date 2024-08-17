@@ -1,0 +1,11 @@
+[package]
+name = "neon_web"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+wasm-bindgen = { version = "*" }
+neon_core = { path = "../neon_core" }
+
+[lib]
+crate-type = ["cdylib", "rlib"]
