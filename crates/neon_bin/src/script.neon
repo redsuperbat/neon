@@ -1,9 +1,0 @@
-fn recur(a) {
-  if a == 0 {
-    true
-  } else {
-    recur(a - 1)
- }
-};
-
-recur(200)
