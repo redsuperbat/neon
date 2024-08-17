@@ -3,12 +3,5 @@
 version = 3
 
 [[package]]
-name = "neon_bin"
-version = "0.1.0"
-dependencies = [
- "neon_core",
-]
-
-[[package]]
 name = "neon_core"
 version = "0.1.0"

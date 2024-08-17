@@ -1,0 +1,11 @@
+[package]
+name = "neon_bin"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "neon_bin"
+path = "src/main.rs"
+
+[dependencies]
+neon_core = { path = "../neon_core" }

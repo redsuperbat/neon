@@ -1,4 +1,5 @@
-use std::collections::HashMap;
+use core::panic;
+use std::{collections::HashMap, fmt::Display};
 
 use crate::{
     parser::{Expression, ExpressionKind},
@@ -11,6 +12,22 @@ pub enum Value {
     Bool { value: bool },
     Fn { function: ExpressionKind },
     Unit,
+}
+
+impl Display for Value {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Value::Int { value } => write!(f, "{}", value),
+            Value::Bool { value } => write!(f, "{}", value),
+            Value::Fn { function } => {
+                let ExpressionKind::Fn { name, .. } = function else {
+                    panic!("invalid type")
+                };
+                write!(f, "Function: {}", name)
+            }
+            Value::Unit => write!(f, "Unit"),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -259,9 +276,7 @@ impl Interpreter {
     }
 
     fn evaluate_int(&self, value: &i64) -> Result<Value, RuntimeError> {
-        Ok(Value::Int {
-            value: value.clone(),
-        })
+        Ok(Value::Int { value: *value })
     }
 
     fn evaluate_binary_add(
