@@ -45,6 +45,8 @@ pub enum TokenKind {
     OpenParen,        // (
     ClosedParen,      // )
     Percentage,       // %
+    Ampersand,        // &
+    Pipe,             // |
     Comma,            // ,
 
     IntegerLiteral, // 5 -3 etc.
@@ -72,9 +74,11 @@ impl ToString for TokenKind {
             TokenKind::ClosedAngleBracket => ">",
             TokenKind::MinusOperator => "-",
             TokenKind::PlusOperator => "+",
+            TokenKind::Ampersand => "&",
+            TokenKind::Pipe => "|",
 
             TokenKind::SemiColon => ";",
-            TokenKind::Percentage => ";",
+            TokenKind::Percentage => "%",
             TokenKind::Equals => "=",
             TokenKind::Bang => "!",
             TokenKind::OpenCurlyBrace => "{",
@@ -140,6 +144,8 @@ impl Lexer {
             ')' => self.single_char(TokenKind::ClosedParen),
             ',' => self.single_char(TokenKind::Comma),
             '%' => self.single_char(TokenKind::Percentage),
+            '&' => self.single_char(TokenKind::Ampersand),
+            '|' => self.single_char(TokenKind::Pipe),
             '"' => self.string_literal(),
 
             ' ' => self.whitespace(),

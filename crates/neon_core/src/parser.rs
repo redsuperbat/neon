@@ -58,22 +58,32 @@ pub enum ExpressionKind {
         value: bool,
     },
 
-    BinaryAdd {
+    And {
         left: Box<Expression>,
         right: Box<Expression>,
     },
 
-    BinarySubtract {
+    Or {
         left: Box<Expression>,
         right: Box<Expression>,
     },
 
-    BinaryCompareLt {
+    Add {
         left: Box<Expression>,
         right: Box<Expression>,
     },
 
-    BinaryCompareGt {
+    Sub {
+        left: Box<Expression>,
+        right: Box<Expression>,
+    },
+
+    Lt {
+        left: Box<Expression>,
+        right: Box<Expression>,
+    },
+
+    Gt {
         left: Box<Expression>,
         right: Box<Expression>,
     },
@@ -83,12 +93,12 @@ pub enum ExpressionKind {
         right: Box<Expression>,
     },
 
-    BinaryNe {
+    Ne {
         left: Box<Expression>,
         right: Box<Expression>,
     },
 
-    BinaryEq {
+    Eq {
         left: Box<Expression>,
         right: Box<Expression>,
     },
@@ -274,7 +284,7 @@ impl Parser {
                 expression = Expression {
                     start: expression.start,
                     end: right.end,
-                    kind: ExpressionKind::BinaryAdd {
+                    kind: ExpressionKind::Add {
                         left: Box::from(expression),
                         right: Box::from(right),
                     },
@@ -294,14 +304,42 @@ impl Parser {
                 };
                 Ok(expression)
             }
+            TokenKind::Ampersand => {
+                self.assert_next(TokenKind::Ampersand)?;
+                self.assert_next(TokenKind::Ampersand)?;
+                let right = self.parse_expression()?;
+                expression = Expression {
+                    start: expression.start,
+                    end: right.end,
+                    kind: ExpressionKind::And {
+                        left: Box::from(expression),
+                        right: Box::new(right),
+                    },
+                };
+                Ok(expression)
+            }
+            TokenKind::Pipe => {
+                self.assert_next(TokenKind::Pipe)?;
+                self.assert_next(TokenKind::Pipe)?;
+                let right = self.parse_expression()?;
+                expression = Expression {
+                    start: expression.start,
+                    end: right.end,
+                    kind: ExpressionKind::Or {
+                        left: Box::from(expression),
+                        right: Box::new(right),
+                    },
+                };
+                Ok(expression)
+            }
 
             TokenKind::OpenAngleBracket => {
                 self.assert_next(TokenKind::OpenAngleBracket)?;
                 let right = self.parse_expression()?;
                 expression = Expression {
-                    start: expression.start.clone(),
+                    start: expression.start,
                     end: right.end,
-                    kind: ExpressionKind::BinaryCompareLt {
+                    kind: ExpressionKind::Lt {
                         left: Box::from(expression),
                         right: Box::new(right),
                     },
@@ -312,9 +350,9 @@ impl Parser {
                 self.assert_next(TokenKind::ClosedAngleBracket)?;
                 let right = self.parse_expression()?;
                 expression = Expression {
-                    start: expression.start.clone(),
+                    start: expression.start,
                     end: right.end,
-                    kind: ExpressionKind::BinaryCompareGt {
+                    kind: ExpressionKind::Gt {
                         left: Box::from(expression),
                         right: Box::new(right),
                     },
@@ -325,9 +363,9 @@ impl Parser {
                 self.assert_next(TokenKind::MinusOperator)?;
                 let right = self.parse_expression()?;
                 expression = Expression {
-                    start: expression.start.clone(),
+                    start: expression.start,
                     end: right.end,
-                    kind: ExpressionKind::BinarySubtract {
+                    kind: ExpressionKind::Sub {
                         left: Box::from(expression),
                         right: Box::new(right),
                     },
@@ -339,9 +377,9 @@ impl Parser {
                 self.assert_next(TokenKind::Equals)?;
                 let right = self.parse_expression()?;
                 expression = Expression {
-                    start: expression.start.clone(),
+                    start: expression.start,
                     end: right.end,
-                    kind: ExpressionKind::BinaryNe {
+                    kind: ExpressionKind::Ne {
                         left: Box::from(expression),
                         right: Box::new(right),
                     },
@@ -354,9 +392,9 @@ impl Parser {
                     self.assert_next(TokenKind::Equals)?;
                     let right = self.parse_expression()?;
                     expression = Expression {
-                        start: expression.start.clone(),
+                        start: expression.start,
                         end: right.end,
-                        kind: ExpressionKind::BinaryEq {
+                        kind: ExpressionKind::Eq {
                             left: Box::from(expression),
                             right: Box::new(right),
                         },
@@ -391,7 +429,7 @@ impl Parser {
         match next.kind {
             TokenKind::OpenParen => {
                 expression = Expression {
-                    start: expression.start.clone(),
+                    start: expression.start,
                     end: expression.end.clone(),
                     kind: ExpressionKind::Invocation {
                         callee: Box::from(expression),

@@ -109,13 +109,15 @@ impl SymbolTable {
             ExpressionKind::Bool { .. } => Ok(()),
             ExpressionKind::String { .. } => Ok(()),
 
-            ExpressionKind::BinaryAdd { left, right } => self.visit_binary(left, right),
-            ExpressionKind::BinarySubtract { left, right } => self.visit_binary(left, right),
-            ExpressionKind::BinaryNe { left, right } => self.visit_binary(left, right),
-            ExpressionKind::BinaryEq { left, right } => self.visit_binary(left, right),
-            ExpressionKind::BinaryCompareLt { left, right } => self.visit_binary(left, right),
-            ExpressionKind::BinaryCompareGt { left, right } => self.visit_binary(left, right),
+            ExpressionKind::Add { left, right } => self.visit_binary(left, right),
+            ExpressionKind::Sub { left, right } => self.visit_binary(left, right),
+            ExpressionKind::Ne { left, right } => self.visit_binary(left, right),
+            ExpressionKind::Eq { left, right } => self.visit_binary(left, right),
+            ExpressionKind::Lt { left, right } => self.visit_binary(left, right),
+            ExpressionKind::Gt { left, right } => self.visit_binary(left, right),
             ExpressionKind::Modulus { left, right } => self.visit_binary(left, right),
+            ExpressionKind::And { left, right } => self.visit_binary(left, right),
+            ExpressionKind::Or { left, right } => self.visit_binary(left, right),
         }
     }
 

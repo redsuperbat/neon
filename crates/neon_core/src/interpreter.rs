@@ -104,7 +104,7 @@ impl Interpreter {
             }
             ExpressionKind::LetBinding { name, right } => self.evaluate_let(name, right, ctx),
             ExpressionKind::Int { value } => self.evaluate_int(value),
-            ExpressionKind::BinaryAdd { left, right } => self.evaluate_binary_add(left, right, ctx),
+            ExpressionKind::Add { left, right } => self.evaluate_binary_add(left, right, ctx),
             ExpressionKind::Block { body, return_val } => {
                 self.evaluate_block(body, return_val, ctx)
             }
@@ -113,22 +113,18 @@ impl Interpreter {
                 if_block,
                 else_block,
             } => self.evaluate_if(predicate, if_block, else_block, ctx),
-            ExpressionKind::BinaryNe { left, right } => self.evaluate_binary_ne(left, right, ctx),
-            ExpressionKind::BinaryEq { left, right } => self.evaluate_binary_eq(left, right, ctx),
-            ExpressionKind::BinarySubtract { left, right } => {
-                self.evaluate_binary_subtract(left, right, ctx)
-            }
+            ExpressionKind::Ne { left, right } => self.evaluate_binary_ne(left, right, ctx),
+            ExpressionKind::Eq { left, right } => self.evaluate_binary_eq(left, right, ctx),
+            ExpressionKind::Sub { left, right } => self.evaluate_binary_subtract(left, right, ctx),
             ExpressionKind::Bool { value } => Ok(Value::Bool { value: *value }),
             ExpressionKind::String { value } => Ok(Value::String {
                 value: value.clone(),
             }),
-            ExpressionKind::BinaryCompareLt { left, right } => {
-                self.evaluate_binary_lt(left, right, ctx)
-            }
-            ExpressionKind::BinaryCompareGt { left, right } => {
-                self.evaluate_binary_gt(left, right, ctx)
-            }
+            ExpressionKind::Lt { left, right } => self.evaluate_binary_lt(left, right, ctx),
+            ExpressionKind::Gt { left, right } => self.evaluate_binary_gt(left, right, ctx),
             ExpressionKind::Modulus { left, right } => self.evaluate_modulus(left, right, ctx),
+            ExpressionKind::And { left, right } => self.evaluate_and(left, right, ctx),
+            ExpressionKind::Or { left, right } => self.evaluate_or(left, right, ctx),
         }
     }
 
@@ -205,6 +201,48 @@ impl Interpreter {
             },
             Value::String { value: l } => match right {
                 Value::String { value: r } => l == r,
+                _ => return Err(RuntimeError::type_error(start, end)),
+            },
+            _ => return Err(RuntimeError::type_error(start, end)),
+        };
+        Ok(Value::Bool { value: result })
+    }
+
+    fn evaluate_or(
+        &self,
+        left: &Expression,
+        right: &Expression,
+        ctx: &mut EvaluationContext,
+    ) -> Result<Value, RuntimeError> {
+        let start = &left.start;
+        let end = &right.end;
+        let left = self.evaluate_expression(left, ctx)?;
+        let right = self.evaluate_expression(right, ctx)?;
+
+        let result = match left {
+            Value::Bool { value: l } => match right {
+                Value::Bool { value: r } => l || r,
+                _ => return Err(RuntimeError::type_error(start, end)),
+            },
+            _ => return Err(RuntimeError::type_error(start, end)),
+        };
+        Ok(Value::Bool { value: result })
+    }
+
+    fn evaluate_and(
+        &self,
+        left: &Expression,
+        right: &Expression,
+        ctx: &mut EvaluationContext,
+    ) -> Result<Value, RuntimeError> {
+        let start = &left.start;
+        let end = &right.end;
+        let left = self.evaluate_expression(left, ctx)?;
+        let right = self.evaluate_expression(right, ctx)?;
+
+        let result = match left {
+            Value::Bool { value: l } => match right {
+                Value::Bool { value: r } => l && r,
                 _ => return Err(RuntimeError::type_error(start, end)),
             },
             _ => return Err(RuntimeError::type_error(start, end)),
