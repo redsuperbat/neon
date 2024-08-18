@@ -134,8 +134,8 @@ impl ToString for SyntaxErrorKind {
 impl SyntaxError {
     fn new<R>(expected: Vec<TokenKind>, found: &Token) -> Result<R, SyntaxError> {
         Err(SyntaxError {
-            start: found.start.clone(),
-            end: found.end.clone(),
+            start: found.start,
+            end: found.end,
             kind: SyntaxErrorKind::UnexpectedToken {
                 expected,
                 found: found.kind.clone(),
@@ -206,12 +206,12 @@ impl Parser {
         loop {
             let expression = self.parse_expression()?;
 
-            if self.next_is(TokenKind::SemiColon) {
-                expressions.push(expression);
-                self.next()?;
-            } else {
+            if self.peek().is_none() {
                 return_val = Some(expression);
                 break;
+            } else {
+                expressions.push(expression);
+                self.assert_next(TokenKind::SemiColon)?;
             }
         }
 
@@ -513,7 +513,7 @@ impl Parser {
 
         Ok(Expression {
             start,
-            end: if_block.end.clone(),
+            end: if_block.end,
             kind: ExpressionKind::If {
                 predicate: Box::new(predicate),
                 if_block: Box::from(if_block),
@@ -646,11 +646,19 @@ mod tests {
         assert!(matches!(ast.kind, ExpressionKind::Block { .. }));
         let ast = parse("a % d");
         assert!(matches!(ast.kind, ExpressionKind::Block { .. }));
+        let ast = parse("hello() + hello()");
+        assert!(matches!(ast.kind, ExpressionKind::Block { .. }));
     }
 
     #[test]
     fn single() {
-        let ast = parse("hello() + hello()");
+        let ast = parse(
+            "fn hello(){
+  5
+};
+
+hello() + hello()",
+        );
         assert!(matches!(ast.kind, ExpressionKind::Block { .. }));
     }
 }
