@@ -115,6 +115,7 @@ impl SymbolTable {
             ExpressionKind::BinaryEq { left, right } => self.visit_binary(left, right),
             ExpressionKind::BinaryCompareLt { left, right } => self.visit_binary(left, right),
             ExpressionKind::BinaryCompareGt { left, right } => self.visit_binary(left, right),
+            ExpressionKind::Modulus { left, right } => self.visit_binary(left, right),
         }
     }
 

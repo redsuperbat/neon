@@ -128,6 +128,7 @@ impl Interpreter {
             ExpressionKind::BinaryCompareGt { left, right } => {
                 self.evaluate_binary_gt(left, right, ctx)
             }
+            ExpressionKind::Modulus { left, right } => self.evaluate_modulus(left, right, ctx),
         }
     }
 
@@ -209,6 +210,27 @@ impl Interpreter {
             _ => return Err(RuntimeError::type_error(start, end)),
         };
         Ok(Value::Bool { value: result })
+    }
+
+    fn evaluate_modulus(
+        &self,
+        left: &Expression,
+        right: &Expression,
+        ctx: &mut EvaluationContext,
+    ) -> Result<Value, RuntimeError> {
+        let start = &left.start;
+        let end = &right.end;
+        let left = self.evaluate_expression(left, ctx)?;
+        let right = self.evaluate_expression(right, ctx)?;
+
+        let result = match left {
+            Value::Int { value: l } => match right {
+                Value::Int { value: r } => l % r,
+                _ => return Err(RuntimeError::type_error(start, end)),
+            },
+            _ => return Err(RuntimeError::type_error(start, end)),
+        };
+        Ok(Value::Int { value: result })
     }
 
     fn evaluate_binary_gt(

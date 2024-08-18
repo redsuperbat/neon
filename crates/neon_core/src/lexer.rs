@@ -1,5 +1,3 @@
-use std::fmt::write;
-
 #[derive(Debug)]
 pub struct Lexer {
     text: String,
@@ -37,15 +35,16 @@ pub enum TokenKind {
     Bang,   // !
     Equals, // =
 
-    PlusOperator,          // +
-    MinusOperator,         // -
-    LessThanComparator,    // <
-    GreaterThanComparator, // >
+    PlusOperator,       // +
+    MinusOperator,      // -
+    OpenAngleBracket,   // <
+    ClosedAngleBracket, // >
 
     OpenCurlyBrace,   // {
     ClosedCurlyBrace, // }
     OpenParen,        // (
     ClosedParen,      // )
+    Percentage,       // %
     Comma,            // ,
 
     IntegerLiteral, // 5 -3 etc.
@@ -69,12 +68,13 @@ impl ToString for TokenKind {
             TokenKind::TrueKeyword => "true",
             TokenKind::FalseKeyword => "false",
 
-            TokenKind::LessThanComparator => "<",
-            TokenKind::GreaterThanComparator => ">",
+            TokenKind::OpenAngleBracket => "<",
+            TokenKind::ClosedAngleBracket => ">",
             TokenKind::MinusOperator => "-",
             TokenKind::PlusOperator => "+",
 
             TokenKind::SemiColon => ";",
+            TokenKind::Percentage => ";",
             TokenKind::Equals => "=",
             TokenKind::Bang => "!",
             TokenKind::OpenCurlyBrace => "{",
@@ -126,8 +126,8 @@ impl Lexer {
             '=' => self.single_char(TokenKind::Equals),
             '!' => self.single_char(TokenKind::Bang),
 
-            '<' => self.single_char(TokenKind::LessThanComparator),
-            '>' => self.single_char(TokenKind::GreaterThanComparator),
+            '<' => self.single_char(TokenKind::OpenAngleBracket),
+            '>' => self.single_char(TokenKind::ClosedAngleBracket),
             '+' => self.single_char(TokenKind::PlusOperator),
             '-' => self.single_char(TokenKind::MinusOperator),
 
@@ -139,6 +139,7 @@ impl Lexer {
             '(' => self.single_char(TokenKind::OpenParen),
             ')' => self.single_char(TokenKind::ClosedParen),
             ',' => self.single_char(TokenKind::Comma),
+            '%' => self.single_char(TokenKind::Percentage),
             '"' => self.string_literal(),
 
             ' ' => self.whitespace(),
@@ -360,10 +361,7 @@ mod tests {
         );
         assert_significant_tokens(
             "<>",
-            vec![
-                TokenKind::LessThanComparator,
-                TokenKind::GreaterThanComparator,
-            ],
+            vec![TokenKind::OpenAngleBracket, TokenKind::ClosedAngleBracket],
         );
     }
 }
