@@ -1,12 +1,12 @@
-use std::usize;
-
+mod pre_processor;
 use js_sys::Array;
 use neon_core::{
-    lexer::{Lexer, Pos, Token, TokenKind},
+    lexer::{Lexer, Pos},
     parser::Parser,
     program::{execute_program, ProgramError},
     symbol_table::SymbolTable,
 };
+use pre_processor::{SemanticAnalyzer, SemanticToken};
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
@@ -26,56 +26,20 @@ pub struct JsToken {
     pub end: JsPos,
 }
 
-fn to_class_name(kind: &TokenKind) -> String {
-    let str = match kind {
-        TokenKind::FnKeyword => "fn",
-        TokenKind::LetKeyword => "let",
-        TokenKind::IfKeyword => "if",
-        TokenKind::ElseKeyword => "else",
-        TokenKind::TrueKeyword => "true",
-        TokenKind::FalseKeyword => "false",
-
-        TokenKind::OpenAngleBracket => "open-angle",
-        TokenKind::ClosedAngleBracket => "cloded-angle",
-        TokenKind::MinusOperator => "minus",
-        TokenKind::PlusOperator => "plus",
-        TokenKind::Ampersand => "ampersand",
-        TokenKind::Pipe => "pipe",
-
-        TokenKind::SemiColon => "semi",
-        TokenKind::Percentage => "percentage",
-        TokenKind::Equals => "equals",
-        TokenKind::Bang => "bang",
-        TokenKind::OpenCurlyBrace => "curly",
-        TokenKind::ClosedCurlyBrace => "curly",
-        TokenKind::OpenParen => "paren",
-        TokenKind::ClosedParen => "paren",
-        TokenKind::Comma => "comma",
-        TokenKind::Newline => "newline",
-        TokenKind::IntegerLiteral => "integer",
-        TokenKind::StringLiteral => "string",
-        TokenKind::Symbol => "symbol",
-        TokenKind::WhiteSpace => "whitespace",
-        TokenKind::Unknown => "unknown",
-
-        _ => "unknown",
-    };
-    str.to_string()
-}
-
-impl From<Token> for JsToken {
-    fn from(value: Token) -> Self {
+impl From<SemanticToken> for JsToken {
+    fn from(value: SemanticToken) -> Self {
         JsToken {
             start: JsPos::from(value.start),
             end: JsPos::from(value.end),
-            kind: to_class_name(&value.kind),
+            kind: value.kind.to_string(),
         }
     }
 }
 
 #[wasm_bindgen]
 pub fn tokenize(src: &str) -> Array {
-    Lexer::new(src)
+    let tokens = Lexer::new(src).collect::<Vec<_>>();
+    SemanticAnalyzer::new(tokens)
         .map(JsToken::from)
         .map(JsValue::from)
         .collect()

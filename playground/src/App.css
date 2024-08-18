@@ -1,23 +1,29 @@
-.symbol {
+.fn-name,
+.fn-call {
   color: #9cbacf !important;
 }
 
-.integer,
-.true,
-.false {
+.variable {
+  color: #f0e5a1 !important;
+}
+
+.int,
+.bool {
   color: orange !important;
+}
+
+.comment {
+  color: gray !important;
 }
 
 .string {
   color: #9fcca5 !important;
 }
 
-.if,
-.else,
-.let,
-.fn {
+.keyword {
   color: #b599b5 !important;
 }
+
 .diagnostic {
   color: red !important;
 }

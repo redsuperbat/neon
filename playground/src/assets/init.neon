@@ -1,5 +1,6 @@
-fn hello(){
-  5
+/ Hello world in neon! /
+fn hello_world(){
+  "Hello world"
 };
 
-hello() + hello()
+hello_world()

@@ -43,6 +43,7 @@ pub enum TokenKind {
     OpenCurlyBrace,   // {
     ClosedCurlyBrace, // }
     OpenParen,        // (
+    ForwardSlash,     // /
     ClosedParen,      // )
     Percentage,       // %
     Ampersand,        // &
@@ -73,6 +74,7 @@ impl ToString for TokenKind {
             TokenKind::OpenAngleBracket => "<",
             TokenKind::ClosedAngleBracket => ">",
             TokenKind::MinusOperator => "-",
+            TokenKind::ForwardSlash => "/",
             TokenKind::PlusOperator => "+",
             TokenKind::Ampersand => "&",
             TokenKind::Pipe => "|",
@@ -132,6 +134,7 @@ impl Lexer {
 
             '<' => self.single_char(TokenKind::OpenAngleBracket),
             '>' => self.single_char(TokenKind::ClosedAngleBracket),
+            '/' => self.single_char(TokenKind::ForwardSlash),
             '+' => self.single_char(TokenKind::PlusOperator),
             '-' => self.single_char(TokenKind::MinusOperator),
 
@@ -181,7 +184,7 @@ impl Lexer {
         while self.peek().is_some() && self.peek()? != '"' {
             lexeme.push(self.next()?);
         }
-        self.next()?;
+        self.next()?; // remove last "
 
         let end = self.get_pos();
         Some(Token {

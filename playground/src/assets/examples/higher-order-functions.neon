@@ -1,3 +1,4 @@
+/ Closing over arguments is not supported yet! /
 fn create_five() {
   fn five(){
     5

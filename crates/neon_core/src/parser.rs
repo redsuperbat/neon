@@ -256,6 +256,10 @@ impl Parser {
         self.peek_at_offset(0)
     }
 
+    fn is_at_end(&self) -> bool {
+        self.peek().is_none()
+    }
+
     fn peek_at_offset(&self, i: usize) -> Option<&Token> {
         self.tokens.get(i)
     }
@@ -462,6 +466,7 @@ impl Parser {
             TokenKind::IfKeyword => self.parse_if(),
             TokenKind::LetKeyword => self.parse_let(),
             TokenKind::Symbol => self.parse_identifier(),
+            TokenKind::ForwardSlash => self.parse_comment(),
             _ => SyntaxError::new(
                 vec![
                     TokenKind::FnKeyword,
@@ -473,6 +478,15 @@ impl Parser {
                 next,
             ),
         }
+    }
+
+    fn parse_comment(&mut self) -> Result<Expression, SyntaxError> {
+        self.assert_next(TokenKind::ForwardSlash)?;
+        while !self.is_at_end() && !self.next_is(TokenKind::ForwardSlash) {
+            self.next()?;
+        }
+        self.assert_next(TokenKind::ForwardSlash)?;
+        self.parse_expression()
     }
 
     fn parse_string(&mut self) -> Result<Expression, SyntaxError> {
@@ -494,6 +508,7 @@ impl Parser {
             end,
         })
     }
+
     fn parse_false_keyword(&mut self) -> Result<Expression, SyntaxError> {
         let Token { start, end, .. } = self.assert_next(TokenKind::FalseKeyword)?;
         Ok(Expression {
@@ -676,11 +691,8 @@ mod tests {
     #[test]
     fn single() {
         let ast = parse(
-            "fn hello(){
-  5
-};
-
-hello() + hello()",
+            "let a = 3+3; / My comment /
+a + a",
         );
         assert!(matches!(ast.kind, ExpressionKind::Block { .. }));
     }

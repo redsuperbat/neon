@@ -20,6 +20,7 @@ import math from "./assets/examples/math.neon?raw";
 import recursion from "./assets/examples/recursion.neon?raw";
 import higherOrderFunctions from "./assets/examples/higher-order-functions.neon?raw";
 import fizzbuzz from "./assets/examples/fizz-buzz.neon?raw";
+import typeErrors from "./assets/examples/type-errors.neon?raw";
 
 function LoadingPage() {
   return <div aria-busy="true"></div>;
@@ -44,6 +45,10 @@ const examples: { label: string; value: string }[] = [
   {
     label: "Fizz Buzz",
     value: fizzbuzz,
+  },
+  {
+    label: "Type errors",
+    value: typeErrors,
   },
 ];
 
