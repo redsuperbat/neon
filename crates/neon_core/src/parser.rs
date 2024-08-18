@@ -42,8 +42,12 @@ pub enum ExpressionKind {
 
     If {
         predicate: Box<Expression>,
-        if_block: Box<Expression>,
-        else_block: Box<Option<Expression>>,
+        consequent: Box<Expression>,
+        alternate: Box<Option<Expression>>,
+    },
+
+    Else {
+        consequent: Box<Expression>,
     },
 
     Int {
@@ -503,21 +507,40 @@ impl Parser {
         let Token { start, .. } = self.assert_next(TokenKind::IfKeyword)?;
         let predicate = self.parse_expression()?;
 
-        let if_block = self.parse_block()?;
-        let mut else_block = None;
+        let consequent = self.parse_block()?;
+        let mut alternate = None;
 
         if self.next_is(TokenKind::ElseKeyword) {
-            self.assert_next(TokenKind::ElseKeyword)?;
-            else_block = Some(self.parse_block()?);
+            alternate = Some(self.parse_else()?);
         }
 
         Ok(Expression {
             start,
-            end: if_block.end,
+            end: consequent.end,
             kind: ExpressionKind::If {
                 predicate: Box::new(predicate),
-                if_block: Box::from(if_block),
-                else_block: Box::from(else_block),
+                consequent: Box::from(consequent),
+                alternate: Box::from(alternate),
+            },
+        })
+    }
+
+    fn parse_else(&mut self) -> Result<Expression, SyntaxError> {
+        let Token { start, .. } = self.assert_next(TokenKind::ElseKeyword)?;
+
+        let consequent;
+
+        if self.next_is(TokenKind::IfKeyword) {
+            consequent = self.parse_if()?;
+        } else {
+            consequent = self.parse_block()?;
+        }
+
+        Ok(Expression {
+            start,
+            end: consequent.end,
+            kind: ExpressionKind::Else {
+                consequent: Box::new(consequent),
             },
         })
     }

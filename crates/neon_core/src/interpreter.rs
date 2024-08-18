@@ -110,9 +110,10 @@ impl Interpreter {
             }
             ExpressionKind::If {
                 predicate,
-                if_block,
-                else_block,
-            } => self.evaluate_if(predicate, if_block, else_block, ctx),
+                consequent,
+                alternate,
+            } => self.evaluate_if(predicate, consequent, alternate, ctx),
+            ExpressionKind::Else { consequent } => self.evaluate_expression(consequent, ctx),
             ExpressionKind::Ne { left, right } => self.evaluate_binary_ne(left, right, ctx),
             ExpressionKind::Eq { left, right } => self.evaluate_binary_eq(left, right, ctx),
             ExpressionKind::Sub { left, right } => self.evaluate_binary_subtract(left, right, ctx),
@@ -316,8 +317,8 @@ impl Interpreter {
     fn evaluate_if(
         &self,
         predicate: &Expression,
-        if_block: &Expression,
-        else_block: &Option<Expression>,
+        consequent: &Expression,
+        alternate: &Option<Expression>,
         ctx: &mut EvaluationContext,
     ) -> Result<Value, RuntimeError> {
         let start = &predicate.start;
@@ -328,11 +329,11 @@ impl Interpreter {
         };
 
         if value {
-            return self.evaluate_expression(if_block, ctx);
+            return self.evaluate_expression(consequent, ctx);
         };
 
-        if let Some(else_block) = else_block {
-            return self.evaluate_expression(else_block, ctx);
+        if let Some(alternate) = alternate {
+            return self.evaluate_expression(alternate, ctx);
         };
 
         Ok(Value::Unit)

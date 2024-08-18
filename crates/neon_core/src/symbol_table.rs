@@ -102,9 +102,11 @@ impl SymbolTable {
             ExpressionKind::Block { body, return_val } => self.visit_block(body, return_val),
             ExpressionKind::If {
                 predicate,
-                if_block,
-                else_block,
-            } => self.visit_if(predicate, if_block, else_block),
+                consequent,
+                alternate,
+            } => self.visit_if(predicate, consequent, alternate),
+            ExpressionKind::Else { consequent } => self.visit_expression(consequent),
+
             ExpressionKind::Int { .. } => Ok(()),
             ExpressionKind::Bool { .. } => Ok(()),
             ExpressionKind::String { .. } => Ok(()),
@@ -124,11 +126,11 @@ impl SymbolTable {
     fn visit_if(
         &mut self,
         predicate: &Expression,
-        if_block: &Expression,
+        consequent: &Expression,
         else_block: &Option<Expression>,
     ) -> Result<(), SymbolError> {
         self.visit_expression(predicate)?;
-        self.visit_expression(if_block)?;
+        self.visit_expression(consequent)?;
         if let Some(else_block) = else_block {
             self.visit_expression(else_block)?;
         };

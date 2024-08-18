@@ -19,6 +19,7 @@ import init_script from "./assets/init.neon?raw";
 import math from "./assets/examples/math.neon?raw";
 import recursion from "./assets/examples/recursion.neon?raw";
 import higherOrderFunctions from "./assets/examples/higher-order-functions.neon?raw";
+import fizzbuzz from "./assets/examples/fizz-buzz.neon?raw";
 
 function LoadingPage() {
   return <div aria-busy="true"></div>;
@@ -40,6 +41,10 @@ const examples: { label: string; value: string }[] = [
     label: "Higher order functions",
     value: higherOrderFunctions,
   },
+  {
+    label: "Fizz Buzz",
+    value: fizzbuzz,
+  },
 ];
 
 type Output =
@@ -56,6 +61,9 @@ function ExecutionPage() {
   let monacoEl: HTMLDivElement | undefined;
   let editor: monaco.editor.IStandaloneCodeEditor | undefined;
   let decorations: monaco.editor.IEditorDecorationsCollection | undefined;
+  let runtimeDecorations:
+    | monaco.editor.IEditorDecorationsCollection
+    | undefined;
 
   onMount(() => {
     if (!monacoEl) return;
@@ -64,6 +72,7 @@ function ExecutionPage() {
       theme: "vs-dark",
     });
     decorations = editor.createDecorationsCollection();
+    runtimeDecorations = editor.createDecorationsCollection();
 
     onContentChange(editor.getValue());
     editor.getModel()?.onDidChangeContent(() => {
@@ -139,6 +148,7 @@ function ExecutionPage() {
   }
 
   function exec() {
+    runtimeDecorations?.clear();
     const src = editor?.getValue();
     if (!src) return;
     try {
@@ -149,6 +159,25 @@ function ExecutionPage() {
       });
     } catch (e) {
       if (!(e instanceof ProgramErr)) return;
+      runtimeDecorations?.append([
+        {
+          range: {
+            startColumn: e.start[1],
+            endColumn: e.end[1],
+            startLineNumber: e.start[0],
+            endLineNumber: e.end[0],
+          },
+          options: {
+            isWholeLine: true,
+            inlineClassName: "diagnostic-container",
+            after: {
+              inlineClassName: "diagnostic",
+              content: e.message,
+            },
+          },
+        },
+      ]);
+
       setOutput({
         type: "error",
         message: e.message,
