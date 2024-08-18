@@ -49,6 +49,7 @@ pub enum TokenKind {
     Ampersand,        // &
     Pipe,             // |
     Comma,            // ,
+    Asterix,          // *
 
     IntegerLiteral, // 5 -3 etc.
     StringLiteral,  // "hello world" etc.
@@ -78,6 +79,7 @@ impl ToString for TokenKind {
             TokenKind::PlusOperator => "+",
             TokenKind::Ampersand => "&",
             TokenKind::Pipe => "|",
+            TokenKind::Asterix => "*",
 
             TokenKind::SemiColon => ";",
             TokenKind::Percentage => "%",
@@ -137,6 +139,7 @@ impl Lexer {
             '/' => self.single_char(TokenKind::ForwardSlash),
             '+' => self.single_char(TokenKind::PlusOperator),
             '-' => self.single_char(TokenKind::MinusOperator),
+            '*' => self.single_char(TokenKind::Asterix),
 
             ';' => self.single_char(TokenKind::SemiColon),
 

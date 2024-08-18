@@ -1,10 +1,17 @@
-/ Closing over arguments is not supported yet! /
-fn create_five() {
-  fn five(){
-    5
-  }
+/ Helper function to repeat a function call /
+fn repeat(fn_to_repeat, n) {
+  fn helper(i) {
+    if i < n + 1 {
+      fn_to_repeat() + helper(i + 1)
+    } else {
+      ""
+    }
+  };
+  helper(1)
 };
-let five = create_five();
 
-five() + five()
+fn greet(person) {
+  "Hello, " + person + "! "
+};
 
+repeat(fn a(){ greet("Dave") }, 10)

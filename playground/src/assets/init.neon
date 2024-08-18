@@ -1,6 +1,41 @@
-/ Hello world in neon! /
-fn hello_world(){
-  "Hello world"
+/
+  Welcome to Neon! 👋 Lets do a small deep dive of the language!
+  In order to declare functions you use the "fn" keyword
+/
+fn hello() {
+  "Hello"
 };
 
-hello_world()
+/
+  As you can see the function does not need a return keyword
+  since the body is an expression it will implicitly return the
+  string "hello" ✅
+
+  To declare variables, use the "let" keyword 
+/
+let greeting = hello();
+/ To handle control flow, use the "if" and "else" keywords /
+let message = if greeting == "Hello" {
+  " world!"
+} else {
+  "hell"
+};
+/
+  If statements are also expressions returning the value which
+  corresponds to the evaluated branch.
+  Even neon script files are expressions so they need to return something
+  in this case we can return the expression "hello() + message"
+/
+hello() + message
+/
+ If you execute this script below 👇 you should
+ see "Hello world!" printed to the result.
+
+ Neon is written in rust and this version you are running now
+ is compiled to webassembly in order to run in the browser. All
+ error messages and syntax highlights are custom made with Neon's
+ Parser, Lexer, Interpreter and SemanticAnalyzer 🧠
+
+ If you want to try more stuff out, see the examples!
+ Thanks for checking Neon out, it's been so much fun making it 🎉
+/

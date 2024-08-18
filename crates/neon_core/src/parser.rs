@@ -150,11 +150,22 @@ impl SyntaxError {
 
 impl Parser {
     pub fn new(tokens: Vec<Token>) -> Parser {
+        let tokens = tokens
+            .into_iter()
+            .filter(|t| t.kind != TokenKind::WhiteSpace && t.kind != TokenKind::Newline);
+
+        let mut token_queue = VecDeque::new();
+        let mut in_comment = false;
+        for token in tokens {
+            if token.kind == TokenKind::ForwardSlash {
+                in_comment = !in_comment;
+            } else if !in_comment {
+                token_queue.push_back(token);
+            }
+        }
+
         Parser {
-            tokens: tokens
-                .into_iter()
-                .filter(|t| t.kind != TokenKind::WhiteSpace && t.kind != TokenKind::Newline)
-                .collect::<VecDeque<Token>>(),
+            tokens: token_queue,
         }
     }
 
@@ -254,10 +265,6 @@ impl Parser {
 
     fn peek(&self) -> Option<&Token> {
         self.peek_at_offset(0)
-    }
-
-    fn is_at_end(&self) -> bool {
-        self.peek().is_none()
     }
 
     fn peek_at_offset(&self, i: usize) -> Option<&Token> {
@@ -466,7 +473,6 @@ impl Parser {
             TokenKind::IfKeyword => self.parse_if(),
             TokenKind::LetKeyword => self.parse_let(),
             TokenKind::Symbol => self.parse_identifier(),
-            TokenKind::ForwardSlash => self.parse_comment(),
             _ => SyntaxError::new(
                 vec![
                     TokenKind::FnKeyword,
@@ -478,15 +484,6 @@ impl Parser {
                 next,
             ),
         }
-    }
-
-    fn parse_comment(&mut self) -> Result<Expression, SyntaxError> {
-        self.assert_next(TokenKind::ForwardSlash)?;
-        while !self.is_at_end() && !self.next_is(TokenKind::ForwardSlash) {
-            self.next()?;
-        }
-        self.assert_next(TokenKind::ForwardSlash)?;
-        self.parse_expression()
     }
 
     fn parse_string(&mut self) -> Result<Expression, SyntaxError> {

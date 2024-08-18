@@ -393,18 +393,20 @@ impl Interpreter {
             return Err(RuntimeError::type_error(start, end));
         };
 
-        let mut value_args = vec![];
-
-        for arg in arguments {
-            value_args.push(self.evaluate_expression(arg, ctx)?);
-        }
+        let value_args = arguments
+            .iter()
+            .map(|a| self.evaluate_expression(a, ctx))
+            .collect::<Result<Vec<Value>, RuntimeError>>()?;
 
         let mut func_ctx = ctx.clone();
         func_ctx.call_stack.push(name);
 
-        for (param, arg_value) in parameters.iter().zip(value_args.iter()) {
-            func_ctx.bindings.insert(param.clone(), arg_value.clone());
-        }
+        parameters
+            .iter()
+            .zip(value_args.iter())
+            .for_each(|(param, argument)| {
+                func_ctx.bindings.insert(param.clone(), argument.clone());
+            });
 
         let result = self.evaluate_expression(&body, &mut func_ctx);
         func_ctx.call_stack.pop();

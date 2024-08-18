@@ -93,6 +93,7 @@ function ExecutionPage() {
 
   function onContentChange(src: string) {
     decorations?.clear();
+    runtimeDecorations?.clear();
     renderSyntaxHighlighting(src);
     renderDiagnostics(src);
   }
