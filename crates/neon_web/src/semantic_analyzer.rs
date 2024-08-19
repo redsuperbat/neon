@@ -119,6 +119,8 @@ impl SemanticAnalyzer {
             | TokenKind::Bang
             | TokenKind::Equals
             | TokenKind::Pipe
+            | TokenKind::Plus
+            | TokenKind::Minus
             | TokenKind::Percentage
             | TokenKind::OpenAngleBracket
             | TokenKind::ClosedAngleBracket => self.single(SemanticTokenKind::Operator),

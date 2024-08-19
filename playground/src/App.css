@@ -1,27 +1,45 @@
+:root {
+  --fn-color: #9cbacf;
+  --variable-color: #d4c79a;
+  --bool-color: orange;
+  --int-color: pink;
+  --operator-color: #b8860b;
+  --comment-color: gray;
+  --string-color: #9fcca5;
+  --keyword-color: #b599b5;
+}
+
 .fn-name,
 .fn-call {
-  color: #9cbacf !important;
+  color: var(--fn-color) !important;
 }
 
 .variable {
-  color: #f0e5a1 !important;
+  color: var(--variable-color) !important;
 }
 
-.int,
 .bool {
-  color: orange !important;
+  color: var(--bool-color) !important;
+}
+
+.int {
+  color: var(--int-color) !important;
+}
+
+.operator {
+  color: var(--operator-color) !important;
 }
 
 .comment {
-  color: gray !important;
+  color: var(--comment-color) !important;
 }
 
 .string {
-  color: #9fcca5 !important;
+  color: var(--string-color) !important;
 }
 
 .keyword {
-  color: #b599b5 !important;
+  color: var(--keyword-color) !important;
 }
 
 .diagnostic {

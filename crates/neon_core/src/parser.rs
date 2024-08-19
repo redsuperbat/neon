@@ -240,8 +240,8 @@ impl Parser {
         };
 
         match next.kind {
-            TokenKind::PlusOperator => {
-                self.assert_next(TokenKind::PlusOperator)?;
+            TokenKind::Plus => {
+                self.assert_next(TokenKind::Plus)?;
                 let right = self.parse_expression()?;
                 expression = Expression {
                     start: expression.start,
@@ -321,8 +321,8 @@ impl Parser {
                 };
                 Ok(expression)
             }
-            TokenKind::MinusOperator => {
-                self.assert_next(TokenKind::MinusOperator)?;
+            TokenKind::Minus => {
+                self.assert_next(TokenKind::Minus)?;
                 let right = self.parse_expression()?;
                 expression = Expression {
                     start: expression.start,

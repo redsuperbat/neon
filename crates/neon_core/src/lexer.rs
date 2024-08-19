@@ -35,8 +35,8 @@ pub enum TokenKind {
     Bang,   // !
     Equals, // =
 
-    PlusOperator,       // +
-    MinusOperator,      // -
+    Plus,               // +
+    Minus,              // -
     OpenAngleBracket,   // <
     ClosedAngleBracket, // >
 
@@ -74,9 +74,9 @@ impl ToString for TokenKind {
 
             TokenKind::OpenAngleBracket => "<",
             TokenKind::ClosedAngleBracket => ">",
-            TokenKind::MinusOperator => "-",
+            TokenKind::Minus => "-",
             TokenKind::ForwardSlash => "/",
-            TokenKind::PlusOperator => "+",
+            TokenKind::Plus => "+",
             TokenKind::Ampersand => "&",
             TokenKind::Pipe => "|",
             TokenKind::Asterix => "*",
@@ -137,8 +137,8 @@ impl Lexer {
             '<' => self.single_char(TokenKind::OpenAngleBracket),
             '>' => self.single_char(TokenKind::ClosedAngleBracket),
             '/' => self.single_char(TokenKind::ForwardSlash),
-            '+' => self.single_char(TokenKind::PlusOperator),
-            '-' => self.single_char(TokenKind::MinusOperator),
+            '+' => self.single_char(TokenKind::Plus),
+            '-' => self.single_char(TokenKind::Minus),
             '*' => self.single_char(TokenKind::Asterix),
 
             ';' => self.single_char(TokenKind::SemiColon),
@@ -355,7 +355,7 @@ mod tests {
                 TokenKind::Symbol,
                 TokenKind::OpenParen,
                 TokenKind::ClosedParen,
-                TokenKind::PlusOperator,
+                TokenKind::Plus,
                 TokenKind::Symbol,
                 TokenKind::OpenParen,
                 TokenKind::ClosedParen,
@@ -365,7 +365,7 @@ mod tests {
             "\"hello()\" + hello()",
             vec![
                 TokenKind::StringLiteral,
-                TokenKind::PlusOperator,
+                TokenKind::Plus,
                 TokenKind::Symbol,
                 TokenKind::OpenParen,
                 TokenKind::ClosedParen,

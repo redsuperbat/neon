@@ -1,4 +1,5 @@
-mod pre_processor;
+mod semantic_analyzer;
+
 use js_sys::Array;
 use neon_core::{
     lexer::{Lexer, Pos},
@@ -6,7 +7,7 @@ use neon_core::{
     program::{execute_program, ProgramError},
     symbol_table::SymbolTable,
 };
-use pre_processor::{SemanticAnalyzer, SemanticToken};
+use semantic_analyzer::{SemanticAnalyzer, SemanticToken};
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
