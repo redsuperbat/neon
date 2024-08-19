@@ -2,8 +2,20 @@ use std::collections::VecDeque;
 
 use crate::lexer::{Pos, Token, TokenKind};
 
+struct Location {
+    start: Pos,
+    end: Pos,
+}
+
+impl Location {
+    fn new(start: Pos, end: Pos) -> Location {
+        Location { end, start }
+    }
+}
+
 pub struct Parser {
     tokens: VecDeque<Token>,
+    last_location: Location,
 }
 
 #[derive(Debug, Clone)]
@@ -49,6 +61,8 @@ pub enum ExpressionKind {
     Else {
         consequent: Box<Expression>,
     },
+
+    Empty,
 
     Int {
         value: i64,
@@ -166,92 +180,25 @@ impl Parser {
 
         Parser {
             tokens: token_queue,
+            last_location: Location::new(Pos::empty(), Pos::empty()),
         }
     }
 
     fn next(&mut self) -> Result<Token, SyntaxError> {
-        self.tokens.pop_front().ok_or(SyntaxError {
-            start: Pos::empty(),
-            end: Pos::empty(),
+        let token = self.tokens.pop_front().ok_or(SyntaxError {
+            start: self.last_location.start,
+            end: self.last_location.end,
             kind: SyntaxErrorKind::UnexpectedEndOfFile,
-        })
+        })?;
+        self.last_location = Location::new(token.start, token.end);
+        Ok(token)
     }
 
-    pub fn parse_block(&mut self) -> Result<Expression, SyntaxError> {
-        let Token { start, end, .. } = self.assert_next(TokenKind::OpenCurlyBrace)?;
-        let mut body = vec![];
-        let return_val;
-
-        loop {
-            let expression = self.parse_expression()?;
-
-            if self.next_is(TokenKind::ClosedCurlyBrace) {
-                return_val = Some(expression);
-                break;
-            } else {
-                body.push(expression);
-                self.assert_next(TokenKind::SemiColon)?;
-            }
+    fn is_at_end(&self) -> bool {
+        match self.peek() {
+            Some(_) => false,
+            None => true,
         }
-
-        let Some(return_val) = return_val else {
-            return Err(SyntaxError {
-                kind: SyntaxErrorKind::UnexpectedEndOfBlock,
-                start,
-                end: body.last().map(|t| t.end.clone()).unwrap_or(end),
-            });
-        };
-
-        let Token { end, .. } = self.assert_next(TokenKind::ClosedCurlyBrace)?;
-
-        Ok(Expression {
-            start,
-            end,
-            kind: ExpressionKind::Block {
-                return_val: Box::new(return_val),
-                body,
-            },
-        })
-    }
-
-    pub fn parse_program(&mut self) -> Result<Expression, SyntaxError> {
-        let mut expressions = vec![];
-        let return_val;
-
-        loop {
-            let expression = self.parse_expression()?;
-
-            if self.peek().is_none() {
-                return_val = Some(expression);
-                break;
-            } else {
-                expressions.push(expression);
-                self.assert_next(TokenKind::SemiColon)?;
-            }
-        }
-
-        let Some(return_val) = return_val else {
-            return Err(SyntaxError {
-                kind: SyntaxErrorKind::UnexpectedEndOfProgram,
-                start: expressions
-                    .first()
-                    .map(|t| t.start.clone())
-                    .unwrap_or(Pos::empty()),
-                end: expressions
-                    .last()
-                    .map(|t| t.end.clone())
-                    .unwrap_or(Pos::empty()),
-            });
-        };
-
-        Ok(Expression {
-            start: expressions.first().unwrap_or(&return_val).start.clone(),
-            end: return_val.end.clone(),
-            kind: ExpressionKind::Block {
-                body: expressions,
-                return_val: Box::new(return_val),
-            },
-        })
     }
 
     fn assert_next(&mut self, kind: TokenKind) -> Result<Token, SyntaxError> {
@@ -466,6 +413,8 @@ impl Parser {
 
         match next.kind {
             TokenKind::FnKeyword => self.parse_fn(),
+            TokenKind::OpenCurlyBrace => self.parse_block(),
+            TokenKind::ClosedCurlyBrace => self.parse_empty(),
             TokenKind::FalseKeyword => self.parse_false_keyword(),
             TokenKind::TrueKeyword => self.parse_true_keyword(),
             TokenKind::IntegerLiteral => self.parse_integer(),
@@ -484,6 +433,59 @@ impl Parser {
                 next,
             ),
         }
+    }
+
+    fn parse_block_body(&mut self) -> Result<(Vec<Expression>, Expression), SyntaxError> {
+        let mut body = vec![];
+        let return_val;
+        loop {
+            let expression = self.parse_expression()?;
+
+            if self.next_is(TokenKind::ClosedCurlyBrace) || self.is_at_end() {
+                return_val = expression;
+                break;
+            } else {
+                body.push(expression);
+            }
+        }
+        Ok((body, return_val))
+    }
+
+    fn parse_block(&mut self) -> Result<Expression, SyntaxError> {
+        let Token { start, .. } = self.assert_next(TokenKind::OpenCurlyBrace)?;
+        let (body, return_val) = self.parse_block_body()?;
+        let Token { end, .. } = self.assert_next(TokenKind::ClosedCurlyBrace)?;
+
+        Ok(Expression {
+            start,
+            end,
+            kind: ExpressionKind::Block {
+                return_val: Box::new(return_val),
+                body,
+            },
+        })
+    }
+
+    pub fn parse_program(&mut self) -> Result<Expression, SyntaxError> {
+        let (body, return_val) = self.parse_block_body()?;
+
+        Ok(Expression {
+            start: body.first().unwrap_or(&return_val).start,
+            end: return_val.end,
+            kind: ExpressionKind::Block {
+                body,
+                return_val: Box::new(return_val),
+            },
+        })
+    }
+
+    fn parse_empty(&mut self) -> Result<Expression, SyntaxError> {
+        let Token { start, end, .. } = self.assert_next(TokenKind::ClosedCurlyBrace)?;
+        Ok(Expression {
+            kind: ExpressionKind::Empty,
+            start,
+            end,
+        })
     }
 
     fn parse_string(&mut self) -> Result<Expression, SyntaxError> {
@@ -595,7 +597,7 @@ impl Parser {
 
     fn parse_let(&mut self) -> Result<Expression, SyntaxError> {
         let Token { start, .. } = self.assert_next(TokenKind::LetKeyword)?;
-        let Token { end, lexeme, .. } = self.assert_next(TokenKind::Symbol)?;
+        let Token { lexeme, end, .. } = self.assert_next(TokenKind::Symbol)?;
         self.assert_next(TokenKind::Equals)?;
         let right = self.parse_expression().map(Box::new)?;
 
@@ -665,11 +667,11 @@ mod tests {
 
     #[test]
     fn parsing() {
-        let ast = parse("let a = 3; let b = 4; fn test() { a + b }");
+        let ast = parse("let a = 3 let b = 4 fn test() { a + b }");
         assert!(matches!(ast.kind, ExpressionKind::Block { .. }));
-        let ast = parse("let a = 3; fn t() { 3 + 4 }; t()");
+        let ast = parse("let a = 3 fn t() { 3 + 4 } t()");
         assert!(matches!(ast.kind, ExpressionKind::Block { .. }));
-        let ast = parse("let a = 4; let b = a + a; fn test() { b + b }");
+        let ast = parse("let a = 4 let b = a + a fn test() { b + b }");
         assert!(matches!(ast.kind, ExpressionKind::Block { .. }));
         let ast = parse("a");
         assert!(matches!(ast.kind, ExpressionKind::Block { .. }));
@@ -687,10 +689,8 @@ mod tests {
 
     #[test]
     fn single() {
-        let ast = parse(
-            "let a = 3+3; / My comment /
-a + a",
-        );
+        let ast = parse("let a = 3 + 3");
+        println!("{:?}", ast);
         assert!(matches!(ast.kind, ExpressionKind::Block { .. }));
     }
 }

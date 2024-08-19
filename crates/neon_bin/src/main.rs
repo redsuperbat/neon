@@ -1,7 +1,7 @@
 use neon_core::{
-    interpreter::{EvaluationContext, Interpreter},
+    interpreter::{EvaluationContext, Interpreter, Value},
     lexer::Lexer,
-    parser::Parser,
+    parser::{ExpressionKind, Parser},
     program::{execute_program, ProgramError},
     symbol_table::SymbolTable,
 };
@@ -19,10 +19,12 @@ fn print(str: &str) -> () {
 fn repl() {
     let handle = io::stdin().lock();
 
+    let bindings = HashMap::new();
+
     let mut ctx = EvaluationContext {
         symbol_table: SymbolTable::new(),
         call_stack: vec![],
-        bindings: HashMap::new(),
+        bindings,
     };
     let interpreter = Interpreter::new();
 

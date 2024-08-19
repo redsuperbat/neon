@@ -110,6 +110,7 @@ impl SymbolTable {
             ExpressionKind::Int { .. } => Ok(()),
             ExpressionKind::Bool { .. } => Ok(()),
             ExpressionKind::String { .. } => Ok(()),
+            ExpressionKind::Empty => Ok(()),
 
             ExpressionKind::Add { left, right } => self.visit_binary(left, right),
             ExpressionKind::Sub { left, right } => self.visit_binary(left, right),

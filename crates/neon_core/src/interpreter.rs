@@ -1,5 +1,7 @@
-use core::panic;
-use std::{collections::HashMap, fmt::Display};
+use std::{
+    collections::HashMap,
+    fmt::{self, Display, Formatter},
+};
 
 use crate::{
     lexer::Pos,
@@ -17,7 +19,7 @@ pub enum Value {
 }
 
 impl Display for Value {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             Value::Int { value } => write!(f, "{}", value),
             Value::Bool { value } => write!(f, "{}", value),
@@ -126,6 +128,7 @@ impl Interpreter {
             ExpressionKind::Modulus { left, right } => self.evaluate_modulus(left, right, ctx),
             ExpressionKind::And { left, right } => self.evaluate_and(left, right, ctx),
             ExpressionKind::Or { left, right } => self.evaluate_or(left, right, ctx),
+            ExpressionKind::Empty => Ok(Value::Unit),
         }
     }
 

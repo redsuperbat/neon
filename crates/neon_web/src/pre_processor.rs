@@ -18,6 +18,7 @@ pub enum SemanticTokenKind {
     String,
     Int,
     Keyword,
+    Operator,
 }
 
 impl ToString for SemanticTokenKind {
@@ -31,6 +32,7 @@ impl ToString for SemanticTokenKind {
             SemanticTokenKind::String => "string",
             SemanticTokenKind::Int => "int",
             SemanticTokenKind::Keyword => "keyword",
+            SemanticTokenKind::Operator => "operator",
         };
         str.to_string()
     }
@@ -113,8 +115,17 @@ impl SemanticAnalyzer {
                 self.single(SemanticTokenKind::Keyword)
             }
 
-            TokenKind::TrueKeyword => self.single(SemanticTokenKind::Bool),
-            TokenKind::FalseKeyword => self.single(SemanticTokenKind::Bool),
+            TokenKind::Ampersand
+            | TokenKind::Bang
+            | TokenKind::Equals
+            | TokenKind::Pipe
+            | TokenKind::Percentage
+            | TokenKind::OpenAngleBracket
+            | TokenKind::ClosedAngleBracket => self.single(SemanticTokenKind::Operator),
+
+            TokenKind::TrueKeyword | TokenKind::FalseKeyword => {
+                self.single(SemanticTokenKind::Bool)
+            }
             TokenKind::IntegerLiteral => self.single(SemanticTokenKind::Int),
             TokenKind::StringLiteral => self.single(SemanticTokenKind::String),
 
