@@ -195,10 +195,7 @@ impl Parser {
     }
 
     fn is_at_end(&self) -> bool {
-        match self.peek() {
-            Some(_) => false,
-            None => true,
-        }
+        self.peek().is_none()
     }
 
     fn assert_next(&mut self, kind: TokenKind) -> Result<Token, SyntaxError> {
@@ -437,8 +434,16 @@ impl Parser {
 
     fn parse_block_body(&mut self) -> Result<(Vec<Expression>, Expression), SyntaxError> {
         let mut body = vec![];
-        let return_val;
+        let mut return_val = Expression {
+            start: self.last_location.start,
+            end: self.last_location.end,
+            kind: ExpressionKind::Empty,
+        };
         loop {
+            if self.next_is(TokenKind::ClosedCurlyBrace) || self.is_at_end() {
+                break;
+            };
+
             let expression = self.parse_expression()?;
 
             if self.next_is(TokenKind::ClosedCurlyBrace) || self.is_at_end() {
@@ -690,7 +695,6 @@ mod tests {
     #[test]
     fn single() {
         let ast = parse("let a = 3 + 3");
-        println!("{:?}", ast);
         assert!(matches!(ast.kind, ExpressionKind::Block { .. }));
     }
 }

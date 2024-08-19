@@ -97,7 +97,6 @@ impl SemanticAnalyzer {
 
     fn next_token(&mut self) -> Option<SemanticToken> {
         let scope = self.lexical_scope.front()?;
-        println!("{:?}", scope);
         match scope {
             LexicalScope::Default => self.default_scope_token(),
             LexicalScope::Fn => self.fn_scope_token(),
@@ -191,7 +190,6 @@ mod tests {
 
     #[test]
     fn analyzing() {
-        let tokens = analyze("let a  = 3");
-        println!("{:?}", tokens);
+        analyze("let a  = 3");
     }
 }
