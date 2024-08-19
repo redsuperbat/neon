@@ -6,12 +6,12 @@ fn repeat(fn_to_repeat, n) {
     } else {
       ""
     }
-  };
+  }
   helper(1)
-};
+}
 
 fn greet(person) {
   "Hello, " + person + "! "
-};
+}
 
 repeat(fn a(){ greet("Dave") }, 10)

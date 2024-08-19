@@ -1,17 +1,17 @@
 / Works fine /
- let a = 3 + 3;
- a;
+ let a = 3 + 3
+ a
 / 
  Neon does not do type coercion therefore you cannot add a string to an int 
  try to fix this 👇 so the type error goes away.
  To make the error appear, just try executing the code.
 /
-let b = 3 + "3";
-b;
+let b = 3 + "3"
+b
 /
  Because everything is an expression in Neon, Neon evaluates things from right to left 
  therefore this is also an error. Try fixing it! 🚀
 /
-let c = 13 % 3 == 0;
+let c = 13 % 3 == 0
 c
 

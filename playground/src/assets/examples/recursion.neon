@@ -4,6 +4,6 @@ fn count_to_ten(a) {
   } else {
     count_to_ten(a + 1)
   }
-};
+}
 
 count_to_ten(0)

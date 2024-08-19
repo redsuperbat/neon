@@ -4,7 +4,7 @@
 /
 fn hello() {
   "Hello"
-};
+}
 
 /
   As you can see the function does not need a return keyword
@@ -13,13 +13,13 @@ fn hello() {
 
   To declare variables, use the "let" keyword 
 /
-let greeting = hello();
+let greeting = hello()
 / To handle control flow, use the "if" and "else" keywords /
 let message = if greeting == "Hello" {
   " world!"
 } else {
   "hell"
-};
+}
 /
   If statements are also expressions returning the value which
   corresponds to the evaluated branch.

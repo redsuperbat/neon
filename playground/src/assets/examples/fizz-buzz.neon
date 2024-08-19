@@ -9,13 +9,13 @@ fn fizz_buzz(n) {
         "Buzz~"
       } else {
         ""
-      };
+      }
       word + helper(i + 1)
     } else {
         ""
     }
-  };
+  }
   helper(1)
-};
+}
 
 fizz_buzz(15)
