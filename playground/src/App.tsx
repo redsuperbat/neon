@@ -58,6 +58,18 @@ const examples: { label: string; value: string }[] = [
   },
 ];
 
+const errorDecorationOptions = (
+  message: string,
+): monaco.editor.IModelDecorationOptions => ({
+  isWholeLine: true,
+  className: "diagnostic-container",
+  glyphMarginClassName: "diagnostic-glyph",
+  after: {
+    inlineClassName: "diagnostic",
+    content: `           ${message}`,
+  },
+});
+
 type Output =
   | {
       type: "error";
@@ -139,15 +151,7 @@ function ExecutionPage() {
           startColumn: 0,
           endColumn: col,
         },
-        options: {
-          isWholeLine: true,
-          className: "diagnostic-container",
-          glyphMarginClassName: "diagnostic-glyph",
-          after: {
-            inlineClassName: "diagnostic",
-            content: `           ${e.message}`,
-          },
-        },
+        options: errorDecorationOptions(e.message),
       };
       diagnosticsDecorations?.append([decoration]);
     }
@@ -193,14 +197,7 @@ function ExecutionPage() {
             startLineNumber: e.start[0],
             endLineNumber: e.end[0],
           },
-          options: {
-            isWholeLine: true,
-            inlineClassName: "diagnostic-container",
-            after: {
-              inlineClassName: "diagnostic",
-              content: e.message,
-            },
-          },
+          options: errorDecorationOptions(e.message),
         },
       ]);
 
