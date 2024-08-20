@@ -25,6 +25,33 @@ pub struct Expression {
     pub kind: ExpressionKind,
 }
 
+impl Expression {
+    pub fn kind(kind: ExpressionKind) -> Expression {
+        Expression {
+            kind,
+            end: Pos::start(),
+            start: Pos::start(),
+        }
+    }
+    pub fn boxed(self) -> Box<Self> {
+        Box::new(self)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum BuiltinExpressionKind {
+    Print,
+}
+
+impl BuiltinExpressionKind {
+    pub fn name(&self) -> String {
+        match self {
+            BuiltinExpressionKind::Print => "print",
+        }
+        .to_string()
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum ExpressionKind {
     Fn {
@@ -120,6 +147,11 @@ pub enum ExpressionKind {
         left: Box<Expression>,
         right: Box<Expression>,
     },
+
+    Builtin {
+        kind: BuiltinExpressionKind,
+        arguments: Vec<String>,
+    },
 }
 
 #[derive(Debug)]
@@ -180,7 +212,7 @@ impl Parser {
 
         Parser {
             tokens: token_queue,
-            last_location: Location::new(Pos::empty(), Pos::empty()),
+            last_location: Location::new(Pos::start(), Pos::start()),
         }
     }
 
@@ -244,8 +276,8 @@ impl Parser {
                     start: expression.start,
                     end: right.end,
                     kind: ExpressionKind::Add {
-                        left: Box::from(expression),
-                        right: Box::from(right),
+                        left: expression.boxed(),
+                        right: right.boxed(),
                     },
                 };
                 Ok(expression)
@@ -257,8 +289,8 @@ impl Parser {
                     start: expression.start,
                     end: right.end,
                     kind: ExpressionKind::Modulus {
-                        left: Box::from(expression),
-                        right: Box::new(right),
+                        left: expression.boxed(),
+                        right: right.boxed(),
                     },
                 };
                 Ok(expression)
@@ -271,8 +303,8 @@ impl Parser {
                     start: expression.start,
                     end: right.end,
                     kind: ExpressionKind::And {
-                        left: Box::from(expression),
-                        right: Box::new(right),
+                        left: expression.boxed(),
+                        right: right.boxed(),
                     },
                 };
                 Ok(expression)
@@ -285,8 +317,8 @@ impl Parser {
                     start: expression.start,
                     end: right.end,
                     kind: ExpressionKind::Or {
-                        left: Box::from(expression),
-                        right: Box::new(right),
+                        left: expression.boxed(),
+                        right: right.boxed(),
                     },
                 };
                 Ok(expression)
@@ -299,8 +331,8 @@ impl Parser {
                     start: expression.start,
                     end: right.end,
                     kind: ExpressionKind::Lt {
-                        left: Box::from(expression),
-                        right: Box::new(right),
+                        left: expression.boxed(),
+                        right: right.boxed(),
                     },
                 };
                 Ok(expression)
@@ -312,8 +344,8 @@ impl Parser {
                     start: expression.start,
                     end: right.end,
                     kind: ExpressionKind::Gt {
-                        left: Box::from(expression),
-                        right: Box::new(right),
+                        left: expression.boxed(),
+                        right: right.boxed(),
                     },
                 };
                 Ok(expression)
@@ -325,8 +357,8 @@ impl Parser {
                     start: expression.start,
                     end: right.end,
                     kind: ExpressionKind::Sub {
-                        left: Box::from(expression),
-                        right: Box::new(right),
+                        left: expression.boxed(),
+                        right: right.boxed(),
                     },
                 };
                 Ok(expression)
@@ -339,8 +371,8 @@ impl Parser {
                     start: expression.start,
                     end: right.end,
                     kind: ExpressionKind::Ne {
-                        left: Box::from(expression),
-                        right: Box::new(right),
+                        left: expression.boxed(),
+                        right: right.boxed(),
                     },
                 };
                 Ok(expression)
@@ -354,8 +386,8 @@ impl Parser {
                         start: expression.start,
                         end: right.end,
                         kind: ExpressionKind::Eq {
-                            left: Box::from(expression),
-                            right: Box::new(right),
+                            left: expression.boxed(),
+                            right: right.boxed(),
                         },
                     };
                     Ok(expression)
@@ -391,7 +423,7 @@ impl Parser {
                     start: expression.start,
                     end: expression.end.clone(),
                     kind: ExpressionKind::Invocation {
-                        callee: Box::from(expression),
+                        callee: expression.boxed(),
                         arguments: self.parse_arguments()?,
                     },
                 };
@@ -404,8 +436,8 @@ impl Parser {
     fn parse_leaf_expression(&mut self) -> Result<Expression, SyntaxError> {
         let next = self.peek().ok_or(SyntaxError {
             kind: SyntaxErrorKind::UnexpectedEndOfFile,
-            start: Pos::empty(),
-            end: Pos::empty(),
+            start: Pos::start(),
+            end: Pos::start(),
         })?;
 
         match next.kind {
@@ -465,7 +497,7 @@ impl Parser {
             start,
             end,
             kind: ExpressionKind::Block {
-                return_val: Box::new(return_val),
+                return_val: return_val.boxed(),
                 body,
             },
         })
@@ -479,7 +511,7 @@ impl Parser {
             end: return_val.end,
             kind: ExpressionKind::Block {
                 body,
-                return_val: Box::new(return_val),
+                return_val: return_val.boxed(),
             },
         })
     }
@@ -537,9 +569,9 @@ impl Parser {
             start,
             end: consequent.end,
             kind: ExpressionKind::If {
-                predicate: Box::new(predicate),
-                consequent: Box::from(consequent),
-                alternate: Box::from(alternate),
+                predicate: predicate.boxed(),
+                consequent: consequent.boxed(),
+                alternate: Box::new(alternate),
             },
         })
     }
@@ -559,7 +591,7 @@ impl Parser {
             start,
             end: consequent.end,
             kind: ExpressionKind::Else {
-                consequent: Box::new(consequent),
+                consequent: consequent.boxed(),
             },
         })
     }
@@ -652,7 +684,7 @@ impl Parser {
             kind: ExpressionKind::Fn {
                 name: name.lexeme,
                 parameters,
-                body: Box::from(block),
+                body: block.boxed(),
             },
         })
     }

@@ -10,7 +10,7 @@ pub struct Lexer {
 pub struct Pos(pub usize, pub usize);
 
 impl Pos {
-    pub fn empty() -> Pos {
+    pub fn start() -> Pos {
         Pos(0, 0)
     }
 }

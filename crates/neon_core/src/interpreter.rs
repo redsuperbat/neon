@@ -5,7 +5,7 @@ use std::{
 
 use crate::{
     lexer::Pos,
-    parser::{Expression, ExpressionKind},
+    parser::{BuiltinExpressionKind, Expression, ExpressionKind},
     symbol_table::SymbolTable,
 };
 
@@ -73,7 +73,13 @@ impl RuntimeError {
     }
 }
 
-pub struct Interpreter {}
+pub trait Builtin {
+    fn exec(&self, values: Vec<&Value>) -> Result<Value, RuntimeError>;
+}
+
+pub struct Interpreter {
+    builtins: HashMap<BuiltinExpressionKind, Box<dyn Builtin>>,
+}
 
 #[derive(Debug, Clone)]
 pub struct EvaluationContext {
@@ -82,9 +88,41 @@ pub struct EvaluationContext {
     pub call_stack: Vec<String>,
 }
 
+impl EvaluationContext {
+    pub fn new(symbol_table: SymbolTable) -> EvaluationContext {
+        EvaluationContext {
+            symbol_table,
+            bindings: HashMap::new(),
+            call_stack: vec![],
+        }
+    }
+    pub fn register_bultin(&mut self, kind: BuiltinExpressionKind) {
+        let arguments: Vec<String> = (0..=100).map(|n| n.to_string() + "arg").collect();
+        let name = kind.name();
+        let func = Value::Fn {
+            function: ExpressionKind::Fn {
+                name: name.clone(),
+                parameters: arguments.clone(),
+                body: Expression::kind(ExpressionKind::Builtin { kind, arguments }).boxed(),
+            },
+        };
+        self.bindings.insert(name, func);
+    }
+}
+
 impl Interpreter {
     pub fn new() -> Interpreter {
-        Interpreter {}
+        Interpreter {
+            builtins: HashMap::new(),
+        }
+    }
+
+    pub fn register_bultin(
+        &mut self,
+        kind: BuiltinExpressionKind,
+        builtin: Box<dyn Builtin>,
+    ) -> () {
+        self.builtins.insert(kind, builtin);
     }
 
     pub fn evaluate_expression(
@@ -92,15 +130,14 @@ impl Interpreter {
         expression: &Expression,
         ctx: &mut EvaluationContext,
     ) -> Result<Value, RuntimeError> {
-        match &expression.kind {
+        let Expression { start, end, kind } = expression;
+        match kind {
             ExpressionKind::Fn {
                 name,
                 parameters,
                 body: block,
             } => self.evaluate_fn(name, parameters, block, ctx),
-            ExpressionKind::Identifier { name } => {
-                self.evaluate_identifier(name, &expression.start, &expression.end, ctx)
-            }
+            ExpressionKind::Identifier { name } => self.evaluate_identifier(name, start, end, ctx),
             ExpressionKind::Invocation { callee, arguments } => {
                 self.evaluate_invocation(callee, arguments, ctx)
             }
@@ -129,7 +166,25 @@ impl Interpreter {
             ExpressionKind::And { left, right } => self.evaluate_and(left, right, ctx),
             ExpressionKind::Or { left, right } => self.evaluate_or(left, right, ctx),
             ExpressionKind::Empty => Ok(Value::Unit),
+            ExpressionKind::Builtin { arguments, kind } => {
+                self.evaluate_internal(kind, arguments, ctx)
+            }
         }
+    }
+
+    fn evaluate_internal(
+        &self,
+        kind: &BuiltinExpressionKind,
+        arguments: &Vec<String>,
+        ctx: &mut EvaluationContext,
+    ) -> Result<Value, RuntimeError> {
+        let values = arguments
+            .iter()
+            .map(|a| ctx.bindings.get(a))
+            .filter_map(|a| a)
+            .collect::<Vec<&Value>>();
+        let builtin = self.builtins.get(kind).expect("Internal neon error");
+        builtin.exec(values)
     }
 
     fn evaluate_binary_subtract(

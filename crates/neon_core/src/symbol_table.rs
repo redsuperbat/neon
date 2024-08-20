@@ -1,6 +1,6 @@
 use crate::{
     lexer::Pos,
-    parser::{Expression, ExpressionKind},
+    parser::{BuiltinExpressionKind, Expression, ExpressionKind},
 };
 use std::{
     collections::{HashMap, HashSet},
@@ -86,6 +86,13 @@ impl SymbolTable {
         self.declarations_by_reference.get(reference)
     }
 
+    pub fn register_bultin(&mut self, kind: BuiltinExpressionKind) {
+        let name = kind.name();
+        self.declarations_by_reference
+            .insert(name.clone(), name.clone());
+        self.scope.declarations.insert(name);
+    }
+
     pub fn visit_expression(&mut self, expression: &Expression) -> Result<(), SymbolError> {
         let Expression { start, end, .. } = &expression;
         match &expression.kind {
@@ -121,6 +128,7 @@ impl SymbolTable {
             ExpressionKind::Modulus { left, right } => self.visit_binary(left, right),
             ExpressionKind::And { left, right } => self.visit_binary(left, right),
             ExpressionKind::Or { left, right } => self.visit_binary(left, right),
+            ExpressionKind::Builtin { .. } => Ok(()),
         }
     }
 

@@ -1,12 +1,11 @@
 use neon_core::{
-    interpreter::{EvaluationContext, Interpreter, Value},
+    interpreter::{Builtin, EvaluationContext, Interpreter, RuntimeError, Value},
     lexer::Lexer,
-    parser::{ExpressionKind, Parser},
+    parser::{BuiltinExpressionKind, Parser},
     program::{execute_program, ProgramError},
     symbol_table::SymbolTable,
 };
 use std::{
-    collections::HashMap,
     env, fs,
     io::{self, BufRead, Write},
 };
@@ -16,21 +15,32 @@ fn print(str: &str) -> () {
     io::stdout().flush().expect("Failed to flush to stdout");
 }
 
+struct Print {}
+impl Builtin for Print {
+    fn exec(&self, values: Vec<&Value>) -> Result<Value, RuntimeError> {
+        for value in values {
+            print!("{} ", value);
+        }
+        print!("\n");
+        Ok(Value::Unit)
+    }
+}
+
 fn repl() {
     let handle = io::stdin().lock();
 
-    let bindings = HashMap::new();
+    let mut symbol_table = SymbolTable::new();
+    symbol_table.register_bultin(BuiltinExpressionKind::Print);
 
-    let mut ctx = EvaluationContext {
-        symbol_table: SymbolTable::new(),
-        call_stack: vec![],
-        bindings,
-    };
-    let interpreter = Interpreter::new();
+    let mut ctx = EvaluationContext::new(symbol_table);
+    ctx.register_bultin(BuiltinExpressionKind::Print);
+
+    let mut interpreter = Interpreter::new();
+    interpreter.register_bultin(BuiltinExpressionKind::Print, Box::new(Print {}));
 
     print("> ");
     for line in handle.lines() {
-        let line = line.expect("Failed to read line") + "\n";
+        let line = line.expect("Failed to read line");
         let tokens = Lexer::new(line).vec();
 
         let ast = match Parser::new(tokens).parse_program() {
@@ -50,12 +60,6 @@ fn repl() {
                 continue;
             }
         }
-
-        ctx = EvaluationContext {
-            symbol_table: ctx.symbol_table,
-            bindings: ctx.bindings,
-            call_stack: ctx.call_stack,
-        };
 
         let result = match interpreter.evaluate_expression(&ast, &mut ctx) {
             Ok(ast) => ast,
