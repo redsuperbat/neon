@@ -1,26 +1,28 @@
+import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
 import init, {
+  compile,
   interpret_src,
   JsToken,
-  tokenize,
-  compile,
   ProgramErr,
+  tokenize,
 } from "neon-web";
 import {
   createResource,
   createSignal,
-  Match,
-  onMount,
-  Switch,
-  onCleanup,
   For,
+  Match,
+  onCleanup,
+  onMount,
+  Show,
+  Switch,
 } from "solid-js";
-import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
-import init_script from "./assets/init.neon?raw";
+import fizzbuzz from "./assets/examples/fizz-buzz.neon?raw";
+import higherOrderFunctions from "./assets/examples/higher-order-functions.neon?raw";
 import math from "./assets/examples/math.neon?raw";
 import recursion from "./assets/examples/recursion.neon?raw";
-import higherOrderFunctions from "./assets/examples/higher-order-functions.neon?raw";
-import fizzbuzz from "./assets/examples/fizz-buzz.neon?raw";
 import typeErrors from "./assets/examples/type-errors.neon?raw";
+import iife from "./assets/examples/iife.neon?raw";
+import initScript from "./assets/init.neon?raw";
 
 function LoadingPage() {
   return <div aria-busy="true"></div>;
@@ -50,6 +52,10 @@ const examples: { label: string; value: string }[] = [
     label: "Type errors",
     value: typeErrors,
   },
+  {
+    label: "iife (Immediately invoked function expression)",
+    value: iife,
+  },
 ];
 
 type Output =
@@ -64,9 +70,14 @@ type Output =
 
 function ExecutionPage() {
   const [output, setOutput] = createSignal<Output>();
+  const [disabled, setDisabled] = createSignal(false);
   let monacoEl: HTMLDivElement | undefined;
   let editor: monaco.editor.IStandaloneCodeEditor | undefined;
-  let decorations: monaco.editor.IEditorDecorationsCollection | undefined;
+
+  let syntaxDecorations: monaco.editor.IEditorDecorationsCollection | undefined;
+  let diagnosticsDecorations:
+    | monaco.editor.IEditorDecorationsCollection
+    | undefined;
   let runtimeDecorations:
     | monaco.editor.IEditorDecorationsCollection
     | undefined;
@@ -74,11 +85,17 @@ function ExecutionPage() {
   onMount(() => {
     if (!monacoEl) return;
     editor = monaco.editor.create(monacoEl, {
-      value: init_script,
+      value: initScript,
       theme: "vs-dark",
+      glyphMargin: true,
     });
-    decorations = editor.createDecorationsCollection();
+    syntaxDecorations = editor.createDecorationsCollection();
     runtimeDecorations = editor.createDecorationsCollection();
+    diagnosticsDecorations = editor.createDecorationsCollection();
+
+    diagnosticsDecorations.onDidChange(() =>
+      setDisabled((diagnosticsDecorations?.length ?? 0) > 0),
+    );
 
     onContentChange(editor.getValue());
     editor.getModel()?.onDidChangeContent(() => {
@@ -93,8 +110,9 @@ function ExecutionPage() {
   });
 
   function onContentChange(src: string) {
-    decorations?.clear();
+    syntaxDecorations?.clear();
     runtimeDecorations?.clear();
+    diagnosticsDecorations?.clear();
     renderSyntaxHighlighting(src);
     renderDiagnostics(src);
   }
@@ -118,24 +136,25 @@ function ExecutionPage() {
         range: {
           startLineNumber: e.start[0],
           endLineNumber: e.start[0],
-          startColumn: col,
-          endColumn: e.end[1],
+          startColumn: 0,
+          endColumn: col,
         },
         options: {
           isWholeLine: true,
-          inlineClassName: "diagnostic-container",
+          className: "diagnostic-container",
+          glyphMarginClassName: "diagnostic-glyph",
           after: {
             inlineClassName: "diagnostic",
-            content: e.message,
+            content: `           ${e.message}`,
           },
         },
       };
-      decorations?.append([decoration]);
+      diagnosticsDecorations?.append([decoration]);
     }
   }
 
   function renderSyntaxHighlighting(src: string) {
-    if (!decorations) return;
+    if (!syntaxDecorations) return;
 
     const tokens: JsToken[] = tokenize(src);
     const highlights: monaco.editor.IModelDeltaDecoration[] = tokens.map(
@@ -151,7 +170,7 @@ function ExecutionPage() {
         },
       }),
     );
-    decorations.append(highlights);
+    syntaxDecorations.append(highlights);
   }
 
   function exec() {
@@ -205,23 +224,45 @@ function ExecutionPage() {
         ref={monacoEl}
       ></div>
 
-      <div role="group">
-        <select
-          onchange={(e) => setEditorContent(e.target.value)}
-          name="select"
-          aria-label="Select"
-          required
+      <div
+        style={{
+          display: "grid",
+          "grid-template-columns": "1fr auto",
+          gap: "10px",
+        }}
+      >
+        <div>
+          <select
+            onchange={(e) => setEditorContent(e.target.value)}
+            style={{ height: "60px" }}
+            aria-invalid={disabled()}
+            name="select"
+            aria-label="Select"
+            aria-describedby="invalid-diagnostics"
+            required
+          >
+            <option selected disabled value="">
+              Examples
+            </option>
+            <For each={examples}>
+              {({ value, label }) => <option value={value}>{label}</option>}
+            </For>
+          </select>
+          <Show when={disabled()}>
+            <small id="invalid-diagnostics">
+              Cannot execute when there are diagnostics errors
+            </small>
+          </Show>
+        </div>
+        <button
+          style={{ height: "60px" }}
+          disabled={disabled()}
+          onclick={() => exec()}
         >
-          <option selected disabled value="">
-            Examples
-          </option>
-          <For each={examples}>
-            {({ value, label }) => <option value={value}>{label}</option>}
-          </For>
-        </select>
-
-        <button onclick={() => exec()}>Execute</button>
+          Execute
+        </button>
       </div>
+
       <div
         style={{
           display: "grid",

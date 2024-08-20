@@ -3,7 +3,7 @@ mod semantic_analyzer;
 use js_sys::Array;
 use neon_core::{
     lexer::{Lexer, Pos},
-    parser::Parser,
+    parser::{Parser, SyntaxErrorKind},
     program::{execute_program, ProgramError},
     symbol_table::SymbolTable,
 };
@@ -46,6 +46,30 @@ pub fn tokenize(src: &str) -> Array {
         .collect()
 }
 
+fn program_err_to_string(err: ProgramError) -> String {
+    match err {
+        ProgramError::SyntaxError(e) => {
+            let message = match e.kind {
+                SyntaxErrorKind::UnexpectedToken { expected, found } => {
+                    let expected = expected
+                        .into_iter()
+                        .map(|t| t.to_string())
+                        .collect::<Vec<_>>()
+                        .join(", ");
+                    format!(
+                        "Unexpected token '{}'  expected any of {expected}",
+                        found.to_string(),
+                    )
+                }
+                _ => e.kind.to_string(),
+            };
+            message
+        }
+        ProgramError::SymbolError(e) => e.kind.to_string(),
+        ProgramError::RuntimeError(e) => e.kind.to_string(),
+    }
+}
+
 #[wasm_bindgen]
 pub fn compile(src: &str) -> Result<(), ProgramErr> {
     let tokens = Lexer::new(src).collect::<Vec<_>>();
@@ -54,7 +78,7 @@ pub fn compile(src: &str) -> Result<(), ProgramErr> {
         .map_err(|e| ProgramErr {
             start: JsPos::from(e.start),
             end: JsPos::from(e.end),
-            message: e.kind.to_string(),
+            message: program_err_to_string(ProgramError::SyntaxError(e)),
         })?;
     let mut symbol_table = SymbolTable::new();
     symbol_table
@@ -62,7 +86,7 @@ pub fn compile(src: &str) -> Result<(), ProgramErr> {
         .map_err(|e| ProgramErr {
             start: JsPos::from(e.start),
             end: JsPos::from(e.end),
-            message: e.kind.to_string(),
+            message: program_err_to_string(ProgramError::SymbolError(e)),
         })?;
     Ok(())
 }
@@ -90,17 +114,17 @@ pub fn interpret_src(src: &str) -> Result<ProgramOk, ProgramErr> {
                 ProgramError::SyntaxError(e) => ProgramErr {
                     start: JsPos::from(e.start),
                     end: JsPos::from(e.end),
-                    message: e.kind.to_string(),
+                    message: program_err_to_string(ProgramError::SyntaxError(e)),
                 },
                 ProgramError::SymbolError(e) => ProgramErr {
-                    message: e.kind.to_string(),
                     start: JsPos::from(e.start),
                     end: JsPos::from(e.end),
+                    message: program_err_to_string(ProgramError::SymbolError(e)),
                 },
                 ProgramError::RuntimeError(e) => ProgramErr {
                     start: JsPos::from(e.start),
                     end: JsPos::from(e.end),
-                    message: e.kind.to_string(),
+                    message: program_err_to_string(ProgramError::RuntimeError(e)),
                 },
             };
             Err(err)

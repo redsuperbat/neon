@@ -46,6 +46,10 @@
   color: red !important;
 }
 
+.diagnostic-glyph:after {
+  content: "⛔️" !important;
+}
+
 .diagnostic-container {
   background: rgba(255, 102, 102, 0.1) !important;
 }
