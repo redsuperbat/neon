@@ -123,11 +123,8 @@ function ExecutionPage() {
     });
 
     // This will be called by rust code
-    window.on_print = (...values) =>
-      setLogs((prev) => [
-        ...(prev ?? []),
-        ...[...values].map((it) => String(it)),
-      ]);
+    window.on_print = (...args) =>
+      setLogs((prev) => [...(prev ?? []), ...args.map((it) => String(it))]);
   });
 
   onCleanup(() => {

@@ -6,7 +6,7 @@ import "./App.css";
 import { App } from "./App";
 
 declare global {
-  function on_print(cb: (...values: any) => void): void;
+  function on_print(...values: any[]): void;
 }
 
 window.on_print = () => {};
