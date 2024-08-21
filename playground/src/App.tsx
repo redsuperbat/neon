@@ -22,6 +22,7 @@ import math from "./assets/examples/math.neon?raw";
 import recursion from "./assets/examples/recursion.neon?raw";
 import typeErrors from "./assets/examples/type-errors.neon?raw";
 import iife from "./assets/examples/iife.neon?raw";
+import helloWorld from "./assets/examples/hello-world.neon?raw";
 import initScript from "./assets/init.neon?raw";
 
 function LoadingPage() {
@@ -51,6 +52,10 @@ const examples: { label: string; value: string }[] = [
   {
     label: "Type errors",
     value: typeErrors,
+  },
+  {
+    label: "Hello world 👋",
+    value: helloWorld,
   },
   {
     label: "iife (Immediately invoked function expression)",
@@ -83,6 +88,7 @@ type Output =
 function ExecutionPage() {
   const [output, setOutput] = createSignal<Output>();
   const [disabled, setDisabled] = createSignal(false);
+  const [logs, setLogs] = createSignal<string[]>();
   let monacoEl: HTMLDivElement | undefined;
   let editor: monaco.editor.IStandaloneCodeEditor | undefined;
 
@@ -115,6 +121,13 @@ function ExecutionPage() {
       if (!value) return;
       onContentChange(value);
     });
+
+    // This will be called by rust code
+    window.on_print = (...values) =>
+      setLogs((prev) => [
+        ...(prev ?? []),
+        ...[...values].map((it) => String(it)),
+      ]);
   });
 
   onCleanup(() => {
@@ -178,6 +191,7 @@ function ExecutionPage() {
   }
 
   function exec() {
+    setLogs(undefined);
     runtimeDecorations?.clear();
     const src = editor?.getValue();
     if (!src) return;
@@ -262,13 +276,16 @@ function ExecutionPage() {
 
       <div
         style={{
-          display: "grid",
-          "place-items": "center",
-          "grid-template-columns": "auto 1fr",
-          padding: "10px",
+          "margin-bottom": "5px",
         }}
       >
-        <span>Result:</span>
+        <span
+          style={{
+            "margin-right": "5px",
+          }}
+        >
+          Script evaluated to:
+        </span>
         <span
           style={{
             color: output()?.type === "error" ? "red" : "green",
@@ -277,6 +294,18 @@ function ExecutionPage() {
           {output()?.message}
         </span>
       </div>
+
+      <h3>Logs</h3>
+      <pre>
+        <code
+          style={{
+            display: "flex",
+            "flex-direction": "column",
+          }}
+        >
+          <For each={logs()}>{(item) => <div>{item}</div>}</For>
+        </code>
+      </pre>
     </main>
   );
 }

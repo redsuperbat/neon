@@ -1,5 +1,6 @@
 /
   Welcome to Neon! 👋 Lets do a small deep dive of the language!
+  Below is the hello world example
   In order to declare functions you use the "fn" keyword
 /
 fn hello() {
@@ -18,18 +19,19 @@ let greeting = hello()
 let message = if greeting == "Hello" {
   " world!"
 } else {
-  "hell"
+  print("Woopsie 😱")
 }
+
 /
   If statements are also expressions returning the value which
   corresponds to the evaluated branch.
-  Even neon script files are expressions so they need to return something
-  in this case we can return the expression "hello() + message"
+  Even neon script files are expressions in this case
+  the script file will evaluate to the result of "hello() + message"
 /
 hello() + message
 /
  If you execute this script below 👇 you should
- see "Hello world!" printed to the result.
+ see "Hello world!" listed as the value the script evaluated to
 
  Neon is written in rust and this version you are running now
  is compiled to webassembly in order to run in the browser. All

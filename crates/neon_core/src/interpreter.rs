@@ -45,7 +45,13 @@ pub enum RuntimeErrorKind {
 
 impl ToString for RuntimeErrorKind {
     fn to_string(&self) -> String {
-        format!("{:?}", self)
+        match self {
+            RuntimeErrorKind::TypeError => "Type error",
+            RuntimeErrorKind::UndefinedReference => "Reference is undefined",
+            RuntimeErrorKind::UninitializedVariable => "Variable is uninitialized",
+            RuntimeErrorKind::IllegalInvocation => "Callee was not a valid function",
+        }
+        .to_string()
     }
 }
 
@@ -96,14 +102,18 @@ impl EvaluationContext {
             call_stack: vec![],
         }
     }
-    pub fn register_bultin(&mut self, kind: BuiltinExpressionKind) {
+    pub fn register_bultin(&mut self, kind: &BuiltinExpressionKind) {
         let arguments: Vec<String> = (0..=100).map(|n| n.to_string() + "arg").collect();
         let name = kind.name();
         let func = Value::Fn {
             function: ExpressionKind::Fn {
                 name: name.clone(),
                 parameters: arguments.clone(),
-                body: Expression::kind(ExpressionKind::Builtin { kind, arguments }).boxed(),
+                body: Expression::kind(ExpressionKind::Builtin {
+                    kind: kind.clone(),
+                    arguments,
+                })
+                .boxed(),
             },
         };
         self.bindings.insert(name, func);
@@ -119,10 +129,10 @@ impl Interpreter {
 
     pub fn register_bultin(
         &mut self,
-        kind: BuiltinExpressionKind,
+        kind: &BuiltinExpressionKind,
         builtin: Box<dyn Builtin>,
     ) -> () {
-        self.builtins.insert(kind, builtin);
+        self.builtins.insert(kind.clone(), builtin);
     }
 
     pub fn evaluate_expression(

@@ -163,10 +163,6 @@ pub struct SyntaxError {
 
 #[derive(Debug)]
 pub enum SyntaxErrorKind {
-    UnexpectedEndOfBlock,
-
-    UnexpectedEndOfProgram,
-
     UnexpectedEndOfFile,
 
     UnexpectedToken {
@@ -177,7 +173,21 @@ pub enum SyntaxErrorKind {
 
 impl ToString for SyntaxErrorKind {
     fn to_string(&self) -> String {
-        format!("{:?}", self)
+        let str = match self {
+            SyntaxErrorKind::UnexpectedEndOfFile => "Unexpected end of program",
+            SyntaxErrorKind::UnexpectedToken { expected, found } => {
+                let expected = expected
+                    .into_iter()
+                    .map(|t| format!("'{}'", t.to_string()))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                &format!(
+                    "Unexpected token '{}'  expected any of {expected}",
+                    found.to_string(),
+                )
+            }
+        };
+        str.to_string()
     }
 }
 

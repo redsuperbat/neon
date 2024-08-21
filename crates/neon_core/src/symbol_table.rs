@@ -26,7 +26,7 @@ impl Scope {
             return Err(SymbolError {
                 start: start.clone(),
                 end: end.clone(),
-                kind: SymbolErrorKind::ReDeclaration {
+                kind: SymbolErrorKind::Redeclaration {
                     name: id.to_string(),
                 },
             });
@@ -64,14 +64,21 @@ pub struct SymbolError {
 
 impl ToString for SymbolErrorKind {
     fn to_string(&self) -> String {
-        format!("{:?}", self)
+        match self {
+            SymbolErrorKind::UndefinedReference { name } => {
+                format!("Undefined reference '{name}'")
+            }
+            SymbolErrorKind::Redeclaration { name } => {
+                format!("Redeclaration of variable '{name}'")
+            }
+        }
     }
 }
 
 #[derive(Debug)]
 pub enum SymbolErrorKind {
     UndefinedReference { name: String },
-    ReDeclaration { name: String },
+    Redeclaration { name: String },
 }
 
 impl SymbolTable {
@@ -86,7 +93,7 @@ impl SymbolTable {
         self.declarations_by_reference.get(reference)
     }
 
-    pub fn register_bultin(&mut self, kind: BuiltinExpressionKind) {
+    pub fn register_bultin(&mut self, kind: &BuiltinExpressionKind) {
         let name = kind.name();
         self.declarations_by_reference
             .insert(name.clone(), name.clone());

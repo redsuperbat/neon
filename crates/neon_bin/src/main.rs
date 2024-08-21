@@ -2,7 +2,6 @@ use neon_core::{
     interpreter::{Builtin, EvaluationContext, Interpreter, RuntimeError, Value},
     lexer::Lexer,
     parser::{BuiltinExpressionKind, Parser},
-    program::{execute_program, ProgramError},
     symbol_table::SymbolTable,
 };
 use std::{
@@ -26,17 +25,21 @@ impl Builtin for Print {
     }
 }
 
-fn repl() {
-    let handle = io::stdin().lock();
-
+fn program() -> (EvaluationContext, Interpreter) {
     let mut symbol_table = SymbolTable::new();
-    symbol_table.register_bultin(BuiltinExpressionKind::Print);
+    symbol_table.register_bultin(&BuiltinExpressionKind::Print);
 
     let mut ctx = EvaluationContext::new(symbol_table);
-    ctx.register_bultin(BuiltinExpressionKind::Print);
+    ctx.register_bultin(&BuiltinExpressionKind::Print);
 
     let mut interpreter = Interpreter::new();
-    interpreter.register_bultin(BuiltinExpressionKind::Print, Box::new(Print {}));
+    interpreter.register_bultin(&BuiltinExpressionKind::Print, Box::new(Print {}));
+    (ctx, interpreter)
+}
+
+fn repl() {
+    let handle = io::stdin().lock();
+    let (mut ctx, interpreter) = program();
 
     print("> ");
     for line in handle.lines() {
@@ -46,7 +49,7 @@ fn repl() {
         let ast = match Parser::new(tokens).parse_program() {
             Ok(ast) => ast,
             Err(e) => {
-                println!("{}", ProgramError::SyntaxError(e));
+                println!("{}", e.kind.to_string());
                 print("> ");
                 continue;
             }
@@ -55,7 +58,7 @@ fn repl() {
         match ctx.symbol_table.visit_expression(&ast) {
             Ok(_) => (),
             Err(e) => {
-                println!("{}", ProgramError::SymbolError(e));
+                println!("{}", e.kind.to_string());
                 print("> ");
                 continue;
             }
@@ -64,7 +67,7 @@ fn repl() {
         let result = match interpreter.evaluate_expression(&ast, &mut ctx) {
             Ok(ast) => ast,
             Err(e) => {
-                println!("{}", ProgramError::RuntimeError(e));
+                println!("{}", e.kind.to_string());
                 print("> ");
                 continue;
             }
@@ -77,9 +80,21 @@ fn repl() {
 
 fn file(path: &str) {
     let src = fs::read_to_string(path).expect("File not found");
-    match execute_program(&src) {
+    let tokens = Lexer::new(src).vec();
+
+    let ast = match Parser::new(tokens).parse_program() {
+        Ok(v) => v,
+        Err(e) => {
+            println!("{}", e.kind.to_string());
+            return;
+        }
+    };
+
+    let (mut ctx, interpreter) = program();
+
+    match interpreter.evaluate_expression(&ast, &mut ctx) {
         Ok(result) => println!("{:?}", result),
-        Err(e) => println!("{}", e),
+        Err(e) => println!("{}", e.kind.to_string()),
     }
 }
 

@@ -3,5 +3,5 @@
   in this case they are called an iife (immediately invoked function expression)
 /
 fn hello_world() {
-    "Hello world!"
+  print("Hello world!")
 }()

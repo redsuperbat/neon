@@ -1,19 +1,15 @@
 fn fizz_buzz(n) {
   fn helper(i) {
     if i < n + 1 {
-      let word = if 0 == i % 15 {
-        "FizzBuzz~"
+      if 0 == i % 15 {
+        print("FizzBuzz", i)
       } else if 0 == i % 3 {
-        "Fizz~"
+        print("Fizz", i)
       } else if 0 == i % 5 {
-        "Buzz~"
-      } else {
-        ""
+        print("Buzz", i)
       }
-      word + helper(i + 1)
-    } else {
-        ""
-    }
+      helper(i + 1)
+    } 
   }
   helper(1)
 }

@@ -2,9 +2,9 @@ mod semantic_analyzer;
 
 use js_sys::Array;
 use neon_core::{
+    interpreter::{Builtin, EvaluationContext, Interpreter, RuntimeError, Value},
     lexer::{Lexer, Pos},
-    parser::{Parser, SyntaxErrorKind},
-    program::{execute_program, ProgramError},
+    parser::{BuiltinExpressionKind, Parser},
     symbol_table::SymbolTable,
 };
 use semantic_analyzer::{SemanticAnalyzer, SemanticToken};
@@ -46,49 +46,39 @@ pub fn tokenize(src: &str) -> Array {
         .collect()
 }
 
-fn program_err_to_string(err: ProgramError) -> String {
-    match err {
-        ProgramError::SyntaxError(e) => {
-            let message = match e.kind {
-                SyntaxErrorKind::UnexpectedToken { expected, found } => {
-                    let expected = expected
-                        .into_iter()
-                        .map(|t| t.to_string())
-                        .collect::<Vec<_>>()
-                        .join(", ");
-                    format!(
-                        "Unexpected token '{}'  expected any of {expected}",
-                        found.to_string(),
-                    )
-                }
-                _ => e.kind.to_string(),
-            };
-            message
-        }
-        ProgramError::SymbolError(e) => e.kind.to_string(),
-        ProgramError::RuntimeError(e) => e.kind.to_string(),
-    }
-}
-
 #[wasm_bindgen]
 pub fn compile(src: &str) -> Result<(), ProgramErr> {
+    let print = BuiltinExpressionKind::Print;
     let tokens = Lexer::new(src).collect::<Vec<_>>();
     let ast = Parser::new(tokens)
         .parse_program()
         .map_err(|e| ProgramErr {
             start: JsPos::from(e.start),
             end: JsPos::from(e.end),
-            message: program_err_to_string(ProgramError::SyntaxError(e)),
+            message: e.kind.to_string(),
         })?;
+
     let mut symbol_table = SymbolTable::new();
+    symbol_table.register_bultin(&print);
+
     symbol_table
         .visit_expression(&ast)
         .map_err(|e| ProgramErr {
             start: JsPos::from(e.start),
             end: JsPos::from(e.end),
-            message: program_err_to_string(ProgramError::SymbolError(e)),
+            message: e.kind.to_string(),
         })?;
+
+    let mut ctx = EvaluationContext::new(symbol_table);
+
+    ctx.register_bultin(&print);
     Ok(())
+}
+
+#[wasm_bindgen]
+extern "C" {
+    #[wasm_bindgen(js_namespace = window)]
+    fn on_print(s: &str);
 }
 
 #[wasm_bindgen(getter_with_clone)]
@@ -103,31 +93,60 @@ pub struct ProgramErr {
     pub message: String,
 }
 
+struct Print {}
+impl Builtin for Print {
+    fn exec(&self, values: Vec<&Value>) -> Result<Value, RuntimeError> {
+        let str = values
+            .iter()
+            .map(|v| v.to_string())
+            .collect::<Vec<_>>()
+            .join(" ");
+        on_print(&str);
+        Ok(Value::Unit)
+    }
+}
+
+fn program() -> (EvaluationContext, Interpreter) {
+    let mut symbol_table = SymbolTable::new();
+    symbol_table.register_bultin(&BuiltinExpressionKind::Print);
+
+    let mut ctx = EvaluationContext::new(symbol_table);
+    ctx.register_bultin(&BuiltinExpressionKind::Print);
+
+    let mut interpreter = Interpreter::new();
+    interpreter.register_bultin(&BuiltinExpressionKind::Print, Box::new(Print {}));
+    (ctx, interpreter)
+}
+
 #[wasm_bindgen]
 pub fn interpret_src(src: &str) -> Result<ProgramOk, ProgramErr> {
-    match execute_program(src) {
-        Ok(result) => Ok(ProgramOk {
-            result: result.to_string(),
-        }),
-        Err(err) => {
-            let err = match err {
-                ProgramError::SyntaxError(e) => ProgramErr {
-                    start: JsPos::from(e.start),
-                    end: JsPos::from(e.end),
-                    message: program_err_to_string(ProgramError::SyntaxError(e)),
-                },
-                ProgramError::SymbolError(e) => ProgramErr {
-                    start: JsPos::from(e.start),
-                    end: JsPos::from(e.end),
-                    message: program_err_to_string(ProgramError::SymbolError(e)),
-                },
-                ProgramError::RuntimeError(e) => ProgramErr {
-                    start: JsPos::from(e.start),
-                    end: JsPos::from(e.end),
-                    message: program_err_to_string(ProgramError::RuntimeError(e)),
-                },
-            };
-            Err(err)
-        }
-    }
+    let tokens = Lexer::new(src).collect::<Vec<_>>();
+    let ast = Parser::new(tokens)
+        .parse_program()
+        .map_err(|e| ProgramErr {
+            start: JsPos::from(e.start),
+            end: JsPos::from(e.end),
+            message: e.kind.to_string(),
+        })?;
+
+    let (mut ctx, interpreter) = program();
+
+    ctx.symbol_table
+        .visit_expression(&ast)
+        .map_err(|e| ProgramErr {
+            start: JsPos::from(e.start),
+            end: JsPos::from(e.end),
+            message: e.kind.to_string(),
+        })?;
+
+    interpreter
+        .evaluate_expression(&ast, &mut ctx)
+        .map(|r| ProgramOk {
+            result: r.to_string(),
+        })
+        .map_err(|e| ProgramErr {
+            start: JsPos::from(e.start),
+            end: JsPos::from(e.end),
+            message: e.kind.to_string(),
+        })
 }

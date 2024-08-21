@@ -19,6 +19,7 @@ pub enum SemanticTokenKind {
     Int,
     Keyword,
     Operator,
+    Builtin,
 }
 
 impl ToString for SemanticTokenKind {
@@ -33,6 +34,7 @@ impl ToString for SemanticTokenKind {
             SemanticTokenKind::Int => "int",
             SemanticTokenKind::Keyword => "keyword",
             SemanticTokenKind::Operator => "operator",
+            SemanticTokenKind::Builtin => "builtin",
         };
         str.to_string()
     }
@@ -170,10 +172,16 @@ impl SemanticAnalyzer {
     }
 
     fn analyze_symbol(&mut self) -> Option<SemanticToken> {
-        if self.is_at_offset(1, TokenKind::OpenParen) {
-            self.single(SemanticTokenKind::FnCall)
-        } else {
-            self.single(SemanticTokenKind::VariableName)
+        let symbol = self.peek()?;
+        let is_fn = self.is_at_offset(1, TokenKind::OpenParen);
+
+        if !is_fn {
+            return self.single(SemanticTokenKind::VariableName);
+        }
+
+        match symbol.lexeme.as_str() {
+            "print" => self.single(SemanticTokenKind::Builtin),
+            _ => self.single(SemanticTokenKind::FnCall),
         }
     }
 }

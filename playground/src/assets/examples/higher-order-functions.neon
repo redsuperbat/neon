@@ -2,16 +2,15 @@
 fn repeat(fn_to_repeat, n) {
   fn helper(i) {
     if i < n + 1 {
-      fn_to_repeat() + helper(i + 1)
-    } else {
-      ""
-    }
+      fn_to_repeat(i)
+      helper(i + 1)
+    } 
   }
   helper(1)
 }
 
-fn greet(person) {
-  "Hello, " + person + "! "
+fn greet(person, person_nr) {
+  print("Hello,", person + "!", person_nr)
 }
 
-repeat(fn a(){ greet("Dave") }, 10)
+repeat(fn a(i){ greet("Dave", i) }, 10)
