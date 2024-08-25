@@ -53,7 +53,7 @@ impl BuiltinExpressionKind {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum BinaryExpressionKind {
+pub enum BinaryOp {
     Mod,
     And,
     Or,
@@ -117,7 +117,7 @@ pub enum ExpressionKind {
     },
 
     Binary {
-        kind: BinaryExpressionKind,
+        operation: BinaryOp,
         left: Box<Expression>,
         right: Box<Expression>,
     },
@@ -255,44 +255,44 @@ impl Parser {
         let (kind, right) = match next.kind {
             TokenKind::Plus => {
                 self.assert_next(TokenKind::Plus)?;
-                (BinaryExpressionKind::Add, self.parse_expression()?)
+                (BinaryOp::Add, self.parse_expression()?)
             }
             TokenKind::Percentage => {
                 self.assert_next(TokenKind::Percentage)?;
-                (BinaryExpressionKind::Mod, self.parse_expression()?)
+                (BinaryOp::Mod, self.parse_expression()?)
             }
             TokenKind::Ampersand => {
                 self.assert_next(TokenKind::Ampersand)?;
                 self.assert_next(TokenKind::Ampersand)?;
-                (BinaryExpressionKind::And, self.parse_expression()?)
+                (BinaryOp::And, self.parse_expression()?)
             }
             TokenKind::Pipe => {
                 self.assert_next(TokenKind::Pipe)?;
                 self.assert_next(TokenKind::Pipe)?;
-                (BinaryExpressionKind::Or, self.parse_expression()?)
+                (BinaryOp::Or, self.parse_expression()?)
             }
             TokenKind::OpenAngleBracket => {
                 self.assert_next(TokenKind::OpenAngleBracket)?;
-                (BinaryExpressionKind::Lt, self.parse_expression()?)
+                (BinaryOp::Lt, self.parse_expression()?)
             }
             TokenKind::ClosedAngleBracket => {
                 self.assert_next(TokenKind::ClosedAngleBracket)?;
-                (BinaryExpressionKind::Gt, self.parse_expression()?)
+                (BinaryOp::Gt, self.parse_expression()?)
             }
             TokenKind::Minus => {
                 self.assert_next(TokenKind::Minus)?;
-                (BinaryExpressionKind::Sub, self.parse_expression()?)
+                (BinaryOp::Sub, self.parse_expression()?)
             }
             TokenKind::Bang => {
                 self.assert_next(TokenKind::Bang)?;
                 self.assert_next(TokenKind::Equals)?;
-                (BinaryExpressionKind::Ne, self.parse_expression()?)
+                (BinaryOp::Ne, self.parse_expression()?)
             }
             TokenKind::Equals => {
                 if self.at_offet_is(1, TokenKind::Equals) {
                     self.assert_next(TokenKind::Equals)?;
                     self.assert_next(TokenKind::Equals)?;
-                    (BinaryExpressionKind::Eq, self.parse_expression()?)
+                    (BinaryOp::Eq, self.parse_expression()?)
                 } else {
                     return Ok(expression);
                 }
@@ -304,7 +304,7 @@ impl Parser {
             start: expression.start,
             end: right.end,
             kind: ExpressionKind::Binary {
-                kind,
+                operation: kind,
                 left: expression.boxed(),
                 right: right.boxed(),
             },

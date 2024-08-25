@@ -5,7 +5,7 @@ use std::{
 
 use crate::{
     lexer::Pos,
-    parser::{BinaryExpressionKind, BuiltinExpressionKind, Expression, ExpressionKind},
+    parser::{BinaryOp, BuiltinExpressionKind, Expression, ExpressionKind},
     symbol_table::SymbolTable,
 };
 
@@ -166,16 +166,20 @@ impl Interpreter {
             ExpressionKind::String { value } => Ok(Value::String {
                 value: value.clone(),
             }),
-            ExpressionKind::Binary { kind, left, right } => match kind {
-                BinaryExpressionKind::Add => self.evaluate_binary_add(left, right, ctx),
-                BinaryExpressionKind::Ne => self.evaluate_binary_ne(left, right, ctx),
-                BinaryExpressionKind::Eq => self.evaluate_binary_eq(left, right, ctx),
-                BinaryExpressionKind::Sub => self.evaluate_binary_subtract(left, right, ctx),
-                BinaryExpressionKind::Lt => self.evaluate_binary_lt(left, right, ctx),
-                BinaryExpressionKind::Gt => self.evaluate_binary_gt(left, right, ctx),
-                BinaryExpressionKind::Mod => self.evaluate_modulus(left, right, ctx),
-                BinaryExpressionKind::And => self.evaluate_and(left, right, ctx),
-                BinaryExpressionKind::Or => self.evaluate_or(left, right, ctx),
+            ExpressionKind::Binary {
+                operation,
+                left,
+                right,
+            } => match operation {
+                BinaryOp::Add => self.evaluate_binary_add(left, right, ctx),
+                BinaryOp::Ne => self.evaluate_binary_ne(left, right, ctx),
+                BinaryOp::Eq => self.evaluate_binary_eq(left, right, ctx),
+                BinaryOp::Sub => self.evaluate_binary_subtract(left, right, ctx),
+                BinaryOp::Lt => self.evaluate_binary_lt(left, right, ctx),
+                BinaryOp::Gt => self.evaluate_binary_gt(left, right, ctx),
+                BinaryOp::Mod => self.evaluate_modulus(left, right, ctx),
+                BinaryOp::And => self.evaluate_and(left, right, ctx),
+                BinaryOp::Or => self.evaluate_or(left, right, ctx),
             },
             ExpressionKind::Empty => Ok(Value::Unit),
             ExpressionKind::Builtin { arguments, kind } => {
