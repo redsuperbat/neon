@@ -52,6 +52,19 @@ impl BuiltinExpressionKind {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum BinaryExpressionKind {
+    Mod,
+    And,
+    Or,
+    Add,
+    Sub,
+    Lt,
+    Gt,
+    Ne,
+    Eq,
+}
+
 #[derive(Debug, Clone)]
 pub enum ExpressionKind {
     Fn {
@@ -103,47 +116,8 @@ pub enum ExpressionKind {
         value: bool,
     },
 
-    And {
-        left: Box<Expression>,
-        right: Box<Expression>,
-    },
-
-    Or {
-        left: Box<Expression>,
-        right: Box<Expression>,
-    },
-
-    Add {
-        left: Box<Expression>,
-        right: Box<Expression>,
-    },
-
-    Sub {
-        left: Box<Expression>,
-        right: Box<Expression>,
-    },
-
-    Lt {
-        left: Box<Expression>,
-        right: Box<Expression>,
-    },
-
-    Gt {
-        left: Box<Expression>,
-        right: Box<Expression>,
-    },
-
-    Modulus {
-        left: Box<Expression>,
-        right: Box<Expression>,
-    },
-
-    Ne {
-        left: Box<Expression>,
-        right: Box<Expression>,
-    },
-
-    Eq {
+    Binary {
+        kind: BinaryExpressionKind,
         left: Box<Expression>,
         right: Box<Expression>,
     },
@@ -272,141 +246,69 @@ impl Parser {
     }
 
     pub fn parse_expression(&mut self) -> Result<Expression, SyntaxError> {
-        let mut expression = self.parse_sub_leaf_expression()?;
+        let expression = self.parse_sub_leaf_expression()?;
 
         let Some(next) = self.peek() else {
             return Ok(expression);
         };
 
-        match next.kind {
+        let (kind, right) = match next.kind {
             TokenKind::Plus => {
                 self.assert_next(TokenKind::Plus)?;
-                let right = self.parse_expression()?;
-                expression = Expression {
-                    start: expression.start,
-                    end: right.end,
-                    kind: ExpressionKind::Add {
-                        left: expression.boxed(),
-                        right: right.boxed(),
-                    },
-                };
-                Ok(expression)
+                (BinaryExpressionKind::Add, self.parse_expression()?)
             }
             TokenKind::Percentage => {
                 self.assert_next(TokenKind::Percentage)?;
-                let right = self.parse_expression()?;
-                expression = Expression {
-                    start: expression.start,
-                    end: right.end,
-                    kind: ExpressionKind::Modulus {
-                        left: expression.boxed(),
-                        right: right.boxed(),
-                    },
-                };
-                Ok(expression)
+                (BinaryExpressionKind::Mod, self.parse_expression()?)
             }
             TokenKind::Ampersand => {
                 self.assert_next(TokenKind::Ampersand)?;
                 self.assert_next(TokenKind::Ampersand)?;
-                let right = self.parse_expression()?;
-                expression = Expression {
-                    start: expression.start,
-                    end: right.end,
-                    kind: ExpressionKind::And {
-                        left: expression.boxed(),
-                        right: right.boxed(),
-                    },
-                };
-                Ok(expression)
+                (BinaryExpressionKind::And, self.parse_expression()?)
             }
             TokenKind::Pipe => {
                 self.assert_next(TokenKind::Pipe)?;
                 self.assert_next(TokenKind::Pipe)?;
-                let right = self.parse_expression()?;
-                expression = Expression {
-                    start: expression.start,
-                    end: right.end,
-                    kind: ExpressionKind::Or {
-                        left: expression.boxed(),
-                        right: right.boxed(),
-                    },
-                };
-                Ok(expression)
+                (BinaryExpressionKind::Or, self.parse_expression()?)
             }
-
             TokenKind::OpenAngleBracket => {
                 self.assert_next(TokenKind::OpenAngleBracket)?;
-                let right = self.parse_expression()?;
-                expression = Expression {
-                    start: expression.start,
-                    end: right.end,
-                    kind: ExpressionKind::Lt {
-                        left: expression.boxed(),
-                        right: right.boxed(),
-                    },
-                };
-                Ok(expression)
+                (BinaryExpressionKind::Lt, self.parse_expression()?)
             }
             TokenKind::ClosedAngleBracket => {
                 self.assert_next(TokenKind::ClosedAngleBracket)?;
-                let right = self.parse_expression()?;
-                expression = Expression {
-                    start: expression.start,
-                    end: right.end,
-                    kind: ExpressionKind::Gt {
-                        left: expression.boxed(),
-                        right: right.boxed(),
-                    },
-                };
-                Ok(expression)
+                (BinaryExpressionKind::Gt, self.parse_expression()?)
             }
             TokenKind::Minus => {
                 self.assert_next(TokenKind::Minus)?;
-                let right = self.parse_expression()?;
-                expression = Expression {
-                    start: expression.start,
-                    end: right.end,
-                    kind: ExpressionKind::Sub {
-                        left: expression.boxed(),
-                        right: right.boxed(),
-                    },
-                };
-                Ok(expression)
+                (BinaryExpressionKind::Sub, self.parse_expression()?)
             }
             TokenKind::Bang => {
                 self.assert_next(TokenKind::Bang)?;
                 self.assert_next(TokenKind::Equals)?;
-                let right = self.parse_expression()?;
-                expression = Expression {
-                    start: expression.start,
-                    end: right.end,
-                    kind: ExpressionKind::Ne {
-                        left: expression.boxed(),
-                        right: right.boxed(),
-                    },
-                };
-                Ok(expression)
+                (BinaryExpressionKind::Ne, self.parse_expression()?)
             }
             TokenKind::Equals => {
                 if self.at_offet_is(1, TokenKind::Equals) {
                     self.assert_next(TokenKind::Equals)?;
                     self.assert_next(TokenKind::Equals)?;
-                    let right = self.parse_expression()?;
-                    expression = Expression {
-                        start: expression.start,
-                        end: right.end,
-                        kind: ExpressionKind::Eq {
-                            left: expression.boxed(),
-                            right: right.boxed(),
-                        },
-                    };
-                    Ok(expression)
+                    (BinaryExpressionKind::Eq, self.parse_expression()?)
                 } else {
-                    Ok(expression)
+                    return Ok(expression);
                 }
             }
-            _ => Ok(expression),
-        }
+            _ => return Ok(expression),
+        };
+
+        Ok(Expression {
+            start: expression.start,
+            end: right.end,
+            kind: ExpressionKind::Binary {
+                kind,
+                left: expression.boxed(),
+                right: right.boxed(),
+            },
+        })
     }
 
     fn parse_identifier(&mut self) -> Result<Expression, SyntaxError> {

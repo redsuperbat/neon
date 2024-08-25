@@ -5,7 +5,7 @@ use std::{
 
 use crate::{
     lexer::Pos,
-    parser::{BuiltinExpressionKind, Expression, ExpressionKind},
+    parser::{BinaryExpressionKind, BuiltinExpressionKind, Expression, ExpressionKind},
     symbol_table::SymbolTable,
 };
 
@@ -153,7 +153,6 @@ impl Interpreter {
             }
             ExpressionKind::LetBinding { name, right } => self.evaluate_let(name, right, ctx),
             ExpressionKind::Int { value } => self.evaluate_int(value),
-            ExpressionKind::Add { left, right } => self.evaluate_binary_add(left, right, ctx),
             ExpressionKind::Block { body, return_val } => {
                 self.evaluate_block(body, return_val, ctx)
             }
@@ -163,18 +162,21 @@ impl Interpreter {
                 alternate,
             } => self.evaluate_if(predicate, consequent, alternate, ctx),
             ExpressionKind::Else { consequent } => self.evaluate_expression(consequent, ctx),
-            ExpressionKind::Ne { left, right } => self.evaluate_binary_ne(left, right, ctx),
-            ExpressionKind::Eq { left, right } => self.evaluate_binary_eq(left, right, ctx),
-            ExpressionKind::Sub { left, right } => self.evaluate_binary_subtract(left, right, ctx),
             ExpressionKind::Bool { value } => Ok(Value::Bool { value: *value }),
             ExpressionKind::String { value } => Ok(Value::String {
                 value: value.clone(),
             }),
-            ExpressionKind::Lt { left, right } => self.evaluate_binary_lt(left, right, ctx),
-            ExpressionKind::Gt { left, right } => self.evaluate_binary_gt(left, right, ctx),
-            ExpressionKind::Modulus { left, right } => self.evaluate_modulus(left, right, ctx),
-            ExpressionKind::And { left, right } => self.evaluate_and(left, right, ctx),
-            ExpressionKind::Or { left, right } => self.evaluate_or(left, right, ctx),
+            ExpressionKind::Binary { kind, left, right } => match kind {
+                BinaryExpressionKind::Add => self.evaluate_binary_add(left, right, ctx),
+                BinaryExpressionKind::Ne => self.evaluate_binary_ne(left, right, ctx),
+                BinaryExpressionKind::Eq => self.evaluate_binary_eq(left, right, ctx),
+                BinaryExpressionKind::Sub => self.evaluate_binary_subtract(left, right, ctx),
+                BinaryExpressionKind::Lt => self.evaluate_binary_lt(left, right, ctx),
+                BinaryExpressionKind::Gt => self.evaluate_binary_gt(left, right, ctx),
+                BinaryExpressionKind::Mod => self.evaluate_modulus(left, right, ctx),
+                BinaryExpressionKind::And => self.evaluate_and(left, right, ctx),
+                BinaryExpressionKind::Or => self.evaluate_or(left, right, ctx),
+            },
             ExpressionKind::Empty => Ok(Value::Unit),
             ExpressionKind::Builtin { arguments, kind } => {
                 self.evaluate_internal(kind, arguments, ctx)

@@ -125,16 +125,7 @@ impl SymbolTable {
             ExpressionKind::Bool { .. } => Ok(()),
             ExpressionKind::String { .. } => Ok(()),
             ExpressionKind::Empty => Ok(()),
-
-            ExpressionKind::Add { left, right } => self.visit_binary(left, right),
-            ExpressionKind::Sub { left, right } => self.visit_binary(left, right),
-            ExpressionKind::Ne { left, right } => self.visit_binary(left, right),
-            ExpressionKind::Eq { left, right } => self.visit_binary(left, right),
-            ExpressionKind::Lt { left, right } => self.visit_binary(left, right),
-            ExpressionKind::Gt { left, right } => self.visit_binary(left, right),
-            ExpressionKind::Modulus { left, right } => self.visit_binary(left, right),
-            ExpressionKind::And { left, right } => self.visit_binary(left, right),
-            ExpressionKind::Or { left, right } => self.visit_binary(left, right),
+            ExpressionKind::Binary { left, right, .. } => self.visit_binary(left, right),
             ExpressionKind::Builtin { .. } => Ok(()),
         }
     }
