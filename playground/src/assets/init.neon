@@ -1,21 +1,26 @@
 /
-  Welcome to Neon! 👋 Lets do a small deep dive of the language!
-  Below is the hello world example
-  In order to declare functions you use the "fn" keyword
+  Welcome to Neon! 👋 Let’s take a quick dive into the language.
+
+  Below is a simple "Hello, World!" example:
 /
+
 fn hello() {
   "Hello"
 }
 
 /
-  As you can see the function does not need a return keyword
-  since the body is an expression it will implicitly return the
-  string "hello" ✅
+  As you can see, there's no need for a `return` keyword—the function automatically 
+  returns the string "Hello" since the body is an expression. ✅
 
-  To declare variables, use the "let" keyword 
+  To declare variables, use the `let` keyword:
 /
+
 let greeting = hello()
-/ To handle control flow, use the "if" and "else" keywords /
+
+/
+  For control flow, use the `if` and `else` keywords:
+/
+
 let message = if greeting == "Hello" {
   " world!"
 } else {
@@ -23,21 +28,19 @@ let message = if greeting == "Hello" {
 }
 
 /
-  If statements are also expressions returning the value which
-  corresponds to the evaluated branch.
-  Even neon script files are expressions in this case
-  the script file will evaluate to the result of "hello() + message"
+  In Neon, `if` statements are also expressions, returning the value of the evaluated branch. 
+  Even entire Neon scripts are expressions—this script, 
+  for example, will evaluate to the result of `hello() + message`
 /
+
 hello() + message
+
 /
- If you execute this script below 👇 you should
- see "Hello world!" listed as the value the script evaluated to
+  When you run this script, you should see "Hello world!" as the output. 
 
- Neon is written in rust and this version you are running now
- is compiled to webassembly in order to run in the browser. All
- error messages and syntax highlights are custom made with Neon's
- Parser, Lexer, Interpreter and SemanticAnalyzer 🧠
+  Neon is written in Rust, and the version you’re using now is compiled to 
+  WebAssembly to run in the browser. All error messages and syntax highlighting 
+  are custom-built with Neon's own parser, lexer, interpreter, and semantic analyzer. 🧠
 
- If you want to try more stuff out, see the examples!
- Thanks for checking Neon out, it's been so much fun making it 🎉
+  If you want to explore more, check out the examples! Thanks for trying out Neon—it’s been a blast to create it. 🎉
 /
