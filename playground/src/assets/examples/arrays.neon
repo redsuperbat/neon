@@ -1,0 +1,107 @@
+/**
+ * Neon supports arrays that can store various types of data.
+ * Let's start with a basic array containing integers.
+ */
+
+let numbers = [3, 4, 5]
+print("Array:", numbers)
+print("First element:", numbers[0])
+print("Third element (using expression in index):", numbers[1 + 1])
+
+/**
+ * Arrays can contain any type of data, including functions, 
+ * booleans, and even other arrays.
+ */
+
+fn pie_eater(i) {
+  print("I want", i, "number of pies")
+}
+
+/* Creating an array with mixed types */
+let mixedArray = [
+  numbers,
+  pie_eater,
+  true,
+  3 + 4
+]
+
+print("Mixed Array:", mixedArray)
+
+/* Accessing elements from the mixed array */
+let func = mixedArray[1]
+let pies = mixedArray[3]
+
+/* Calls the function with the result of the expression */
+func(pies) 
+
+/**
+ * Arrays can also be nested, meaning you can have arrays inside arrays.
+ */
+
+let nestedArray = [
+  [1, 2, 3],
+  ["apple", "banana", "cherry"],
+  [true, false, true]
+]
+
+print("Nested Array:", nestedArray)
+print("Second element of the first array in nestedArray:", nestedArray[0][1])
+
+/**
+ * Let's try an array of functions to see how Neon handles it.
+ */
+
+fn greet(name) {
+  print("Hello,", name)
+}
+
+fn farewell(name) {
+  print("Goodbye,", name)
+}
+
+let functionsArray = [greet, farewell]
+print("Functions Array:", functionsArray)
+
+let greetFunc = functionsArray[0]
+let farewellFunc = functionsArray[1]
+
+greetFunc("Alice")
+farewellFunc("Bob")
+
+
+/**
+ * Neon does not support loops or reassignment, so we'll use recursion
+ * and immutable variables to iterate through an array.
+ */
+
+fn print_array_elements(arr, length, index) {
+    if index < length {
+        print("Element at index", index, ":", arr[index])
+        print_array_elements(arr, length, index + 1)
+    }
+}
+
+/* An array to demonstrate recursion */
+let numbers2 = [10, 20, 30, 40, 50]
+let numbers_length = 5
+
+print("Iterating through the 'numbers' array:")
+print_array_elements(numbers2, numbers_length, 0)
+
+/**
+ * Let's create an example where we sum the elements of an array
+ * using recursion without reassignment.
+ */
+
+fn sum_array_elements(arr, length, index, total) {
+    if index < length {
+      let new_total = total + arr[index]
+      sum_array_elements(arr, length, index + 1, new_total)
+    } else {
+      total
+    }
+}
+
+let sum = sum_array_elements(numbers2, numbers_length, 0, 0)
+print("Sum of array elements:", sum)
+

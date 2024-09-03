@@ -48,7 +48,7 @@
 }
 
 .diagnostic {
-  color: red !important;
+  text-decoration: underline wavy red !important;
 }
 
 .diagnostic-glyph:after {

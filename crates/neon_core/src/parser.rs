@@ -387,27 +387,31 @@ impl Parser {
 
         match next.kind {
             TokenKind::OpenParen => {
-                expression = Expression {
-                    start: expression.start,
-                    end: expression.end,
-                    kind: ExpressionKind::Invocation {
-                        callee: expression.boxed(),
-                        arguments: self.parse_arguments()?,
-                    },
-                };
+                while self.next_is(TokenKind::OpenParen) {
+                    expression = Expression {
+                        start: expression.start,
+                        end: expression.end,
+                        kind: ExpressionKind::Invocation {
+                            callee: expression.boxed(),
+                            arguments: self.parse_arguments()?,
+                        },
+                    };
+                }
                 Ok(expression)
             }
             TokenKind::OpenSquareBracket => {
-                self.assert_next(TokenKind::OpenSquareBracket)?;
-                expression = Expression {
-                    start: expression.start,
-                    end: expression.end,
-                    kind: ExpressionKind::IndexAccess {
-                        indexee: expression.boxed(),
-                        index: self.parse_expression()?.boxed(),
-                    },
-                };
-                self.assert_next(TokenKind::ClosedSquareBracket)?;
+                while self.next_is(TokenKind::OpenSquareBracket) {
+                    self.assert_next(TokenKind::OpenSquareBracket)?;
+                    expression = Expression {
+                        start: expression.start,
+                        end: expression.end,
+                        kind: ExpressionKind::IndexAccess {
+                            indexee: expression.boxed(),
+                            index: self.parse_expression()?.boxed(),
+                        },
+                    };
+                    self.assert_next(TokenKind::ClosedSquareBracket)?;
+                }
                 Ok(expression)
             }
             _ => Ok(expression),

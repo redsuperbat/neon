@@ -22,6 +22,7 @@ import math from "./assets/examples/math.neon?raw";
 import recursion from "./assets/examples/recursion.neon?raw";
 import typeErrors from "./assets/examples/type-errors.neon?raw";
 import iife from "./assets/examples/iife.neon?raw";
+import array from "./assets/examples/arrays.neon?raw";
 import helloWorld from "./assets/examples/hello-world.neon?raw";
 import initScript from "./assets/init.neon?raw";
 
@@ -36,6 +37,10 @@ const examples: { label: string; value: string }[] = [
   {
     label: "Math",
     value: math,
+  },
+  {
+    label: "Array",
+    value: array,
   },
   {
     label: "Recursion",
@@ -66,12 +71,11 @@ const examples: { label: string; value: string }[] = [
 const errorDecorationOptions = (
   message: string,
 ): monaco.editor.IModelDecorationOptions => ({
-  isWholeLine: true,
+  inlineClassName: "diagnostic",
   className: "diagnostic-container",
   glyphMarginClassName: "diagnostic-glyph",
-  after: {
-    inlineClassName: "diagnostic",
-    content: `           ${message}`,
+  hoverMessage: {
+    value: message,
   },
 });
 
@@ -102,11 +106,14 @@ function ExecutionPage() {
 
   onMount(() => {
     if (!monacoEl) return;
+
     editor = monaco.editor.create(monacoEl, {
       value: initScript,
       theme: "vs-dark",
       glyphMargin: true,
+      automaticLayout: true,
     });
+
     syntaxDecorations = editor.createDecorationsCollection();
     runtimeDecorations = editor.createDecorationsCollection();
     diagnosticsDecorations = editor.createDecorationsCollection();
@@ -116,6 +123,7 @@ function ExecutionPage() {
     );
 
     onContentChange(editor.getValue());
+
     editor.getModel()?.onDidChangeContent(() => {
       const value = editor?.getValue();
       if (!value) return;
@@ -150,16 +158,13 @@ function ExecutionPage() {
       if (!(e instanceof ProgramErr)) return;
       const model = editor?.getModel();
       if (!model) return;
-      const lineNumber = e.start[0];
-
-      const col = model.getLineMaxColumn(lineNumber);
 
       const decoration: monaco.editor.IModelDeltaDecoration = {
         range: {
+          startColumn: e.start[1],
+          endColumn: e.end[1],
           startLineNumber: e.start[0],
-          endLineNumber: e.start[0],
-          startColumn: 0,
-          endColumn: col,
+          endLineNumber: e.end[0],
         },
         options: errorDecorationOptions(e.message),
       };

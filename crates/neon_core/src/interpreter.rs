@@ -31,7 +31,7 @@ impl Display for Value {
                 write!(f, "Function: {}", name)
             }
             Value::Unit => write!(f, "Unit"),
-            Value::String { value } => write!(f, "\"{}\"", value),
+            Value::String { value } => write!(f, "{}", value),
             Value::Array { elements } => {
                 let mut str = String::from("[");
 
