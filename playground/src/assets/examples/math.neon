@@ -14,7 +14,7 @@ fn multiply(a, b) {
   }
 }
 
-/ Neon only supports integers therefore division is truncated /
+/* Neon only supports integers therefore division is truncated */
 fn divide(dividend, divisor) {
   fn helper(dividend, divisor, quotient) {
     if minus(dividend, divisor) < 0 {

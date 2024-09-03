@@ -127,7 +127,19 @@ impl SymbolTable {
             ExpressionKind::Empty => Ok(()),
             ExpressionKind::Binary { left, right, .. } => self.visit_binary(left, right),
             ExpressionKind::Builtin { .. } => Ok(()),
+            ExpressionKind::Array { elements } => self.visit_array(elements),
+            ExpressionKind::IndexAccess { indexee, index } => {
+                self.visit_expression(indexee)?;
+                self.visit_expression(index)
+            }
         }
+    }
+
+    fn visit_array(&mut self, elements: &Vec<Expression>) -> Result<(), SymbolError> {
+        for el in elements {
+            self.visit_expression(el)?;
+        }
+        Ok(())
     }
 
     fn visit_if(

@@ -40,16 +40,20 @@ pub enum TokenKind {
     OpenAngleBracket,   // <
     ClosedAngleBracket, // >
 
-    OpenCurlyBrace,   // {
-    ClosedCurlyBrace, // }
-    OpenParen,        // (
-    ForwardSlash,     // /
-    ClosedParen,      // )
-    Percentage,       // %
-    Ampersand,        // &
-    Pipe,             // |
-    Comma,            // ,
-    Asterix,          // *
+    Dot, // .
+
+    OpenCurlyBrace,      // {
+    ClosedCurlyBrace,    // }
+    OpenSquareBracket,   // ]
+    ClosedSquareBracket, // ]
+    OpenParen,           // (
+    ForwardSlash,        // /
+    ClosedParen,         // )
+    Percentage,          // %
+    Ampersand,           // &
+    Pipe,                // |
+    Comma,               // ,
+    Asterix,             // *
 
     IntegerLiteral, // 5 -3 etc.
     StringLiteral,  // "hello world" etc.
@@ -87,6 +91,8 @@ impl ToString for TokenKind {
             TokenKind::Bang => "!",
             TokenKind::OpenCurlyBrace => "{",
             TokenKind::ClosedCurlyBrace => "}",
+            TokenKind::OpenSquareBracket => "[",
+            TokenKind::ClosedSquareBracket => "]",
             TokenKind::OpenParen => "(",
             TokenKind::ClosedParen => ")",
             TokenKind::Comma => ",",
@@ -96,6 +102,7 @@ impl ToString for TokenKind {
             TokenKind::Symbol => "symbol",
             TokenKind::WhiteSpace => "whitespace",
             TokenKind::Unknown => "unknown",
+            TokenKind::Dot => ".",
         };
         s.to_string()
     }
@@ -140,6 +147,9 @@ impl Lexer {
             '+' => self.single_char(TokenKind::Plus),
             '-' => self.single_char(TokenKind::Minus),
             '*' => self.single_char(TokenKind::Asterix),
+            ']' => self.single_char(TokenKind::ClosedSquareBracket),
+            '[' => self.single_char(TokenKind::OpenSquareBracket),
+            '.' => self.single_char(TokenKind::Dot),
 
             ';' => self.single_char(TokenKind::SemiColon),
 

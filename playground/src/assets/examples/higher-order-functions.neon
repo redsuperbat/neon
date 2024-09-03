@@ -1,4 +1,4 @@
-/ Helper function to repeat a function call /
+/* Helper function to repeat a function call */
 fn repeat(fn_to_repeat, n) {
   fn helper(i) {
     if i < n + 1 {

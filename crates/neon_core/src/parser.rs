@@ -116,6 +116,15 @@ pub enum ExpressionKind {
         value: bool,
     },
 
+    Array {
+        elements: Vec<Expression>,
+    },
+
+    IndexAccess {
+        indexee: Box<Expression>,
+        index: Box<Expression>,
+    },
+
     Binary {
         operation: BinaryOp,
         left: Box<Expression>,
@@ -180,22 +189,8 @@ impl SyntaxError {
 
 impl Parser {
     pub fn new(tokens: Vec<Token>) -> Parser {
-        let tokens = tokens
-            .into_iter()
-            .filter(|t| t.kind != TokenKind::WhiteSpace && t.kind != TokenKind::Newline);
-
-        let mut token_queue = VecDeque::new();
-        let mut in_comment = false;
-        for token in tokens {
-            if token.kind == TokenKind::ForwardSlash {
-                in_comment = !in_comment;
-            } else if !in_comment {
-                token_queue.push_back(token);
-            }
-        }
-
         Parser {
-            tokens: token_queue,
+            tokens: VecDeque::from(tokens),
             last_location: Location::new(Pos::start(), Pos::start()),
         }
     }
@@ -210,12 +205,46 @@ impl Parser {
         Ok(token)
     }
 
-    fn is_at_end(&self) -> bool {
-        self.peek().is_none()
+    fn next_significant(&mut self) -> Result<Token, SyntaxError> {
+        if self.next_sequence_is((TokenKind::ForwardSlash, TokenKind::Asterix)) {
+            self.parse_comment()?;
+        }
+
+        let mut token = self.next()?;
+
+        while token.kind == TokenKind::WhiteSpace {
+            token = self.next()?;
+        }
+
+        while token.kind == TokenKind::Newline {
+            token = self.next()?;
+        }
+
+        Ok(token)
+    }
+
+    fn parse_comment(&mut self) -> Result<(), SyntaxError> {
+        // remove /*
+        self.next()?;
+        self.next()?;
+
+        while !self.next_sequence_is((TokenKind::Asterix, TokenKind::ForwardSlash)) {
+            self.next()?;
+        }
+
+        // remove */
+        self.next()?;
+        self.next()?;
+
+        Ok(())
+    }
+
+    fn is_at_end(&mut self) -> bool {
+        self.peek_significant().is_none()
     }
 
     fn assert_next(&mut self, kind: TokenKind) -> Result<Token, SyntaxError> {
-        let next = self.next()?;
+        let next = self.next_significant()?;
         if next.kind == kind {
             Ok(next)
         } else {
@@ -227,12 +256,39 @@ impl Parser {
         self.peek_at_offset(0)
     }
 
+    fn peek_significant(&mut self) -> Option<&Token> {
+        if self.next_sequence_is((TokenKind::ForwardSlash, TokenKind::Asterix)) {
+            self.parse_comment().ok()?;
+        }
+
+        let mut token = self.peek()?;
+
+        while token.kind == TokenKind::WhiteSpace {
+            self.next().ok()?;
+            token = self.peek()?;
+        }
+
+        while token.kind == TokenKind::Newline {
+            self.next().ok()?;
+            token = self.peek()?;
+        }
+
+        self.peek()
+    }
+
     fn peek_at_offset(&self, i: usize) -> Option<&Token> {
         self.tokens.get(i)
     }
 
-    fn next_is(&self, kind: TokenKind) -> bool {
-        match self.peek() {
+    fn next_sequence_is(&self, tokens: (TokenKind, TokenKind)) -> bool {
+        match (self.peek(), self.peek_at_offset(1)) {
+            (Some(a), Some(b)) => a.kind == tokens.0 && b.kind == tokens.1,
+            _ => false,
+        }
+    }
+
+    fn next_is(&mut self, kind: TokenKind) -> bool {
+        match self.peek_significant() {
             Some(token) => token.kind == kind,
             None => false,
         }
@@ -248,7 +304,7 @@ impl Parser {
     pub fn parse_expression(&mut self) -> Result<Expression, SyntaxError> {
         let expression = self.parse_sub_leaf_expression()?;
 
-        let Some(next) = self.peek() else {
+        let Some(next) = self.peek_significant() else {
             return Ok(expression);
         };
 
@@ -325,7 +381,7 @@ impl Parser {
     fn parse_sub_leaf_expression(&mut self) -> Result<Expression, SyntaxError> {
         let mut expression = self.parse_leaf_expression()?;
 
-        let Some(next) = self.peek() else {
+        let Some(next) = self.peek_significant() else {
             return Ok(expression);
         };
 
@@ -333,7 +389,7 @@ impl Parser {
             TokenKind::OpenParen => {
                 expression = Expression {
                     start: expression.start,
-                    end: expression.end.clone(),
+                    end: expression.end,
                     kind: ExpressionKind::Invocation {
                         callee: expression.boxed(),
                         arguments: self.parse_arguments()?,
@@ -341,19 +397,38 @@ impl Parser {
                 };
                 Ok(expression)
             }
+            TokenKind::OpenSquareBracket => {
+                self.assert_next(TokenKind::OpenSquareBracket)?;
+                expression = Expression {
+                    start: expression.start,
+                    end: expression.end,
+                    kind: ExpressionKind::IndexAccess {
+                        indexee: expression.boxed(),
+                        index: self.parse_expression()?.boxed(),
+                    },
+                };
+                self.assert_next(TokenKind::ClosedSquareBracket)?;
+                Ok(expression)
+            }
             _ => Ok(expression),
         }
     }
 
     fn parse_leaf_expression(&mut self) -> Result<Expression, SyntaxError> {
-        let next = self.peek().ok_or(SyntaxError {
-            kind: SyntaxErrorKind::UnexpectedEndOfFile,
-            start: Pos::start(),
-            end: Pos::start(),
-        })?;
+        let next = self.peek_significant();
+
+        let Some(next) = next else {
+            let Location { start, end } = self.last_location;
+            return Ok(Expression {
+                kind: ExpressionKind::Empty,
+                start,
+                end,
+            });
+        };
 
         match next.kind {
             TokenKind::FnKeyword => self.parse_fn(),
+            TokenKind::OpenSquareBracket => self.parse_array(),
             TokenKind::OpenCurlyBrace => self.parse_block(),
             TokenKind::ClosedCurlyBrace => self.parse_empty(),
             TokenKind::FalseKeyword => self.parse_false_keyword(),
@@ -366,7 +441,12 @@ impl Parser {
             _ => SyntaxError::new(
                 vec![
                     TokenKind::FnKeyword,
+                    TokenKind::OpenSquareBracket,
+                    TokenKind::ClosedCurlyBrace,
+                    TokenKind::FalseKeyword,
+                    TokenKind::TrueKeyword,
                     TokenKind::IntegerLiteral,
+                    TokenKind::StringLiteral,
                     TokenKind::IfKeyword,
                     TokenKind::LetKeyword,
                     TokenKind::Symbol,
@@ -374,6 +454,30 @@ impl Parser {
                 next,
             ),
         }
+    }
+
+    fn parse_array(&mut self) -> Result<Expression, SyntaxError> {
+        let Token { start, .. } = self.assert_next(TokenKind::OpenSquareBracket)?;
+        let mut elements = vec![];
+
+        while !self.next_is(TokenKind::ClosedSquareBracket) {
+            elements.push(self.parse_expression()?);
+
+            if self.next_is(TokenKind::Comma) {
+                self.next_significant()?;
+                continue;
+            } else {
+                break;
+            }
+        }
+
+        let end = self.assert_next(TokenKind::ClosedSquareBracket)?.end;
+
+        Ok(Expression {
+            start,
+            end,
+            kind: ExpressionKind::Array { elements },
+        })
     }
 
     fn parse_block_body(&mut self) -> Result<(Vec<Expression>, Expression), SyntaxError> {

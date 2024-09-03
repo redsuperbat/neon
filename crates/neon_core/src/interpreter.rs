@@ -15,6 +15,7 @@ pub enum Value {
     String { value: String },
     Bool { value: bool },
     Fn { function: ExpressionKind },
+    Array { elements: Vec<Value> },
     Unit,
 }
 
@@ -30,7 +31,22 @@ impl Display for Value {
                 write!(f, "Function: {}", name)
             }
             Value::Unit => write!(f, "Unit"),
-            Value::String { value } => write!(f, "{}", value),
+            Value::String { value } => write!(f, "\"{}\"", value),
+            Value::Array { elements } => {
+                let mut str = String::from("[");
+
+                for (i, element) in elements.iter().enumerate() {
+                    if i == 0 {
+                        str += &format!("{}", element);
+                    } else {
+                        str += &format!(", {}", element);
+                    }
+                }
+
+                str += "]";
+
+                write!(f, "{}", str)
+            }
         }
     }
 }
@@ -41,17 +57,20 @@ pub enum RuntimeErrorKind {
     UndefinedReference,
     UninitializedVariable,
     IllegalInvocation,
+    IndexOutOfBounds { index: usize },
 }
 
 impl ToString for RuntimeErrorKind {
     fn to_string(&self) -> String {
         match self {
-            RuntimeErrorKind::TypeError => "Type error",
-            RuntimeErrorKind::UndefinedReference => "Reference is undefined",
-            RuntimeErrorKind::UninitializedVariable => "Variable is uninitialized",
-            RuntimeErrorKind::IllegalInvocation => "Callee was not a valid function",
+            RuntimeErrorKind::TypeError => "Type error".to_string(),
+            RuntimeErrorKind::UndefinedReference => "Reference is undefined".to_string(),
+            RuntimeErrorKind::UninitializedVariable => "Variable is uninitialized".to_string(),
+            RuntimeErrorKind::IllegalInvocation => "Callee was not a valid function".to_string(),
+            RuntimeErrorKind::IndexOutOfBounds { index } => {
+                format!("Index '{}' out of bounds", index)
+            }
         }
-        .to_string()
     }
 }
 
@@ -185,7 +204,49 @@ impl Interpreter {
             ExpressionKind::Builtin { arguments, kind } => {
                 self.evaluate_internal(kind, arguments, ctx)
             }
+            ExpressionKind::Array { elements } => self.evaluate_array(elements, ctx),
+            ExpressionKind::IndexAccess { indexee, index } => {
+                self.evaluate_index_access(indexee, index, ctx)
+            }
         }
+    }
+
+    fn evaluate_index_access(
+        &self,
+        indexee: &Expression,
+        index: &Expression,
+        ctx: &mut EvaluationContext,
+    ) -> Result<Value, RuntimeError> {
+        let array = self.evaluate_expression(indexee, ctx)?;
+        let Value::Array { elements } = array else {
+            return Err(RuntimeError::type_error(&indexee.start, &indexee.end));
+        };
+        let index_value = self.evaluate_expression(index, ctx)?;
+        let Value::Int { value: i } = index_value else {
+            return Err(RuntimeError::type_error(&index.start, &index.end));
+        };
+        let value = elements.get(i as usize);
+        match value {
+            Some(v) => Ok(v.clone()),
+            None => Err(RuntimeError {
+                start: index.start,
+                end: index.end,
+                kind: RuntimeErrorKind::IndexOutOfBounds { index: i as usize },
+            }),
+        }
+    }
+
+    fn evaluate_array(
+        &self,
+        elements: &Vec<Expression>,
+        ctx: &mut EvaluationContext,
+    ) -> Result<Value, RuntimeError> {
+        let elements = elements
+            .iter()
+            .map(|e| self.evaluate_expression(e, ctx))
+            .collect::<Result<Vec<Value>, RuntimeError>>()?;
+
+        Ok(Value::Array { elements })
     }
 
     fn evaluate_internal(

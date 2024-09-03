@@ -1,7 +1,8 @@
-/ 
-  functions can be invoked directly after they are defined
-  in this case they are called an iife (immediately invoked function expression)
-/
+/**
+ *  functions can be invoked directly after they are defined
+ *  in this case they are called an iife (immediately invoked function expression)
+ */
+
 fn hello_world() {
   print("iffies are cool 🚀")
 }()
