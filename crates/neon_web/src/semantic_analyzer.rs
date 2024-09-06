@@ -112,9 +112,12 @@ impl SemanticAnalyzer {
                 self.lexical_scope.push_front(LexicalScope::Fn);
                 self.single(SemanticTokenKind::Keyword)
             }
-            TokenKind::LetKeyword | TokenKind::IfKeyword | TokenKind::ElseKeyword => {
-                self.single(SemanticTokenKind::Keyword)
-            }
+
+            TokenKind::LetKeyword
+            | TokenKind::IfKeyword
+            | TokenKind::ElseKeyword
+            | TokenKind::ForKeyword
+            | TokenKind::InKeyword => self.single(SemanticTokenKind::Keyword),
 
             TokenKind::Ampersand
             | TokenKind::Bang

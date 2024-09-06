@@ -31,6 +31,8 @@ pub enum TokenKind {
     ElseKeyword,  // else
     TrueKeyword,  // true
     FalseKeyword, // false
+    ForKeyword,   // for
+    InKeyword,    // in
 
     Bang,   // !
     Equals, // =
@@ -75,6 +77,7 @@ impl ToString for TokenKind {
             TokenKind::ElseKeyword => "else",
             TokenKind::TrueKeyword => "true",
             TokenKind::FalseKeyword => "false",
+            TokenKind::ForKeyword => "for",
 
             TokenKind::OpenAngleBracket => "<",
             TokenKind::ClosedAngleBracket => ">",
@@ -283,6 +286,8 @@ impl Lexer {
             "else" => TokenKind::ElseKeyword,
             "true" => TokenKind::TrueKeyword,
             "false" => TokenKind::FalseKeyword,
+            "for" => TokenKind::ForKeyword,
+            "in" => TokenKind::InKeyword,
 
             _ => TokenKind::Symbol,
         };
