@@ -79,7 +79,7 @@ impl SymbolTable {
         let Expression { loc, .. } = &expression;
         match &expression.kind {
             ExpressionKind::Fn(f) => self.visit_fn(f),
-            ExpressionKind::Identifier(name) => self.visit_identifier(name, loc),
+            ExpressionKind::Identifier(id) => self.visit_identifier(id.name(), loc),
             ExpressionKind::Invocation(i) => self.visit_invocation(i),
             ExpressionKind::LetBinding(l) => self.visit_let(l),
             ExpressionKind::Block(b) => self.visit_block(b),
@@ -111,8 +111,7 @@ impl SymbolTable {
 
         self.visit_expression(iterable)?;
 
-        self.enter_scope(&vec![]);
-        self.visit_expression(target)?;
+        self.enter_scope(&vec![target.name().to_string()]);
         self.visit_expression(body)?;
 
         self.exit_scope()?;

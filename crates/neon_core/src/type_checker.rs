@@ -50,7 +50,7 @@ impl TypeChecker<'_> {
         self.current_loc = expression.loc;
         match &expression.kind {
             ExpressionKind::Fn(..) => self.typeof_fn(expression, env),
-            ExpressionKind::Identifier(name) => self.typeof_identifier(name, env),
+            ExpressionKind::Identifier(id) => self.typeof_identifier(id.name(), env),
             ExpressionKind::Invocation { .. } => self.typeof_invocation(expression, env),
             ExpressionKind::LetBinding { .. } => self.typeof_let(expression),
             ExpressionKind::Block { .. } => self.typeof_block(expression, env),

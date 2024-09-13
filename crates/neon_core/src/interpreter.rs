@@ -7,7 +7,7 @@ use crate::{
     location::Location,
     parser::{
         Binary, BinaryOp, Block, Builtin as BuiltinExp, BuiltinExpressionKind, Expression,
-        ExpressionKind, Fn, ForLoop, If, IndexAccess, Invocation, LetBinding,
+        ExpressionKind, Fn, ForLoop, Identifier, If, IndexAccess, Invocation, LetBinding,
     },
     symbol_table::SymbolTable,
 };
@@ -192,20 +192,27 @@ impl Interpreter {
             iterable,
             body,
         } = for_loop;
+        let name = target.name().to_string();
 
-        let Ok(Value::Array(elements)) = self.evaluate_expression(iterable, ctx) else {
-            return Err(RuntimeError::type_error(loc));
+        let mut loop_ctx = ctx.clone();
+
+        match self.evaluate_expression(iterable, ctx)? {
+            Value::String(string) => {
+                for s in string.chars() {
+                    loop_ctx
+                        .bindings
+                        .insert(name.clone(), Value::String(s.to_string()));
+                    self.evaluate_expression(&body, &mut loop_ctx)?;
+                }
+            }
+            Value::Array(elements) => {
+                for el in elements {
+                    loop_ctx.bindings.insert(name.clone(), el);
+                    self.evaluate_expression(&body, &mut loop_ctx)?;
+                }
+            }
+            _ => return Err(RuntimeError::type_error(loc)),
         };
-
-        let ExpressionKind::Identifier(name) = target.kind.to_owned() else {
-            return Err(RuntimeError::type_error(loc));
-        };
-
-        for el in elements {
-            let mut loop_ctx = ctx.clone();
-            loop_ctx.bindings.insert(name.clone(), el);
-            self.evaluate_expression(&body, &mut loop_ctx)?;
-        }
 
         Ok(Value::Unit)
     }
@@ -481,11 +488,11 @@ impl Interpreter {
 
     fn evaluate_identifier(
         &self,
-        name: &str,
+        id: &Identifier,
         loc: &Location,
         ctx: &mut EvaluationContext,
     ) -> Result<Value, RuntimeError> {
-        let value = ctx.bindings.get(name).ok_or(RuntimeError {
+        let value = ctx.bindings.get(id.name()).ok_or(RuntimeError {
             kind: RuntimeErrorKind::UninitializedVariable,
             loc: *loc,
         })?;

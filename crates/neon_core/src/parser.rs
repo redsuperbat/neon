@@ -107,8 +107,17 @@ pub struct Builtin {
 }
 
 #[derive(Debug, Clone)]
+pub struct Identifier(String);
+
+impl Identifier {
+    pub fn name(&self) -> &str {
+        &self.0
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct ForLoop {
-    pub target: Box<Expression>,
+    pub target: Identifier,
     pub iterable: Box<Expression>,
     pub body: Box<Expression>,
 }
@@ -119,7 +128,7 @@ pub enum ExpressionKind {
 
     Block(Block),
 
-    Identifier(String),
+    Identifier(Identifier),
 
     Invocation(Invocation),
 
@@ -393,7 +402,7 @@ impl Parser {
             lexeme, start, end, ..
         } = self.assert_next(TokenKind::Symbol)?;
         Ok(Expression {
-            kind: ExpressionKind::Identifier(lexeme),
+            kind: ExpressionKind::Identifier(Identifier(lexeme)),
             loc: Location::new(start, end),
         })
     }
@@ -480,7 +489,7 @@ impl Parser {
     fn parse_for_loop(&mut self) -> Result<Expression, SyntaxError> {
         let Token { start, .. } = self.assert_next(TokenKind::ForKeyword)?;
 
-        let target = self.parse_identifier()?.boxed();
+        let target = self.parse_loop_target()?;
         self.assert_next(TokenKind::InKeyword)?;
         let iterable = self.parse_expression()?.boxed();
         let body = self.parse_block()?.boxed();
@@ -491,6 +500,11 @@ impl Parser {
             body,
         })
         .into_exp(Location::new(start, Pos::start())))
+    }
+
+    fn parse_loop_target(&mut self) -> Result<Identifier, SyntaxError> {
+        let Token { lexeme, .. } = self.assert_next(TokenKind::Symbol)?;
+        Ok(Identifier(lexeme))
     }
 
     fn parse_array(&mut self) -> Result<Expression, SyntaxError> {
