@@ -38,6 +38,7 @@ pub struct TypeEnvironment {
 #[derive(Debug)]
 pub struct TypeChecker<'a> {
     diagnostics_list: &'a mut DiagnosticsList,
+    current_loc: Location,
 }
 
 impl TypeChecker<'_> {
@@ -46,9 +47,10 @@ impl TypeChecker<'_> {
         expression: &Expression,
         env: &mut TypeEnvironment,
     ) -> Type {
+        self.current_loc = expression.loc;
         match &expression.kind {
-            ExpressionKind::Fn { .. } => self.typeof_fn(expression, env),
-            ExpressionKind::Identifier { .. } => self.typeof_identifier(expression, env),
+            ExpressionKind::Fn(..) => self.typeof_fn(expression, env),
+            ExpressionKind::Identifier(name) => self.typeof_identifier(name, env),
             ExpressionKind::Invocation { .. } => self.typeof_invocation(expression, env),
             ExpressionKind::LetBinding { .. } => self.typeof_let(expression),
             ExpressionKind::Block { .. } => self.typeof_block(expression, env),
@@ -63,6 +65,8 @@ impl TypeChecker<'_> {
             ExpressionKind::Bool { .. } => Type::new(TypeKind::Bool),
             ExpressionKind::String { .. } => Type::new(TypeKind::String),
             ExpressionKind::Empty => Type::new(TypeKind::Unit),
+            ExpressionKind::ForLoop { .. } => todo!(),
+            ExpressionKind::PropertyAccess { .. } => todo!(),
         }
     }
 
@@ -94,12 +98,7 @@ impl TypeChecker<'_> {
         todo!()
     }
 
-    fn typeof_identifier(&mut self, exp: &Expression, env: &mut TypeEnvironment) -> Type {
-        let Expression { kind, start, end } = exp;
-        let ExpressionKind::Identifier { name } = kind else {
-            panic!("Internal neon error");
-        };
-
+    fn typeof_identifier(&mut self, identifier: &str, env: &mut TypeEnvironment) -> Type {
         todo!()
     }
 
@@ -111,13 +110,10 @@ impl TypeChecker<'_> {
         todo!()
     }
 
-    fn unify(&mut self, lhs: Type, rhs: Type, exp: &Expression) -> Type {
-        let Expression { start, end, .. } = exp;
+    fn unify(&mut self, lhs: Type, rhs: Type) -> Type {
         if lhs.kind == TypeKind::Never {
-            self.diagnostics_list.add(Diagnostic::new(
-                DiagnosticKind::Error,
-                Location::new(start, end),
-            ));
+            self.diagnostics_list
+                .add(Diagnostic::new(DiagnosticKind::Error, self.current_loc));
             return lhs;
         }
         return Type::new(TypeKind::Never);

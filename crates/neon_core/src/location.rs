@@ -27,11 +27,24 @@ pub struct Location {
     pub end: Pos,
 }
 
+impl Into<Location> for &Location {
+    fn into(self) -> Location {
+        *self
+    }
+}
+
 impl Location {
     pub fn new<T: Into<Pos>>(start: T, end: T) -> Location {
         Location {
             start: start.into(),
             end: end.into(),
+        }
+    }
+
+    pub fn beginning() -> Location {
+        Location {
+            start: Pos::start(),
+            end: Pos::start(),
         }
     }
 }

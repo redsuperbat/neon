@@ -4,35 +4,35 @@ use std::{
 };
 
 use crate::{
-    location::Pos,
-    parser::{BinaryOp, BuiltinExpressionKind, Expression, ExpressionKind},
+    location::Location,
+    parser::{
+        Binary, BinaryOp, Block, Builtin as BuiltinExp, BuiltinExpressionKind, Expression,
+        ExpressionKind, Fn, If, IndexAccess, Invocation, LetBinding,
+    },
     symbol_table::SymbolTable,
 };
 
 #[derive(Debug, Clone)]
 pub enum Value {
-    Int { value: i64 },
-    String { value: String },
-    Bool { value: bool },
-    Fn { function: ExpressionKind },
-    Array { elements: Vec<Value> },
+    Int(i64),
+    String(String),
+    Bool(bool),
+    Fn(Fn),
+    Array(Vec<Value>),
     Unit,
 }
 
 impl Display for Value {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            Value::Int { value } => write!(f, "{}", value),
-            Value::Bool { value } => write!(f, "{}", value),
-            Value::Fn { function } => {
-                let ExpressionKind::Fn { name, .. } = function else {
-                    panic!("invalid type")
-                };
-                write!(f, "Function: {}", name)
+            Value::Int(value) => write!(f, "{}", value),
+            Value::Bool(value) => write!(f, "{}", value),
+            Value::Fn(function) => {
+                write!(f, "Function: {}", function.name)
             }
             Value::Unit => write!(f, "Unit"),
-            Value::String { value } => write!(f, "{}", value),
-            Value::Array { elements } => {
+            Value::String(value) => write!(f, "{}", value),
+            Value::Array(elements) => {
                 let mut str = String::from("[");
 
                 for (i, element) in elements.iter().enumerate() {
@@ -77,23 +77,20 @@ impl ToString for RuntimeErrorKind {
 #[derive(Debug)]
 pub struct RuntimeError {
     pub kind: RuntimeErrorKind,
-    pub start: Pos,
-    pub end: Pos,
+    pub loc: Location,
 }
 
 impl RuntimeError {
-    fn type_error(start: &Pos, end: &Pos) -> RuntimeError {
+    fn type_error<T: Into<Location>>(loc: T) -> RuntimeError {
         RuntimeError {
             kind: RuntimeErrorKind::TypeError,
-            end: end.clone(),
-            start: start.clone(),
+            loc: loc.into(),
         }
     }
-    fn illegal_invocation(start: &Pos, end: &Pos) -> RuntimeError {
+    fn illegal_invocation(loc: &Location) -> RuntimeError {
         RuntimeError {
             kind: RuntimeErrorKind::IllegalInvocation,
-            end: end.clone(),
-            start: start.clone(),
+            loc: *loc,
         }
     }
 }
@@ -124,17 +121,17 @@ impl EvaluationContext {
     pub fn register_bultin(&mut self, kind: &BuiltinExpressionKind) {
         let arguments: Vec<String> = (0..=100).map(|n| n.to_string() + "arg").collect();
         let name = kind.name();
-        let func = Value::Fn {
-            function: ExpressionKind::Fn {
-                name: name.clone(),
-                parameters: arguments.clone(),
-                body: Expression::kind(ExpressionKind::Builtin {
-                    kind: kind.clone(),
-                    arguments,
-                })
-                .boxed(),
-            },
+        let function_expression = Fn {
+            name: name.clone(),
+            parameters: arguments.clone(),
+            body: Expression::kind(ExpressionKind::Builtin(BuiltinExp {
+                kind: kind.clone(),
+                arguments,
+            }))
+            .boxed(),
         };
+
+        let func = Value::Fn(function_expression);
         self.bindings.insert(name, func);
     }
 }
@@ -159,78 +156,79 @@ impl Interpreter {
         expression: &Expression,
         ctx: &mut EvaluationContext,
     ) -> Result<Value, RuntimeError> {
-        let Expression { start, end, kind } = expression;
+        let Expression { loc, kind } = expression;
         match kind {
-            ExpressionKind::Fn {
-                name,
-                parameters,
-                body: block,
-            } => self.evaluate_fn(name, parameters, block, ctx),
-            ExpressionKind::Identifier { name } => self.evaluate_identifier(name, start, end, ctx),
-            ExpressionKind::Invocation { callee, arguments } => {
-                self.evaluate_invocation(callee, arguments, ctx)
-            }
-            ExpressionKind::LetBinding { name, right } => self.evaluate_let(name, right, ctx),
-            ExpressionKind::Int { value } => self.evaluate_int(value),
-            ExpressionKind::Block { body, return_val } => {
-                self.evaluate_block(body, return_val, ctx)
-            }
-            ExpressionKind::If {
-                predicate,
-                consequent,
-                alternate,
-            } => self.evaluate_if(predicate, consequent, alternate, ctx),
-            ExpressionKind::Else { consequent } => self.evaluate_expression(consequent, ctx),
-            ExpressionKind::Bool { value } => Ok(Value::Bool { value: *value }),
-            ExpressionKind::String { value } => Ok(Value::String {
-                value: value.clone(),
-            }),
-            ExpressionKind::Binary {
-                operation,
-                left,
-                right,
-            } => match operation {
-                BinaryOp::Add => self.evaluate_binary_add(left, right, ctx),
-                BinaryOp::Ne => self.evaluate_binary_ne(left, right, ctx),
-                BinaryOp::Eq => self.evaluate_binary_eq(left, right, ctx),
-                BinaryOp::Sub => self.evaluate_binary_subtract(left, right, ctx),
-                BinaryOp::Lt => self.evaluate_binary_lt(left, right, ctx),
-                BinaryOp::Gt => self.evaluate_binary_gt(left, right, ctx),
-                BinaryOp::Mod => self.evaluate_modulus(left, right, ctx),
-                BinaryOp::And => self.evaluate_and(left, right, ctx),
-                BinaryOp::Or => self.evaluate_or(left, right, ctx),
-            },
+            ExpressionKind::Fn(f) => self.evaluate_fn(f, ctx),
+            ExpressionKind::Identifier(name) => self.evaluate_identifier(name, loc, ctx),
+            ExpressionKind::Invocation(invocation) => self.evaluate_invocation(invocation, ctx),
+            ExpressionKind::LetBinding(let_bind) => self.evaluate_let(let_bind, ctx),
+            ExpressionKind::Int(value) => self.evaluate_int(value),
+            ExpressionKind::Block(block) => self.evaluate_block(block, ctx),
+            ExpressionKind::If(exp) => self.evaluate_if(exp, ctx),
+            ExpressionKind::Else(consequent) => self.evaluate_expression(consequent, ctx),
+            ExpressionKind::Bool(value) => Ok(Value::Bool(*value)),
+            ExpressionKind::String(value) => Ok(Value::String(value.clone())),
+            ExpressionKind::Binary(binary) => self.evaluate_binary(binary, ctx),
             ExpressionKind::Empty => Ok(Value::Unit),
-            ExpressionKind::Builtin { arguments, kind } => {
+            ExpressionKind::Builtin(BuiltinExp { kind, arguments }) => {
                 self.evaluate_internal(kind, arguments, ctx)
             }
-            ExpressionKind::Array { elements } => self.evaluate_array(elements, ctx),
-            ExpressionKind::IndexAccess { indexee, index } => {
-                self.evaluate_index_access(indexee, index, ctx)
-            }
+            ExpressionKind::Array(elements) => self.evaluate_array(elements, ctx),
+            ExpressionKind::IndexAccess(access) => self.evaluate_index_access(access, ctx),
+            ExpressionKind::ForLoop { .. } => todo!(),
+            ExpressionKind::PropertyAccess { .. } => todo!(),
         }
+    }
+
+    fn evaluate_binary(
+        &self,
+        binary: &Binary,
+        ctx: &mut EvaluationContext,
+    ) -> Result<Value, RuntimeError> {
+        let Binary {
+            left,
+            right,
+            operation,
+        } = binary;
+        let start = &left.loc.start;
+        let end = &right.loc.end;
+        let loc = Location::new(start, end);
+        let left = self.evaluate_expression(left, ctx)?;
+        let right = self.evaluate_expression(right, ctx)?;
+
+        match operation {
+            BinaryOp::Add => self.evaluate_binary_add(left, right),
+            BinaryOp::Ne => self.evaluate_binary_ne(left, right),
+            BinaryOp::Eq => self.evaluate_binary_eq(left, right),
+            BinaryOp::Sub => self.evaluate_binary_subtract(left, right),
+            BinaryOp::Lt => self.evaluate_binary_lt(left, right),
+            BinaryOp::Gt => self.evaluate_binary_gt(left, right),
+            BinaryOp::Mod => self.evaluate_modulus(left, right),
+            BinaryOp::And => self.evaluate_and(left, right),
+            BinaryOp::Or => self.evaluate_or(left, right),
+        }
+        .map_err(|kind| RuntimeError { kind, loc })
     }
 
     fn evaluate_index_access(
         &self,
-        indexee: &Expression,
-        index: &Expression,
+        access: &IndexAccess,
         ctx: &mut EvaluationContext,
     ) -> Result<Value, RuntimeError> {
+        let IndexAccess { indexee, index } = access;
         let array = self.evaluate_expression(indexee, ctx)?;
-        let Value::Array { elements } = array else {
-            return Err(RuntimeError::type_error(&indexee.start, &indexee.end));
+        let Value::Array(elements) = array else {
+            return Err(RuntimeError::type_error(indexee.loc));
         };
         let index_value = self.evaluate_expression(index, ctx)?;
-        let Value::Int { value: i } = index_value else {
-            return Err(RuntimeError::type_error(&index.start, &index.end));
+        let Value::Int(i) = index_value else {
+            return Err(RuntimeError::type_error(indexee.loc));
         };
         let value = elements.get(i as usize);
         match value {
             Some(v) => Ok(v.clone()),
             None => Err(RuntimeError {
-                start: index.start,
-                end: index.end,
+                loc: index.loc,
                 kind: RuntimeErrorKind::IndexOutOfBounds { index: i as usize },
             }),
         }
@@ -246,7 +244,7 @@ impl Interpreter {
             .map(|e| self.evaluate_expression(e, ctx))
             .collect::<Result<Vec<Value>, RuntimeError>>()?;
 
-        Ok(Value::Array { elements })
+        Ok(Value::Array(elements))
     }
 
     fn evaluate_internal(
@@ -266,208 +264,129 @@ impl Interpreter {
 
     fn evaluate_binary_subtract(
         &self,
-        left: &Expression,
-        right: &Expression,
-        ctx: &mut EvaluationContext,
-    ) -> Result<Value, RuntimeError> {
-        let start = &left.start;
-        let end = &right.end;
-        let left = self.evaluate_expression(left, ctx)?;
-        let right = self.evaluate_expression(right, ctx)?;
-
+        left: Value,
+        right: Value,
+    ) -> Result<Value, RuntimeErrorKind> {
         let result = match left {
-            Value::Int { value: l } => match right {
-                Value::Int { value: r } => l - r,
-                _ => return Err(RuntimeError::type_error(start, end)),
+            Value::Int(l) => match right {
+                Value::Int(r) => l - r,
+                _ => return Err(RuntimeErrorKind::TypeError),
             },
-            _ => return Err(RuntimeError::type_error(start, end)),
+            _ => return Err(RuntimeErrorKind::TypeError),
         };
 
-        Ok(Value::Int { value: result })
+        Ok(Value::Int(result))
     }
 
-    fn evaluate_binary_ne(
-        &self,
-        left: &Expression,
-        right: &Expression,
-        ctx: &mut EvaluationContext,
-    ) -> Result<Value, RuntimeError> {
-        let start = &left.start;
-        let end = &right.end;
-        let left = self.evaluate_expression(left, ctx)?;
-        let right = self.evaluate_expression(right, ctx)?;
-
+    fn evaluate_binary_ne(&self, left: Value, right: Value) -> Result<Value, RuntimeErrorKind> {
         let result = match left {
-            Value::Int { value: l } => match right {
-                Value::Int { value: r } => l != r,
-                _ => return Err(RuntimeError::type_error(start, end)),
+            Value::Int(l) => match right {
+                Value::Int(r) => l != r,
+                _ => return Err(RuntimeErrorKind::TypeError),
             },
-            Value::Bool { value: l } => match right {
-                Value::Bool { value: r } => l != r,
-                _ => return Err(RuntimeError::type_error(start, end)),
+            Value::Bool(l) => match right {
+                Value::Bool(r) => l != r,
+                _ => return Err(RuntimeErrorKind::TypeError),
             },
-            Value::String { value: l } => match right {
-                Value::String { value: r } => l != r,
-                _ => return Err(RuntimeError::type_error(start, end)),
+            Value::String(l) => match right {
+                Value::String(r) => l != r,
+                _ => return Err(RuntimeErrorKind::TypeError),
             },
-            _ => return Err(RuntimeError::type_error(start, end)),
+            _ => return Err(RuntimeErrorKind::TypeError),
         };
-        Ok(Value::Bool { value: result })
+        Ok(Value::Bool(result))
     }
 
-    fn evaluate_binary_eq(
-        &self,
-        left: &Expression,
-        right: &Expression,
-        ctx: &mut EvaluationContext,
-    ) -> Result<Value, RuntimeError> {
-        let start = &left.start;
-        let end = &right.end;
-        let left = self.evaluate_expression(left, ctx)?;
-        let right = self.evaluate_expression(right, ctx)?;
-
+    fn evaluate_binary_eq(&self, left: Value, right: Value) -> Result<Value, RuntimeErrorKind> {
         let result = match left {
-            Value::Int { value: l } => match right {
-                Value::Int { value: r } => l == r,
-                _ => return Err(RuntimeError::type_error(start, end)),
+            Value::Int(l) => match right {
+                Value::Int(r) => l == r,
+                _ => return Err(RuntimeErrorKind::TypeError),
             },
-            Value::Bool { value: l } => match right {
-                Value::Bool { value: r } => l == r,
-                _ => return Err(RuntimeError::type_error(start, end)),
+            Value::Bool(l) => match right {
+                Value::Bool(r) => l == r,
+                _ => return Err(RuntimeErrorKind::TypeError),
             },
-            Value::String { value: l } => match right {
-                Value::String { value: r } => l == r,
-                _ => return Err(RuntimeError::type_error(start, end)),
+            Value::String(l) => match right {
+                Value::String(r) => l == r,
+                _ => return Err(RuntimeErrorKind::TypeError),
             },
-            _ => return Err(RuntimeError::type_error(start, end)),
+            _ => return Err(RuntimeErrorKind::TypeError),
         };
-        Ok(Value::Bool { value: result })
+        Ok(Value::Bool(result))
     }
 
-    fn evaluate_or(
-        &self,
-        left: &Expression,
-        right: &Expression,
-        ctx: &mut EvaluationContext,
-    ) -> Result<Value, RuntimeError> {
-        let start = &left.start;
-        let end = &right.end;
-        let left = self.evaluate_expression(left, ctx)?;
-        let right = self.evaluate_expression(right, ctx)?;
-
+    fn evaluate_or(&self, left: Value, right: Value) -> Result<Value, RuntimeErrorKind> {
         let result = match left {
-            Value::Bool { value: l } => match right {
-                Value::Bool { value: r } => l || r,
-                _ => return Err(RuntimeError::type_error(start, end)),
+            Value::Bool(l) => match right {
+                Value::Bool(r) => l || r,
+                _ => return Err(RuntimeErrorKind::TypeError),
             },
-            _ => return Err(RuntimeError::type_error(start, end)),
+            _ => return Err(RuntimeErrorKind::TypeError),
         };
-        Ok(Value::Bool { value: result })
+        Ok(Value::Bool(result))
     }
 
-    fn evaluate_and(
-        &self,
-        left: &Expression,
-        right: &Expression,
-        ctx: &mut EvaluationContext,
-    ) -> Result<Value, RuntimeError> {
-        let start = &left.start;
-        let end = &right.end;
-        let left = self.evaluate_expression(left, ctx)?;
-        let right = self.evaluate_expression(right, ctx)?;
-
+    fn evaluate_and(&self, left: Value, right: Value) -> Result<Value, RuntimeErrorKind> {
         let result = match left {
-            Value::Bool { value: l } => match right {
-                Value::Bool { value: r } => l && r,
-                _ => return Err(RuntimeError::type_error(start, end)),
+            Value::Bool(l) => match right {
+                Value::Bool(r) => l && r,
+                _ => return Err(RuntimeErrorKind::TypeError),
             },
-            _ => return Err(RuntimeError::type_error(start, end)),
+            _ => return Err(RuntimeErrorKind::TypeError),
         };
-        Ok(Value::Bool { value: result })
+        Ok(Value::Bool(result))
     }
 
-    fn evaluate_modulus(
-        &self,
-        left: &Expression,
-        right: &Expression,
-        ctx: &mut EvaluationContext,
-    ) -> Result<Value, RuntimeError> {
-        let start = &left.start;
-        let end = &right.end;
-        let left = self.evaluate_expression(left, ctx)?;
-        let right = self.evaluate_expression(right, ctx)?;
-
+    fn evaluate_modulus(&self, left: Value, right: Value) -> Result<Value, RuntimeErrorKind> {
         let result = match left {
-            Value::Int { value: l } => match right {
-                Value::Int { value: r } => l % r,
-                _ => return Err(RuntimeError::type_error(start, end)),
+            Value::Int(l) => match right {
+                Value::Int(r) => l % r,
+                _ => return Err(RuntimeErrorKind::TypeError),
             },
-            _ => return Err(RuntimeError::type_error(start, end)),
+            _ => return Err(RuntimeErrorKind::TypeError),
         };
-        Ok(Value::Int { value: result })
+        Ok(Value::Int(result))
     }
 
-    fn evaluate_binary_gt(
-        &self,
-        left: &Expression,
-        right: &Expression,
-        ctx: &mut EvaluationContext,
-    ) -> Result<Value, RuntimeError> {
-        let start = &left.start;
-        let end = &right.end;
-        let left = self.evaluate_expression(left, ctx)?;
-        let right = self.evaluate_expression(right, ctx)?;
-
+    fn evaluate_binary_gt(&self, left: Value, right: Value) -> Result<Value, RuntimeErrorKind> {
         let result = match left {
-            Value::Int { value: l } => match right {
-                Value::Int { value: r } => l > r,
-                _ => return Err(RuntimeError::type_error(start, end)),
+            Value::Int(l) => match right {
+                Value::Int(r) => l > r,
+                _ => return Err(RuntimeErrorKind::TypeError),
             },
-            _ => return Err(RuntimeError::type_error(start, end)),
+            _ => return Err(RuntimeErrorKind::TypeError),
         };
-        Ok(Value::Bool { value: result })
+        Ok(Value::Bool(result))
     }
 
-    fn evaluate_binary_lt(
-        &self,
-        left: &Expression,
-        right: &Expression,
-        ctx: &mut EvaluationContext,
-    ) -> Result<Value, RuntimeError> {
-        let start = &left.start;
-        let end = &right.end;
-        let left = self.evaluate_expression(left, ctx)?;
-        let right = self.evaluate_expression(right, ctx)?;
-
+    fn evaluate_binary_lt(&self, left: Value, right: Value) -> Result<Value, RuntimeErrorKind> {
         let result = match left {
-            Value::Int { value: l } => match right {
-                Value::Int { value: r } => l < r,
-                _ => return Err(RuntimeError::type_error(start, end)),
+            Value::Int(l) => match right {
+                Value::Int(r) => l < r,
+                _ => return Err(RuntimeErrorKind::TypeError),
             },
-            _ => return Err(RuntimeError::type_error(start, end)),
+            _ => return Err(RuntimeErrorKind::TypeError),
         };
-        Ok(Value::Bool { value: result })
+        Ok(Value::Bool(result))
     }
 
-    fn evaluate_if(
-        &self,
-        predicate: &Expression,
-        consequent: &Expression,
-        alternate: &Option<Expression>,
-        ctx: &mut EvaluationContext,
-    ) -> Result<Value, RuntimeError> {
-        let start = &predicate.start;
-        let end = &predicate.end;
+    fn evaluate_if(&self, exp: &If, ctx: &mut EvaluationContext) -> Result<Value, RuntimeError> {
+        let If {
+            predicate,
+            alternate,
+            consequent,
+        } = exp;
         let value = self.evaluate_expression(predicate, ctx)?;
-        let Value::Bool { value } = value else {
-            return Err(RuntimeError::type_error(start, end));
+        let Value::Bool(value) = value else {
+            return Err(RuntimeError::type_error(&predicate.loc));
         };
 
         if value {
             return self.evaluate_expression(consequent, ctx);
         };
 
-        if let Some(alternate) = alternate {
+        if let Some(alternate) = alternate.as_ref() {
             return self.evaluate_expression(alternate, ctx);
         };
 
@@ -476,57 +395,39 @@ impl Interpreter {
 
     fn evaluate_block(
         &self,
-        body: &Vec<Expression>,
-        return_val: &Expression,
+        block: &Block,
         ctx: &mut EvaluationContext,
     ) -> Result<Value, RuntimeError> {
+        let Block { body, return_val } = block;
         for exp in body {
             self.evaluate_expression(exp, ctx)?;
         }
         self.evaluate_expression(return_val, ctx)
     }
 
-    fn evaluate_fn(
-        &self,
-        name: &str,
-        parameters: &Vec<String>,
-        block: &Expression,
-        ctx: &mut EvaluationContext,
-    ) -> Result<Value, RuntimeError> {
-        let value = Value::Fn {
-            function: ExpressionKind::Fn {
-                name: name.to_string(),
-                parameters: parameters.clone(),
-                body: Box::new(block.clone()),
-            },
-        };
-        ctx.bindings.insert(name.to_string(), value.clone());
+    fn evaluate_fn(&self, f: &Fn, ctx: &mut EvaluationContext) -> Result<Value, RuntimeError> {
+        let value = Value::Fn(f.clone());
+        ctx.bindings.insert(f.name.to_string(), value.clone());
         Ok(value)
     }
 
     fn evaluate_invocation(
         &self,
-        callee: &Expression,
-        arguments: &Vec<Expression>,
+        invocation: &Invocation,
         ctx: &mut EvaluationContext,
     ) -> Result<Value, RuntimeError> {
-        let start = &callee.start;
-        let end = &callee.end;
+        let Invocation { arguments, callee } = invocation;
         let value = self.evaluate_expression(callee, ctx)?;
 
-        let Value::Fn { function } = value else {
-            return Err(RuntimeError::illegal_invocation(start, end));
+        let Value::Fn(function) = value else {
+            return Err(RuntimeError::illegal_invocation(&callee.loc));
         };
 
-        let ExpressionKind::Fn {
+        let Fn {
+            name,
             parameters,
             body,
-            name,
-            ..
-        } = function
-        else {
-            return Err(RuntimeError::type_error(start, end));
-        };
+        } = function;
 
         let value_args = arguments
             .iter()
@@ -551,20 +452,17 @@ impl Interpreter {
     fn evaluate_identifier(
         &self,
         name: &str,
-        start: &Pos,
-        end: &Pos,
+        loc: &Location,
         ctx: &mut EvaluationContext,
     ) -> Result<Value, RuntimeError> {
         let declaration = ctx.symbol_table.get_declaration(name).ok_or(RuntimeError {
-            end: *end,
-            start: *start,
+            loc: *loc,
             kind: RuntimeErrorKind::UndefinedReference,
         })?;
 
         let value = ctx.bindings.get(declaration).ok_or(RuntimeError {
             kind: RuntimeErrorKind::UninitializedVariable,
-            end: *end,
-            start: *start,
+            loc: *loc,
         })?;
 
         return Ok(value.clone());
@@ -572,40 +470,30 @@ impl Interpreter {
 
     fn evaluate_let(
         &self,
-        name: &str,
-        right: &Expression,
+        let_bind: &LetBinding,
         ctx: &mut EvaluationContext,
     ) -> Result<Value, RuntimeError> {
+        let LetBinding { name, right } = let_bind;
         let value = self.evaluate_expression(right, ctx)?;
         ctx.bindings.insert(name.to_string(), value);
         Ok(Value::Unit)
     }
 
     fn evaluate_int(&self, value: &i64) -> Result<Value, RuntimeError> {
-        Ok(Value::Int { value: *value })
+        Ok(Value::Int(*value))
     }
 
-    fn evaluate_binary_add(
-        &self,
-        left: &Expression,
-        right: &Expression,
-        ctx: &mut EvaluationContext,
-    ) -> Result<Value, RuntimeError> {
-        let start = &left.start;
-        let end = &right.end;
-        let left = self.evaluate_expression(left, ctx)?;
-        let right = self.evaluate_expression(right, ctx)?;
-
+    fn evaluate_binary_add(&self, left: Value, right: Value) -> Result<Value, RuntimeErrorKind> {
         let result = match left {
-            Value::Int { value: l } => match right {
-                Value::Int { value: r } => Value::Int { value: l + r },
-                _ => return Err(RuntimeError::type_error(start, end)),
+            Value::Int(l) => match right {
+                Value::Int(r) => Value::Int(l + r),
+                _ => return Err(RuntimeErrorKind::TypeError),
             },
-            Value::String { value: l } => match right {
-                Value::String { value: r } => Value::String { value: l + &r },
-                _ => return Err(RuntimeError::type_error(start, end)),
+            Value::String(l) => match right {
+                Value::String(r) => Value::String(l.to_owned() + &r),
+                _ => return Err(RuntimeErrorKind::TypeError),
             },
-            _ => return Err(RuntimeError::type_error(start, end)),
+            _ => return Err(RuntimeErrorKind::TypeError),
         };
 
         Ok(result)

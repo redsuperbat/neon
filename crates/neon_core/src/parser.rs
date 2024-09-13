@@ -12,8 +12,7 @@ pub struct Parser {
 
 #[derive(Debug, Clone)]
 pub struct Expression {
-    pub start: Pos,
-    pub end: Pos,
+    pub loc: Location,
     pub kind: ExpressionKind,
 }
 
@@ -21,8 +20,7 @@ impl Expression {
     pub fn kind(kind: ExpressionKind) -> Expression {
         Expression {
             kind,
-            end: Pos::start(),
-            start: Pos::start(),
+            loc: Location::beginning(),
         }
     }
     pub fn boxed(self) -> Box<Self> {
@@ -58,75 +56,97 @@ pub enum BinaryOp {
 }
 
 #[derive(Debug, Clone)]
+pub struct If {
+    pub predicate: Box<Expression>,
+    pub consequent: Box<Expression>,
+    pub alternate: Box<Option<Expression>>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Fn {
+    pub name: String,
+    pub parameters: Vec<String>,
+    pub body: Box<Expression>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Block {
+    pub body: Vec<Expression>,
+    pub return_val: Box<Expression>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Invocation {
+    pub callee: Box<Expression>,
+    pub arguments: Vec<Expression>,
+}
+#[derive(Debug, Clone)]
+pub struct LetBinding {
+    pub name: String,
+    pub right: Box<Expression>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Binary {
+    pub operation: BinaryOp,
+    pub left: Box<Expression>,
+    pub right: Box<Expression>,
+}
+
+#[derive(Debug, Clone)]
+pub struct IndexAccess {
+    pub indexee: Box<Expression>,
+    pub index: Box<Expression>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Builtin {
+    pub kind: BuiltinExpressionKind,
+    pub arguments: Vec<String>,
+}
+
+#[derive(Debug, Clone)]
 pub enum ExpressionKind {
-    Fn {
-        name: String,
-        parameters: Vec<String>,
-        body: Box<Expression>,
-    },
+    Fn(Fn),
 
-    Block {
-        body: Vec<Expression>,
-        return_val: Box<Expression>,
-    },
+    Block(Block),
 
-    Identifier {
-        name: String,
-    },
+    Identifier(String),
 
-    Invocation {
-        callee: Box<Expression>,
-        arguments: Vec<Expression>,
-    },
+    Invocation(Invocation),
 
-    LetBinding {
-        name: String,
-        right: Box<Expression>,
-    },
+    LetBinding(LetBinding),
 
-    If {
-        predicate: Box<Expression>,
-        consequent: Box<Expression>,
-        alternate: Box<Option<Expression>>,
-    },
+    If(If),
 
-    Else {
-        consequent: Box<Expression>,
-    },
+    Else(Box<Expression>),
 
     Empty,
 
-    Int {
-        value: i64,
+    Int(i64),
+
+    String(String),
+
+    Bool(bool),
+
+    Array(Vec<Expression>),
+
+    ForLoop {
+        target: Box<Expression>,
+        iterable: Box<Expression>,
+        body: Box<Expression>,
     },
 
-    String {
-        value: String,
+    PropertyAccess {
+        object: Box<Expression>,
+        property_name: Box<Expression>,
     },
 
-    Bool {
-        value: bool,
-    },
+    IndexAccess(IndexAccess),
 
-    Array {
-        elements: Vec<Expression>,
-    },
+    Binary(Binary),
 
-    IndexAccess {
-        indexee: Box<Expression>,
-        index: Box<Expression>,
-    },
-
-    Binary {
-        operation: BinaryOp,
-        left: Box<Expression>,
-        right: Box<Expression>,
-    },
-
-    Builtin {
-        kind: BuiltinExpressionKind,
-        arguments: Vec<String>,
-    },
+    Builtin(Builtin),
 }
 
 #[derive(Debug)]
@@ -349,13 +369,12 @@ impl Parser {
         };
 
         Ok(Expression {
-            start: expression.start,
-            end: right.end,
-            kind: ExpressionKind::Binary {
+            loc: Location::new(expression.loc.start, right.loc.end),
+            kind: ExpressionKind::Binary(Binary {
                 operation: kind,
                 left: expression.boxed(),
                 right: right.boxed(),
-            },
+            }),
         })
     }
 
@@ -364,9 +383,8 @@ impl Parser {
             lexeme, start, end, ..
         } = self.assert_next(TokenKind::Symbol)?;
         Ok(Expression {
-            kind: ExpressionKind::Identifier { name: lexeme },
-            end,
-            start,
+            kind: ExpressionKind::Identifier(lexeme),
+            loc: Location::new(start, end),
         })
     }
 
@@ -381,12 +399,11 @@ impl Parser {
             TokenKind::OpenParen => {
                 while self.next_is(TokenKind::OpenParen) {
                     expression = Expression {
-                        start: expression.start,
-                        end: expression.end,
-                        kind: ExpressionKind::Invocation {
+                        loc: expression.loc,
+                        kind: ExpressionKind::Invocation(Invocation {
                             callee: expression.boxed(),
                             arguments: self.parse_arguments()?,
-                        },
+                        }),
                     };
                 }
                 Ok(expression)
@@ -395,12 +412,11 @@ impl Parser {
                 while self.next_is(TokenKind::OpenSquareBracket) {
                     self.assert_next(TokenKind::OpenSquareBracket)?;
                     expression = Expression {
-                        start: expression.start,
-                        end: expression.end,
-                        kind: ExpressionKind::IndexAccess {
+                        loc: expression.loc,
+                        kind: ExpressionKind::IndexAccess(IndexAccess {
                             indexee: expression.boxed(),
                             index: self.parse_expression()?.boxed(),
-                        },
+                        }),
                     };
                     self.assert_next(TokenKind::ClosedSquareBracket)?;
                 }
@@ -414,11 +430,9 @@ impl Parser {
         let next = self.peek_significant();
 
         let Some(next) = next else {
-            let Location { start, end } = self.last_location;
             return Ok(Expression {
                 kind: ExpressionKind::Empty,
-                start,
-                end,
+                loc: self.last_location,
             });
         };
 
@@ -434,6 +448,7 @@ impl Parser {
             TokenKind::IfKeyword => self.parse_if(),
             TokenKind::LetKeyword => self.parse_let(),
             TokenKind::Symbol => self.parse_identifier(),
+            TokenKind::ForKeyword => self.parse_for_loop(),
             _ => SyntaxError::new(
                 vec![
                     TokenKind::FnKeyword,
@@ -450,6 +465,11 @@ impl Parser {
                 next,
             ),
         }
+    }
+
+    fn parse_for_loop(&mut self) -> Result<Expression, SyntaxError> {
+        let Token { .. } = self.assert_next(TokenKind::ForKeyword)?;
+        todo!()
     }
 
     fn parse_array(&mut self) -> Result<Expression, SyntaxError> {
@@ -470,17 +490,15 @@ impl Parser {
         let end = self.assert_next(TokenKind::ClosedSquareBracket)?.end;
 
         Ok(Expression {
-            start,
-            end,
-            kind: ExpressionKind::Array { elements },
+            loc: Location::new(start, end),
+            kind: ExpressionKind::Array(elements),
         })
     }
 
     fn parse_block_body(&mut self) -> Result<(Vec<Expression>, Expression), SyntaxError> {
         let mut body = vec![];
         let mut return_val = Expression {
-            start: self.last_location.start,
-            end: self.last_location.end,
+            loc: self.last_location,
             kind: ExpressionKind::Empty,
         };
         loop {
@@ -506,25 +524,24 @@ impl Parser {
         let Token { end, .. } = self.assert_next(TokenKind::ClosedCurlyBrace)?;
 
         Ok(Expression {
-            start,
-            end,
-            kind: ExpressionKind::Block {
+            loc: Location::new(start, end),
+            kind: ExpressionKind::Block(Block {
                 return_val: return_val.boxed(),
                 body,
-            },
+            }),
         })
     }
 
     pub fn parse_program(&mut self) -> Result<Expression, SyntaxError> {
         let (body, return_val) = self.parse_block_body()?;
+        let start = body.first().unwrap_or(&return_val).loc.start;
 
         Ok(Expression {
-            start: body.first().unwrap_or(&return_val).start,
-            end: return_val.end,
-            kind: ExpressionKind::Block {
+            loc: Location::new(start, return_val.loc.end),
+            kind: ExpressionKind::Block(Block {
                 body,
                 return_val: return_val.boxed(),
-            },
+            }),
         })
     }
 
@@ -532,8 +549,7 @@ impl Parser {
         let Token { start, end, .. } = self.assert_next(TokenKind::ClosedCurlyBrace)?;
         Ok(Expression {
             kind: ExpressionKind::Empty,
-            start,
-            end,
+            loc: Location::new(start, end),
         })
     }
 
@@ -542,27 +558,24 @@ impl Parser {
             start, end, lexeme, ..
         } = self.assert_next(TokenKind::StringLiteral)?;
         Ok(Expression {
-            kind: ExpressionKind::String { value: lexeme },
-            start,
-            end,
+            kind: ExpressionKind::String(lexeme),
+            loc: Location::new(start, end),
         })
     }
 
     fn parse_true_keyword(&mut self) -> Result<Expression, SyntaxError> {
         let Token { start, end, .. } = self.assert_next(TokenKind::TrueKeyword)?;
         Ok(Expression {
-            kind: ExpressionKind::Bool { value: true },
-            start,
-            end,
+            kind: ExpressionKind::Bool(true),
+            loc: Location::new(start, end),
         })
     }
 
     fn parse_false_keyword(&mut self) -> Result<Expression, SyntaxError> {
         let Token { start, end, .. } = self.assert_next(TokenKind::FalseKeyword)?;
         Ok(Expression {
-            kind: ExpressionKind::Bool { value: false },
-            start,
-            end,
+            kind: ExpressionKind::Bool(false),
+            loc: Location::new(start, end),
         })
     }
 
@@ -578,13 +591,12 @@ impl Parser {
         }
 
         Ok(Expression {
-            start,
-            end: consequent.end,
-            kind: ExpressionKind::If {
+            loc: Location::new(start, consequent.loc.end),
+            kind: ExpressionKind::If(If {
                 predicate: predicate.boxed(),
                 consequent: consequent.boxed(),
                 alternate: Box::new(alternate),
-            },
+            }),
         })
     }
 
@@ -600,11 +612,8 @@ impl Parser {
         }
 
         Ok(Expression {
-            start,
-            end: consequent.end,
-            kind: ExpressionKind::Else {
-                consequent: consequent.boxed(),
-            },
+            loc: Location::new(start, consequent.loc.end),
+            kind: ExpressionKind::Else(consequent.boxed()),
         })
     }
 
@@ -638,9 +647,8 @@ impl Parser {
         let value = lexeme.parse::<i64>().expect("Internal neon error");
 
         Ok(Expression {
-            start,
-            end,
-            kind: ExpressionKind::Int { value },
+            loc: Location::new(start, end),
+            kind: ExpressionKind::Int(value),
         })
     }
 
@@ -651,12 +659,11 @@ impl Parser {
         let right = self.parse_expression().map(Box::new)?;
 
         Ok(Expression {
-            kind: ExpressionKind::LetBinding {
+            kind: ExpressionKind::LetBinding(LetBinding {
                 name: lexeme,
                 right,
-            },
-            start,
-            end,
+            }),
+            loc: Location::new(start, end),
         })
     }
 
@@ -691,13 +698,12 @@ impl Parser {
         let block = self.parse_block()?;
 
         Ok(Expression {
-            start,
-            end: block.end.clone(),
-            kind: ExpressionKind::Fn {
+            loc: Location::new(start, block.loc.end),
+            kind: ExpressionKind::Fn(Fn {
                 name: name.lexeme,
                 parameters,
                 body: block.boxed(),
-            },
+            }),
         })
     }
 }
