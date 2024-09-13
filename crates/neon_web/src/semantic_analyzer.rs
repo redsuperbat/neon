@@ -1,4 +1,7 @@
-use neon_core::lexer::{Pos, Token, TokenKind};
+use neon_core::{
+    lexer::{Token, TokenKind},
+    location::Pos,
+};
 use std::collections::VecDeque;
 
 #[derive(Debug)]

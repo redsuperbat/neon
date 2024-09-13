@@ -1,17 +1,9 @@
 use std::collections::VecDeque;
 
-use crate::lexer::{Pos, Token, TokenKind};
-
-struct Location {
-    start: Pos,
-    end: Pos,
-}
-
-impl Location {
-    fn new(start: Pos, end: Pos) -> Location {
-        Location { end, start }
-    }
-}
+use crate::{
+    lexer::{Token, TokenKind},
+    location::{Location, Pos},
+};
 
 pub struct Parser {
     tokens: VecDeque<Token>,

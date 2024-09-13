@@ -1,18 +1,11 @@
+use crate::location::Pos;
+
 #[derive(Debug)]
 pub struct Lexer {
     text: String,
     col: usize,
     line: usize,
     offset: usize,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct Pos(pub usize, pub usize);
-
-impl Pos {
-    pub fn start() -> Pos {
-        Pos(0, 0)
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -78,6 +71,7 @@ impl ToString for TokenKind {
             TokenKind::TrueKeyword => "true",
             TokenKind::FalseKeyword => "false",
             TokenKind::ForKeyword => "for",
+            TokenKind::InKeyword => "in",
 
             TokenKind::OpenAngleBracket => "<",
             TokenKind::ClosedAngleBracket => ">",

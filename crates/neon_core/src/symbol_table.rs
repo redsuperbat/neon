@@ -1,5 +1,5 @@
 use crate::{
-    lexer::Pos,
+    location::Pos,
     parser::{BuiltinExpressionKind, Expression, ExpressionKind},
 };
 use std::{

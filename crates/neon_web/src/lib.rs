@@ -3,7 +3,8 @@ mod semantic_analyzer;
 use js_sys::Array;
 use neon_core::{
     interpreter::{Builtin, EvaluationContext, Interpreter, RuntimeError, Value},
-    lexer::{Lexer, Pos},
+    lexer::Lexer,
+    location::Pos,
     parser::{BuiltinExpressionKind, Parser},
     symbol_table::SymbolTable,
 };

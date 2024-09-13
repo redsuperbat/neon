@@ -4,7 +4,7 @@ use std::{
 };
 
 use crate::{
-    lexer::Pos,
+    location::Pos,
     parser::{BinaryOp, BuiltinExpressionKind, Expression, ExpressionKind},
     symbol_table::SymbolTable,
 };
