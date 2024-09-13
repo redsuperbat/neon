@@ -65,8 +65,8 @@ pub fn compile(src: &str) -> Result<(), ProgramErr> {
     symbol_table
         .visit_expression(&ast)
         .map_err(|e| ProgramErr {
-            start: JsPos::from(e.start),
-            end: JsPos::from(e.end),
+            start: JsPos::from(e.loc.start),
+            end: JsPos::from(e.loc.end),
             message: e.kind.to_string(),
         })?;
 
@@ -135,8 +135,8 @@ pub fn interpret_src(src: &str) -> Result<ProgramOk, ProgramErr> {
     ctx.symbol_table
         .visit_expression(&ast)
         .map_err(|e| ProgramErr {
-            start: JsPos::from(e.start),
-            end: JsPos::from(e.end),
+            start: JsPos::from(e.loc.start),
+            end: JsPos::from(e.loc.end),
             message: e.kind.to_string(),
         })?;
 
@@ -146,8 +146,8 @@ pub fn interpret_src(src: &str) -> Result<ProgramOk, ProgramErr> {
             result: r.to_string(),
         })
         .map_err(|e| ProgramErr {
-            start: JsPos::from(e.start),
-            end: JsPos::from(e.end),
+            start: JsPos::from(e.loc.start),
+            end: JsPos::from(e.loc.end),
             message: e.kind.to_string(),
         })
 }

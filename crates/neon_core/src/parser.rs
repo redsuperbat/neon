@@ -23,6 +23,7 @@ impl Expression {
             loc: Location::beginning(),
         }
     }
+
     pub fn boxed(self) -> Box<Self> {
         Box::new(self)
     }
@@ -106,6 +107,13 @@ pub struct Builtin {
 }
 
 #[derive(Debug, Clone)]
+pub struct ForLoop {
+    pub target: Box<Expression>,
+    pub iterable: Box<Expression>,
+    pub body: Box<Expression>,
+}
+
+#[derive(Debug, Clone)]
 pub enum ExpressionKind {
     Fn(Fn),
 
@@ -131,11 +139,7 @@ pub enum ExpressionKind {
 
     Array(Vec<Expression>),
 
-    ForLoop {
-        target: Box<Expression>,
-        iterable: Box<Expression>,
-        body: Box<Expression>,
-    },
+    ForLoop(ForLoop),
 
     PropertyAccess {
         object: Box<Expression>,
@@ -147,6 +151,12 @@ pub enum ExpressionKind {
     Binary(Binary),
 
     Builtin(Builtin),
+}
+
+impl ExpressionKind {
+    pub fn into_exp(self, loc: Location) -> Expression {
+        Expression { kind: self, loc }
+    }
 }
 
 #[derive(Debug)]
@@ -468,8 +478,19 @@ impl Parser {
     }
 
     fn parse_for_loop(&mut self) -> Result<Expression, SyntaxError> {
-        let Token { .. } = self.assert_next(TokenKind::ForKeyword)?;
-        todo!()
+        let Token { start, .. } = self.assert_next(TokenKind::ForKeyword)?;
+
+        let target = self.parse_identifier()?.boxed();
+        self.assert_next(TokenKind::InKeyword)?;
+        let iterable = self.parse_expression()?.boxed();
+        let body = self.parse_block()?.boxed();
+
+        Ok(ExpressionKind::ForLoop(ForLoop {
+            target,
+            iterable,
+            body,
+        })
+        .into_exp(Location::new(start, Pos::start())))
     }
 
     fn parse_array(&mut self) -> Result<Expression, SyntaxError> {

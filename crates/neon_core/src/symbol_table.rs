@@ -1,14 +1,11 @@
 use crate::{
     location::Location,
     parser::{
-        Binary, Block, BuiltinExpressionKind, Expression, ExpressionKind, Fn, If, IndexAccess,
-        Invocation, LetBinding,
+        Binary, Block, BuiltinExpressionKind, Expression, ExpressionKind, Fn, ForLoop, If,
+        IndexAccess, Invocation, LetBinding,
     },
 };
-use std::{
-    collections::{HashMap, HashSet},
-    mem,
-};
+use std::{collections::HashSet, mem};
 
 #[derive(Debug, Clone)]
 pub struct Scope {
@@ -24,18 +21,8 @@ impl Scope {
         }
     }
 
-    pub fn declare(&mut self, id: &str, loc: &Location) -> Result<(), SymbolError> {
-        if self.has_identifier(id).is_some() {
-            return Err(SymbolError {
-                loc: *loc,
-                kind: SymbolErrorKind::Redeclaration {
-                    name: id.to_string(),
-                },
-            });
-        }
-
+    pub fn declare(&mut self, id: &str) {
         self.declarations.insert(id.to_string());
-        Ok(())
     }
 
     pub fn has_identifier(&self, id: &str) -> Option<String> {
@@ -54,7 +41,6 @@ impl Scope {
 #[derive(Debug, Clone)]
 pub struct SymbolTable {
     scope: Scope,
-    declarations_by_reference: HashMap<String, String>,
 }
 
 #[derive(Debug)]
@@ -66,11 +52,8 @@ pub struct SymbolError {
 impl ToString for SymbolErrorKind {
     fn to_string(&self) -> String {
         match self {
-            SymbolErrorKind::UndefinedReference { name } => {
+            SymbolErrorKind::UndefinedReference(name) => {
                 format!("Undefined reference '{name}'")
-            }
-            SymbolErrorKind::Redeclaration { name } => {
-                format!("Redeclaration of variable '{name}'")
             }
         }
     }
@@ -78,44 +61,30 @@ impl ToString for SymbolErrorKind {
 
 #[derive(Debug)]
 pub enum SymbolErrorKind {
-    UndefinedReference { name: String },
-    Redeclaration { name: String },
+    UndefinedReference(String),
 }
 
 impl SymbolTable {
     pub fn new() -> SymbolTable {
         SymbolTable {
             scope: Scope::global(),
-            declarations_by_reference: HashMap::new(),
         }
     }
 
-    pub fn get_declaration(&self, reference: &str) -> Option<&String> {
-        self.declarations_by_reference.get(reference)
-    }
-
     pub fn register_bultin(&mut self, kind: &BuiltinExpressionKind) {
-        let name = kind.name();
-        self.declarations_by_reference
-            .insert(name.clone(), name.clone());
-        self.scope.declarations.insert(name);
+        self.scope.declarations.insert(kind.name());
     }
 
     pub fn visit_expression(&mut self, expression: &Expression) -> Result<(), SymbolError> {
         let Expression { loc, .. } = &expression;
         match &expression.kind {
-            ExpressionKind::Fn(f) => self.visit_fn(f, loc),
+            ExpressionKind::Fn(f) => self.visit_fn(f),
             ExpressionKind::Identifier(name) => self.visit_identifier(name, loc),
             ExpressionKind::Invocation(i) => self.visit_invocation(i),
-            ExpressionKind::LetBinding(l) => self.visit_let(l, loc),
+            ExpressionKind::LetBinding(l) => self.visit_let(l),
             ExpressionKind::Block(b) => self.visit_block(b),
             ExpressionKind::If(exp) => self.visit_if(exp),
             ExpressionKind::Else(consequent) => self.visit_expression(consequent),
-
-            ExpressionKind::Int { .. } => Ok(()),
-            ExpressionKind::Bool { .. } => Ok(()),
-            ExpressionKind::String { .. } => Ok(()),
-            ExpressionKind::Empty => Ok(()),
             ExpressionKind::Binary(bin) => self.visit_binary(bin),
             ExpressionKind::Builtin { .. } => Ok(()),
             ExpressionKind::Array(elements) => self.visit_array(elements),
@@ -123,9 +92,32 @@ impl SymbolTable {
                 self.visit_expression(indexee)?;
                 self.visit_expression(index)
             }
-            ExpressionKind::ForLoop { .. } => todo!(),
+            ExpressionKind::ForLoop(for_loop) => self.visit_for_loop(for_loop),
             ExpressionKind::PropertyAccess { .. } => todo!(),
+
+            ExpressionKind::Int(..) => Ok(()),
+            ExpressionKind::Bool(..) => Ok(()),
+            ExpressionKind::String(..) => Ok(()),
+            ExpressionKind::Empty => Ok(()),
         }
+    }
+
+    fn visit_for_loop(&mut self, for_loop: &ForLoop) -> Result<(), SymbolError> {
+        let ForLoop {
+            iterable,
+            body,
+            target,
+        } = for_loop;
+
+        self.visit_expression(iterable)?;
+
+        self.enter_scope(&vec![]);
+        self.visit_expression(target)?;
+        self.visit_expression(body)?;
+
+        self.exit_scope()?;
+
+        Ok(())
     }
 
     fn visit_array(&mut self, elements: &Vec<Expression>) -> Result<(), SymbolError> {
@@ -178,13 +170,13 @@ impl SymbolTable {
         }
     }
 
-    fn visit_fn(&mut self, exp: &Fn, loc: &Location) -> Result<(), SymbolError> {
+    fn visit_fn(&mut self, exp: &Fn) -> Result<(), SymbolError> {
         let Fn {
             name,
             parameters,
             body,
         } = exp;
-        self.scope.declare(name, loc)?;
+        self.scope.declare(name);
         self.enter_scope(parameters);
         self.visit_expression(body)?;
         self.exit_scope()?;
@@ -209,24 +201,19 @@ impl SymbolTable {
     }
 
     fn visit_identifier(&mut self, name: &str, loc: &Location) -> Result<(), SymbolError> {
-        if let Some(reference) = self.scope.has_identifier(name) {
-            self.declarations_by_reference
-                .insert(name.to_string(), reference.to_string());
-            Ok(())
-        } else {
-            Err(SymbolError {
-                kind: SymbolErrorKind::UndefinedReference {
-                    name: name.to_string(),
-                },
+        self.scope
+            .has_identifier(name)
+            .map(|_| ())
+            .ok_or(SymbolError {
+                kind: SymbolErrorKind::UndefinedReference(name.to_string()),
                 loc: *loc,
             })
-        }
     }
 
-    fn visit_let(&mut self, l: &LetBinding, loc: &Location) -> Result<(), SymbolError> {
+    fn visit_let(&mut self, l: &LetBinding) -> Result<(), SymbolError> {
         let LetBinding { right, name } = l;
         self.visit_expression(right)?;
-        self.scope.declare(name, loc)?;
+        self.scope.declare(name);
         Ok(())
     }
 

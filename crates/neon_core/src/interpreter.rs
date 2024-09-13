@@ -7,7 +7,7 @@ use crate::{
     location::Location,
     parser::{
         Binary, BinaryOp, Block, Builtin as BuiltinExp, BuiltinExpressionKind, Expression,
-        ExpressionKind, Fn, If, IndexAccess, Invocation, LetBinding,
+        ExpressionKind, Fn, ForLoop, If, IndexAccess, Invocation, LetBinding,
     },
     symbol_table::SymbolTable,
 };
@@ -124,10 +124,11 @@ impl EvaluationContext {
         let function_expression = Fn {
             name: name.clone(),
             parameters: arguments.clone(),
-            body: Expression::kind(ExpressionKind::Builtin(BuiltinExp {
+            body: ExpressionKind::Builtin(BuiltinExp {
                 kind: kind.clone(),
                 arguments,
-            }))
+            })
+            .into_exp(Location::beginning())
             .boxed(),
         };
 
@@ -175,9 +176,38 @@ impl Interpreter {
             }
             ExpressionKind::Array(elements) => self.evaluate_array(elements, ctx),
             ExpressionKind::IndexAccess(access) => self.evaluate_index_access(access, ctx),
-            ExpressionKind::ForLoop { .. } => todo!(),
+            ExpressionKind::ForLoop(for_loop) => self.evaluate_for_loop(for_loop, loc, ctx),
             ExpressionKind::PropertyAccess { .. } => todo!(),
         }
+    }
+
+    fn evaluate_for_loop(
+        &self,
+        for_loop: &ForLoop,
+        loc: &Location,
+        ctx: &mut EvaluationContext,
+    ) -> Result<Value, RuntimeError> {
+        let ForLoop {
+            target,
+            iterable,
+            body,
+        } = for_loop;
+
+        let Ok(Value::Array(elements)) = self.evaluate_expression(iterable, ctx) else {
+            return Err(RuntimeError::type_error(loc));
+        };
+
+        let ExpressionKind::Identifier(name) = target.kind.to_owned() else {
+            return Err(RuntimeError::type_error(loc));
+        };
+
+        for el in elements {
+            let mut loop_ctx = ctx.clone();
+            loop_ctx.bindings.insert(name.clone(), el);
+            self.evaluate_expression(&body, &mut loop_ctx)?;
+        }
+
+        Ok(Value::Unit)
     }
 
     fn evaluate_binary(
@@ -455,12 +485,7 @@ impl Interpreter {
         loc: &Location,
         ctx: &mut EvaluationContext,
     ) -> Result<Value, RuntimeError> {
-        let declaration = ctx.symbol_table.get_declaration(name).ok_or(RuntimeError {
-            loc: *loc,
-            kind: RuntimeErrorKind::UndefinedReference,
-        })?;
-
-        let value = ctx.bindings.get(declaration).ok_or(RuntimeError {
+        let value = ctx.bindings.get(name).ok_or(RuntimeError {
             kind: RuntimeErrorKind::UninitializedVariable,
             loc: *loc,
         })?;
