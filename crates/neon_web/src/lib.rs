@@ -13,11 +13,17 @@ use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
 #[derive(Clone)]
-pub struct JsPos(pub usize, pub usize);
+pub struct JsPos {
+    pub line: usize,
+    pub col: usize,
+}
 
 impl From<Pos> for JsPos {
     fn from(value: Pos) -> Self {
-        JsPos(value.0, value.1)
+        JsPos {
+            col: value.column(),
+            line: value.line(),
+        }
     }
 }
 

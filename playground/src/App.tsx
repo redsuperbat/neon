@@ -2,6 +2,7 @@ import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
 import init, {
   compile,
   interpret_src,
+  JsPos,
   JsToken,
   ProgramErr,
   tokenize,
@@ -16,19 +17,20 @@ import {
   Show,
   Switch,
 } from "solid-js";
+import array from "./assets/examples/arrays.neon?raw";
 import fizzbuzz from "./assets/examples/fizz-buzz.neon?raw";
+import helloWorld from "./assets/examples/hello-world.neon?raw";
 import higherOrderFunctions from "./assets/examples/higher-order-functions.neon?raw";
+import iife from "./assets/examples/iife.neon?raw";
 import math from "./assets/examples/math.neon?raw";
 import recursion from "./assets/examples/recursion.neon?raw";
 import typeErrors from "./assets/examples/type-errors.neon?raw";
-import iife from "./assets/examples/iife.neon?raw";
-import array from "./assets/examples/arrays.neon?raw";
-import helloWorld from "./assets/examples/hello-world.neon?raw";
 import initScript from "./assets/init.neon?raw";
 
 function LoadingPage() {
   return <div aria-busy="true"></div>;
 }
+
 function ErrorPage({ error }: { error: string }) {
   return <article>{error}</article>;
 }
@@ -68,26 +70,40 @@ const examples: { label: string; value: string }[] = [
   },
 ];
 
-const errorDecorationOptions = (
-  message: string,
-): monaco.editor.IModelDecorationOptions => ({
-  inlineClassName: "diagnostic",
-  className: "diagnostic-container",
-  glyphMarginClassName: "diagnostic-glyph",
-  hoverMessage: {
-    value: message,
-  },
+const getModel = (path: string) => {
+  const pathUri = monaco.Uri.parse(path);
+  return monaco.editor.getModel(pathUri);
+};
+
+const createModel = (value: string, language?: string, path?: string) => {
+  const pathUri = path != null ? monaco.Uri.parse(path) : undefined;
+  return monaco.editor.createModel(value, language, pathUri);
+};
+
+const getOrCreateModel = (value: string, language?: string, path?: string) => {
+  const existingModel = path != null ? getModel(path) : null;
+  return existingModel ?? createModel(value, language, path);
+};
+
+const rangeFromLocation = ({
+  end,
+  start,
+}: { start: JsPos; end: JsPos }): monaco.IRange => ({
+  endColumn: end.col,
+  startColumn: start.col,
+  endLineNumber: end.line,
+  startLineNumber: start.line,
 });
 
 type Output =
   | {
-      type: "error";
-      message: string;
-    }
+    type: "error";
+    message: string;
+  }
   | {
-      type: "ok";
-      message: string;
-    };
+    type: "ok";
+    message: string;
+  };
 
 function ExecutionPage() {
   const [output, setOutput] = createSignal<Output>();
@@ -106,9 +122,11 @@ function ExecutionPage() {
 
   onMount(() => {
     if (!monacoEl) return;
+    monaco.languages.register({ id: "neon", extensions: ["neon"] });
 
     editor = monaco.editor.create(monacoEl, {
-      value: initScript,
+      model: getOrCreateModel(initScript, "neon"),
+      language: "neon",
       theme: "vs-dark",
       glyphMargin: true,
       automaticLayout: true,
@@ -143,12 +161,23 @@ function ExecutionPage() {
     syntaxDecorations?.clear();
     runtimeDecorations?.clear();
     diagnosticsDecorations?.clear();
-    renderSyntaxHighlighting(src);
     renderDiagnostics(src);
+    renderSyntaxHighlighting(src);
   }
 
   function setEditorContent(src: string) {
     editor?.setValue(src);
+  }
+
+  function underlineDecoration(e: ProgramErr) {
+    return {
+      range: rangeFromLocation(e),
+      options: {
+        inlineClassName: "diagnostic",
+        className: "diagnostic-container",
+        glyphMarginClassName: "diagnostic-glyph",
+      },
+    };
   }
 
   function renderDiagnostics(src: string) {
@@ -160,15 +189,16 @@ function ExecutionPage() {
       if (!model) return;
 
       const decoration: monaco.editor.IModelDeltaDecoration = {
-        range: {
-          startColumn: e.start[1],
-          endColumn: e.end[1],
-          startLineNumber: e.start[0],
-          endLineNumber: e.end[0],
+        range: rangeFromLocation(e),
+        options: {
+          className: "hover-message",
+          isWholeLine: true,
+          hoverMessage: {
+            value: e.message,
+          },
         },
-        options: errorDecorationOptions(e.message),
       };
-      diagnosticsDecorations?.append([decoration]);
+      diagnosticsDecorations?.append([decoration, underlineDecoration(e)]);
     }
   }
 
@@ -178,12 +208,7 @@ function ExecutionPage() {
     const tokens: JsToken[] = tokenize(src);
     const highlights: monaco.editor.IModelDeltaDecoration[] = tokens.map(
       (it) => ({
-        range: {
-          startColumn: it.start[1],
-          endColumn: it.end[1],
-          startLineNumber: it.start[0],
-          endLineNumber: it.end[0],
-        },
+        range: rangeFromLocation(it),
         options: {
           inlineClassName: it.kind,
         },
@@ -194,7 +219,6 @@ function ExecutionPage() {
 
   function exec() {
     setLogs(undefined);
-    runtimeDecorations?.clear();
     const src = editor?.getValue();
     if (!src) return;
     try {
@@ -207,13 +231,12 @@ function ExecutionPage() {
       if (!(e instanceof ProgramErr)) return;
       runtimeDecorations?.append([
         {
-          range: {
-            startColumn: e.start[1],
-            endColumn: e.end[1],
-            startLineNumber: e.start[0],
-            endLineNumber: e.end[0],
+          range: rangeFromLocation(e),
+          options: {
+            inlineClassName: "diagnostic",
+            className: "diagnostic-container",
+            glyphMarginClassName: "diagnostic-glyph",
           },
-          options: errorDecorationOptions(e.message),
         },
       ]);
 
@@ -231,7 +254,6 @@ function ExecutionPage() {
         style={{
           height: "50vh",
           "border-radius": "5px",
-          overflow: "hidden",
           "margin-bottom": "10px",
         }}
         ref={monacoEl}

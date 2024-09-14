@@ -29,11 +29,28 @@ let message = if greeting == "Hello" {
 
 /**
  *  In Neon, `if` statements are also expressions, returning the value of the evaluated branch. 
- *  Even entire Neon scripts are expressions—this script, 
- *  for example, will evaluate to the result of `hello() + message`
  */
 
-hello() + message
+let greeting = hello() + message
+
+/**
+ * Neon also has for loops and arrays. To loop over an array you can use the `for` and `in` keywords
+ * The below loop will print `1, 2, 3` to the console.
+ */
+
+for el in [1, 2, 3] {
+  print(el)
+}
+
+
+/**
+ * Neon scripts are also expressions, evaluating to a value.
+ * Therefore if we add the `greeting` variable as the last
+ * expression in this file the script will evaluate to the value
+ * contained in the `greeting` variable
+ */
+
+greeting
 
 /**
  * When you run this script, you should see "Hello world!" as the output. 
@@ -42,5 +59,6 @@ hello() + message
  * WebAssembly to run in the browser. All error messages and syntax highlighting 
  * are custom-built with Neon's own parser, lexer, interpreter, and semantic analyzer. 🧠
  *
- * If you want to explore more, check out the examples! Thanks for trying out Neon, it’s been a blast to create it. 🎉
+ * If you want to explore more, check out the examples! 
+ * Thanks for trying out Neon, it’s been a blast to create it. 🎉
  */

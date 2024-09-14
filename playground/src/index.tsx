@@ -9,7 +9,7 @@ declare global {
   function on_print(...values: any[]): void;
 }
 
-window.on_print = () => {};
+window.on_print = () => { };
 
 const root = document.getElementById("root");
 
