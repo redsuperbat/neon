@@ -7,8 +7,8 @@ use crate::{
     location::Location,
     parser::{
         BinaryOp, BinaryOperationNode, BlockNode, BuiltinExpressionKind, BuiltinNode as BuiltinExp,
-        Expression, ExpressionKind, FnNode, ForLoopNode, IdentifierNode, IfNode, IndexAccessNode,
-        InvocationNode, LetBinding, ObjectNode, PropertyAccessNode,
+        Expression, ExpressionKind, FnNode, ForLoopNode, ForLoopTarget, IdentifierNode, IfNode,
+        IndexAccessNode, InvocationNode, LetBinding, ObjectNode, PropertyAccessNode,
     },
     symbol_table::SymbolTable,
 };
@@ -76,15 +76,18 @@ pub enum RuntimeErrorKind {
     UninitializedVariable,
     IllegalInvocation,
     IndexOutOfBounds { index: usize },
-    InvalidPropertyAccess(String),
+    InvalidPropertyAccess { name: String, value: Value },
 }
 
 impl ToString for RuntimeErrorKind {
     fn to_string(&self) -> String {
         match self {
             RuntimeErrorKind::TypeError => "Type error".to_string(),
-            RuntimeErrorKind::InvalidPropertyAccess(name) => {
-                format!("Cannot access property, reading property \"{name}\"")
+            RuntimeErrorKind::InvalidPropertyAccess { name, value } => {
+                format!(
+                    "Cannot access property of {}, reading property \"{name}\"",
+                    value
+                )
             }
             RuntimeErrorKind::UndefinedReference => "Reference is undefined".to_string(),
             RuntimeErrorKind::UninitializedVariable => "Variable is uninitialized".to_string(),
@@ -214,7 +217,10 @@ impl Interpreter {
         let Value::Object(obj) = value else {
             return Err(RuntimeError {
                 loc: *loc,
-                kind: RuntimeErrorKind::InvalidPropertyAccess(pa.property_name.name().to_string()),
+                kind: RuntimeErrorKind::InvalidPropertyAccess {
+                    name: pa.property_name.name().to_string(),
+                    value,
+                },
             });
         };
 
@@ -246,31 +252,72 @@ impl Interpreter {
         ctx: &mut EvaluationContext,
     ) -> Result<Value, RuntimeError> {
         let ForLoopNode {
-            target,
+            targets,
             iterable,
             body,
         } = for_loop;
-        let name = target.name().to_string();
 
         let mut loop_ctx = ctx.clone();
 
-        match self.evaluate_expression(iterable, ctx)? {
-            Value::String(string) => {
-                for s in string.chars() {
-                    loop_ctx
-                        .bindings
-                        .insert(name.clone(), Value::String(s.to_string()));
-                    self.evaluate_expression(&body, &mut loop_ctx)?;
+        match targets {
+            ForLoopTarget::Single(IdentifierNode(name)) => {
+                match self.evaluate_expression(iterable, ctx)? {
+                    Value::String(string) => {
+                        for s in string.chars() {
+                            loop_ctx
+                                .bindings
+                                .insert(name.clone(), Value::String(s.to_string()));
+                            self.evaluate_expression(&body, &mut loop_ctx)?;
+                        }
+                    }
+                    Value::Array(elements) => {
+                        for el in elements {
+                            loop_ctx.bindings.insert(name.clone(), el);
+                            self.evaluate_expression(&body, &mut loop_ctx)?;
+                        }
+                    }
+                    Value::Object(elements) => {
+                        for (_, value) in elements {
+                            loop_ctx.bindings.insert(name.clone(), value);
+                            self.evaluate_expression(&body, &mut loop_ctx)?;
+                        }
+                    }
+                    _ => return Err(RuntimeError::type_error(loc)),
                 }
             }
-            Value::Array(elements) => {
-                for el in elements {
-                    loop_ctx.bindings.insert(name.clone(), el);
-                    self.evaluate_expression(&body, &mut loop_ctx)?;
+            ForLoopTarget::Tuple(IdentifierNode(first), IdentifierNode(second)) => {
+                match self.evaluate_expression(iterable, ctx)? {
+                    Value::String(string) => {
+                        for (i, s) in string.chars().enumerate() {
+                            loop_ctx
+                                .bindings
+                                .insert(first.clone(), Value::Int(i as i64));
+                            loop_ctx
+                                .bindings
+                                .insert(second.clone(), Value::String(s.to_string()));
+                            self.evaluate_expression(&body, &mut loop_ctx)?;
+                        }
+                    }
+                    Value::Array(elements) => {
+                        for (i, el) in elements.iter().enumerate() {
+                            loop_ctx
+                                .bindings
+                                .insert(first.clone(), Value::Int(i as i64));
+                            loop_ctx.bindings.insert(second.clone(), el.clone());
+                            self.evaluate_expression(&body, &mut loop_ctx)?;
+                        }
+                    }
+                    Value::Object(elements) => {
+                        for (key, value) in elements {
+                            loop_ctx.bindings.insert(first.clone(), Value::String(key));
+                            loop_ctx.bindings.insert(second.clone(), value.clone());
+                            self.evaluate_expression(&body, &mut loop_ctx)?;
+                        }
+                    }
+                    _ => return Err(RuntimeError::type_error(loc)),
                 }
             }
-            _ => return Err(RuntimeError::type_error(loc)),
-        };
+        }
 
         Ok(Value::Unit)
     }

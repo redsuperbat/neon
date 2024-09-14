@@ -114,11 +114,20 @@ impl IdentifierNode {
     pub fn name(&self) -> &str {
         &self.0
     }
+    pub fn to_string(&self) -> String {
+        self.name().to_string()
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum ForLoopTarget {
+    Single(IdentifierNode),
+    Tuple(IdentifierNode, IdentifierNode),
 }
 
 #[derive(Debug, Clone)]
 pub struct ForLoopNode {
-    pub target: IdentifierNode,
+    pub targets: ForLoopTarget,
     pub iterable: Box<Expression>,
     pub body: Box<Expression>,
 }
@@ -331,7 +340,7 @@ impl Parser {
     }
 
     pub fn parse_expression(&mut self) -> Result<Expression, SyntaxError> {
-        let expression = self.parse_sub_leaf_expression()?;
+        let expression = self.parse_accessor_expression()?;
 
         let Some(next) = self.peek_significant() else {
             return Ok(expression);
@@ -405,44 +414,36 @@ impl Parser {
         })
     }
 
-    fn parse_sub_leaf_expression(&mut self) -> Result<Expression, SyntaxError> {
+    fn parse_accessor_expression(&mut self) -> Result<Expression, SyntaxError> {
         let mut expression = self.parse_leaf_expression()?;
 
-        let Some(next) = self.peek_significant() else {
-            return Ok(expression);
-        };
+        loop {
+            let Some(next) = self.peek_significant() else {
+                return Ok(expression);
+            };
 
-        match next.kind {
-            TokenKind::OpenParen => {
-                while self.next_is(TokenKind::OpenParen) {
-                    expression = Expression {
-                        loc: expression.loc,
-                        kind: ExpressionKind::Invocation(InvocationNode {
-                            callee: expression.boxed(),
-                            arguments: self.parse_arguments()?,
-                        }),
-                    };
-                }
-                Ok(expression)
-            }
-            TokenKind::Dot => {
-                while self.next_is(TokenKind::Dot) {
+            expression = match next.kind {
+                TokenKind::OpenParen => Expression {
+                    loc: expression.loc,
+                    kind: ExpressionKind::Invocation(InvocationNode {
+                        callee: expression.boxed(),
+                        arguments: self.parse_arguments()?,
+                    }),
+                },
+                TokenKind::Dot => {
                     let Token { start, .. } = self.assert_next(TokenKind::Dot)?;
                     let Token { lexeme, .. } = self.assert_next(TokenKind::Symbol)?;
-                    expression = Expression {
+                    Expression {
                         loc: Location::new(start, expression.loc.end),
                         kind: ExpressionKind::PropertyAccess(PropertyAccessNode {
                             property_name: IdentifierNode(lexeme),
                             object: expression.boxed(),
                         }),
-                    };
+                    }
                 }
-                Ok(expression)
-            }
-            TokenKind::OpenSquareBracket => {
-                while self.next_is(TokenKind::OpenSquareBracket) {
+                TokenKind::OpenSquareBracket => {
                     self.assert_next(TokenKind::OpenSquareBracket)?;
-                    expression = Expression {
+                    let exp = Expression {
                         loc: expression.loc,
                         kind: ExpressionKind::IndexAccess(IndexAccessNode {
                             indexee: expression.boxed(),
@@ -450,10 +451,10 @@ impl Parser {
                         }),
                     };
                     self.assert_next(TokenKind::ClosedSquareBracket)?;
+                    exp
                 }
-                Ok(expression)
-            }
-            _ => Ok(expression),
+                _ => return Ok(expression),
+            };
         }
     }
 
@@ -461,7 +462,12 @@ impl Parser {
         let Token { start, .. } = self.assert_next(TokenKind::OpenCurlyBrace)?;
         let mut properties = vec![];
 
-        while !self.next_is(TokenKind::ClosedCurlyBrace) {
+        loop {
+            // If the first iteration returns an empty object
+            if self.next_is(TokenKind::ClosedSquareBracket) {
+                break;
+            }
+
             let Token { lexeme, .. } = self.assert_next(TokenKind::Symbol)?;
             self.assert_next(TokenKind::Colon)?;
             properties.push(PropertyNode {
@@ -472,7 +478,7 @@ impl Parser {
             if self.next_is(TokenKind::Comma) {
                 self.next()?;
             } else {
-                self.assert_next(TokenKind::ClosedCurlyBrace);
+                self.assert_next(TokenKind::ClosedCurlyBrace)?;
                 break;
             }
         }
@@ -527,20 +533,35 @@ impl Parser {
     fn parse_for_loop(&mut self) -> Result<Expression, SyntaxError> {
         let Token { start, .. } = self.assert_next(TokenKind::ForKeyword)?;
 
-        let target = self.parse_loop_target()?;
+        let targets = self.parse_loop_targets()?;
         self.assert_next(TokenKind::InKeyword)?;
         let iterable = self.parse_expression()?.boxed();
         let body = self.parse_block()?.boxed();
 
         Ok(ExpressionKind::ForLoop(ForLoopNode {
-            target,
+            targets,
             iterable,
             body,
         })
         .into_exp(Location::new(start, Pos::start())))
     }
 
-    fn parse_loop_target(&mut self) -> Result<IdentifierNode, SyntaxError> {
+    fn parse_loop_targets(&mut self) -> Result<ForLoopTarget, SyntaxError> {
+        if self.next_is(TokenKind::Symbol) {
+            let node = self.parse_identifer_node()?;
+            return Ok(ForLoopTarget::Single(node));
+        }
+
+        self.assert_next(TokenKind::OpenParen)?;
+        let first = self.parse_identifer_node()?;
+        self.assert_next(TokenKind::Comma)?;
+        let second = self.parse_identifer_node()?;
+        self.assert_next(TokenKind::ClosedParen)?;
+
+        return Ok(ForLoopTarget::Tuple(first, second));
+    }
+
+    fn parse_identifer_node(&mut self) -> Result<IdentifierNode, SyntaxError> {
         let Token { lexeme, .. } = self.assert_next(TokenKind::Symbol)?;
         Ok(IdentifierNode(lexeme))
     }

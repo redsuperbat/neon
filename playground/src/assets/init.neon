@@ -34,13 +34,33 @@ let message = if greeting == "Hello" {
 let greeting = hello() + message
 
 /**
- * Neon also has for loops and arrays. To loop over an array you can use the `for` and `in` keywords
+ * Neon has for loops, arrays and objects. To loop over an array you can use the `for` and `in` keywords
  * The below loop will print `1, 2, 3` to the console.
  */
 
 for el in [1, 2, 3] {
   print(el)
 }
+
+/**
+ * To declare an object use the curly bracket syntax
+ */
+
+let david = {
+  age: 12,
+  street: "Stockholm west av. 24",
+  siblings: ["Anne", "Max"],
+  greeting: fn greet() {
+    print(greeting)
+    greeting
+  }
+}
+
+/**
+ * To access properties use the dot notation
+ */
+
+print("Davids age", david.age)
 
 
 /**
@@ -50,7 +70,7 @@ for el in [1, 2, 3] {
  * contained in the `greeting` variable
  */
 
-greeting
+david.greeting
 
 /**
  * When you run this script, you should see "Hello world!" as the output. 

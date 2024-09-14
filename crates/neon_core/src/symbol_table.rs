@@ -2,7 +2,8 @@ use crate::{
     location::Location,
     parser::{
         BinaryOperationNode, BlockNode, BuiltinExpressionKind, Expression, ExpressionKind, FnNode,
-        ForLoopNode, IfNode, IndexAccessNode, InvocationNode, LetBinding, ObjectNode,
+        ForLoopNode, ForLoopTarget, IfNode, IndexAccessNode, InvocationNode, LetBinding,
+        ObjectNode,
     },
 };
 use std::{collections::HashSet, mem};
@@ -114,12 +115,20 @@ impl SymbolTable {
         let ForLoopNode {
             iterable,
             body,
-            target,
+            targets,
         } = for_loop;
 
         self.visit_expression(iterable)?;
 
-        self.enter_scope(&vec![target.name().to_string()]);
+        match targets {
+            ForLoopTarget::Single(target) => {
+                self.enter_scope(&vec![target.name().to_string()]);
+            }
+            ForLoopTarget::Tuple(first, second) => {
+                self.enter_scope(&vec![first.to_string(), second.to_string()]);
+            }
+        };
+
         self.visit_expression(body)?;
 
         self.exit_scope()?;
