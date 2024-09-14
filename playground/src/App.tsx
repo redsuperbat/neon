@@ -123,11 +123,31 @@ function ExecutionPage() {
   onMount(() => {
     if (!monacoEl) return;
     monaco.languages.register({ id: "neon", extensions: ["neon"] });
+    monaco.languages.registerHoverProvider("neon", {
+      provideHover() {
+        console.log("Provide hover");
+        return undefined;
+      },
+    });
+
+    monaco.languages.setLanguageConfiguration("neon", {
+      brackets: [
+        ["{", "}"],
+        ["(", ")"],
+      ],
+      surroundingPairs: [
+        { open: "{", close: "}" },
+        { open: '"', close: '"' },
+        { open: "[", close: "]" },
+      ],
+    });
 
     editor = monaco.editor.create(monacoEl, {
       model: getOrCreateModel(initScript, "neon"),
       language: "neon",
       theme: "vs-dark",
+      fixedOverflowWidgets: true,
+      renderValidationDecorations: "on",
       glyphMargin: true,
       automaticLayout: true,
     });
@@ -192,7 +212,6 @@ function ExecutionPage() {
         range: rangeFromLocation(e),
         options: {
           className: "hover-message",
-          isWholeLine: true,
           hoverMessage: {
             value: e.message,
           },
