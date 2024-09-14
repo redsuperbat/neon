@@ -18,14 +18,14 @@ pub struct Token {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum TokenKind {
-    FnKeyword,    // fn
-    LetKeyword,   // let
-    IfKeyword,    // if
     ElseKeyword,  // else
-    TrueKeyword,  // true
     FalseKeyword, // false
+    FnKeyword,    // fn
     ForKeyword,   // for
+    IfKeyword,    // if
     InKeyword,    // in
+    LetKeyword,   // let
+    TrueKeyword,  // true
 
     Bang,   // !
     Equals, // =
@@ -37,25 +37,26 @@ pub enum TokenKind {
 
     Dot, // .
 
-    OpenCurlyBrace,      // {
-    ClosedCurlyBrace,    // }
-    OpenSquareBracket,   // ]
-    ClosedSquareBracket, // ]
-    OpenParen,           // (
-    ForwardSlash,        // /
-    ClosedParen,         // )
-    Percentage,          // %
     Ampersand,           // &
-    Pipe,                // |
-    Comma,               // ,
     Asterix,             // *
+    ClosedCurlyBrace,    // }
+    ClosedParen,         // )
+    ClosedSquareBracket, // ]
+    Comma,               // ,
+    ForwardSlash,        // /
+    OpenCurlyBrace,      // {
+    OpenParen,           // (
+    OpenSquareBracket,   // ]
+    Percentage,          // %
+    Pipe,                // |
 
-    IntegerLiteral, // 5 -3 etc.
+    IntegerLiteral, // 5
     StringLiteral,  // "hello world" etc.
 
     Symbol,     // abc
     Newline,    // \n
     SemiColon,  // ;
+    Colon,      // :
     WhiteSpace, // ' '
 
     Unknown,
@@ -83,6 +84,7 @@ impl ToString for TokenKind {
             TokenKind::Asterix => "*",
 
             TokenKind::SemiColon => ";",
+            TokenKind::Colon => ":",
             TokenKind::Percentage => "%",
             TokenKind::Equals => "=",
             TokenKind::Bang => "!",
@@ -149,6 +151,7 @@ impl Lexer {
             '.' => self.single_char(TokenKind::Dot),
 
             ';' => self.single_char(TokenKind::SemiColon),
+            ':' => self.single_char(TokenKind::Colon),
 
             '{' => self.single_char(TokenKind::OpenCurlyBrace),
             '}' => self.single_char(TokenKind::ClosedCurlyBrace),

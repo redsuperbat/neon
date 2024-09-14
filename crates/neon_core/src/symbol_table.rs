@@ -1,8 +1,8 @@
 use crate::{
     location::Location,
     parser::{
-        Binary, Block, BuiltinExpressionKind, Expression, ExpressionKind, Fn, ForLoop, If,
-        IndexAccess, Invocation, LetBinding,
+        BinaryOperationNode, BlockNode, BuiltinExpressionKind, Expression, ExpressionKind, FnNode,
+        ForLoopNode, IfNode, IndexAccessNode, InvocationNode, LetBinding, ObjectNode,
     },
 };
 use std::{collections::HashSet, mem};
@@ -88,22 +88,30 @@ impl SymbolTable {
             ExpressionKind::Binary(bin) => self.visit_binary(bin),
             ExpressionKind::Builtin { .. } => Ok(()),
             ExpressionKind::Array(elements) => self.visit_array(elements),
-            ExpressionKind::IndexAccess(IndexAccess { indexee, index }) => {
+            ExpressionKind::IndexAccess(IndexAccessNode { indexee, index }) => {
                 self.visit_expression(indexee)?;
                 self.visit_expression(index)
             }
             ExpressionKind::ForLoop(for_loop) => self.visit_for_loop(for_loop),
-            ExpressionKind::PropertyAccess { .. } => todo!(),
 
+            ExpressionKind::PropertyAccess(pa) => self.visit_expression(&pa.object),
             ExpressionKind::Int(..) => Ok(()),
             ExpressionKind::Bool(..) => Ok(()),
             ExpressionKind::String(..) => Ok(()),
             ExpressionKind::Empty => Ok(()),
+            ExpressionKind::Object(obj) => self.visit_object(obj),
         }
     }
 
-    fn visit_for_loop(&mut self, for_loop: &ForLoop) -> Result<(), SymbolError> {
-        let ForLoop {
+    fn visit_object(&mut self, object: &ObjectNode) -> Result<(), SymbolError> {
+        for property in &object.0 {
+            self.visit_expression(property.value.as_ref())?;
+        }
+        Ok(())
+    }
+
+    fn visit_for_loop(&mut self, for_loop: &ForLoopNode) -> Result<(), SymbolError> {
+        let ForLoopNode {
             iterable,
             body,
             target,
@@ -126,8 +134,8 @@ impl SymbolTable {
         Ok(())
     }
 
-    fn visit_if(&mut self, exp: &If) -> Result<(), SymbolError> {
-        let If {
+    fn visit_if(&mut self, exp: &IfNode) -> Result<(), SymbolError> {
+        let IfNode {
             predicate,
             consequent,
             alternate,
@@ -169,8 +177,8 @@ impl SymbolTable {
         }
     }
 
-    fn visit_fn(&mut self, exp: &Fn) -> Result<(), SymbolError> {
-        let Fn {
+    fn visit_fn(&mut self, exp: &FnNode) -> Result<(), SymbolError> {
+        let FnNode {
             name,
             parameters,
             body,
@@ -182,16 +190,16 @@ impl SymbolTable {
         Ok(())
     }
 
-    fn visit_block(&mut self, block: &Block) -> Result<(), SymbolError> {
-        let Block { body, return_val } = block;
+    fn visit_block(&mut self, block: &BlockNode) -> Result<(), SymbolError> {
+        let BlockNode { body, return_val } = block;
         for exp in body {
             self.visit_expression(exp)?;
         }
         self.visit_expression(return_val)
     }
 
-    fn visit_invocation(&mut self, exp: &Invocation) -> Result<(), SymbolError> {
-        let Invocation { callee, arguments } = exp;
+    fn visit_invocation(&mut self, exp: &InvocationNode) -> Result<(), SymbolError> {
+        let InvocationNode { callee, arguments } = exp;
         self.visit_expression(callee)?;
         for arg in arguments {
             self.visit_expression(arg)?;
@@ -216,8 +224,8 @@ impl SymbolTable {
         Ok(())
     }
 
-    fn visit_binary(&mut self, bin: &Binary) -> Result<(), SymbolError> {
-        let Binary { left, right, .. } = bin;
+    fn visit_binary(&mut self, bin: &BinaryOperationNode) -> Result<(), SymbolError> {
+        let BinaryOperationNode { left, right, .. } = bin;
         self.visit_expression(left)?;
         self.visit_expression(right)?;
         Ok(())

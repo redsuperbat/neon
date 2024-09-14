@@ -6,8 +6,9 @@ use std::{
 use crate::{
     location::Location,
     parser::{
-        Binary, BinaryOp, Block, Builtin as BuiltinExp, BuiltinExpressionKind, Expression,
-        ExpressionKind, Fn, ForLoop, Identifier, If, IndexAccess, Invocation, LetBinding,
+        BinaryOp, BinaryOperationNode, BlockNode, BuiltinExpressionKind, BuiltinNode as BuiltinExp,
+        Expression, ExpressionKind, FnNode, ForLoopNode, IdentifierNode, IfNode, IndexAccessNode,
+        InvocationNode, LetBinding, ObjectNode, PropertyAccessNode,
     },
     symbol_table::SymbolTable,
 };
@@ -17,9 +18,10 @@ pub enum Value {
     Int(i64),
     String(String),
     Bool(bool),
-    Fn(Fn),
+    Fn(FnNode),
     Array(Vec<Value>),
     Unit,
+    Object(HashMap<String, Value>),
 }
 
 impl Display for Value {
@@ -32,6 +34,22 @@ impl Display for Value {
             }
             Value::Unit => write!(f, "Unit"),
             Value::String(value) => write!(f, "{}", value),
+            Value::Object(obj) => {
+                if obj.len() == 0 {
+                    return write!(f, "{{}}");
+                }
+
+                let mut parts = vec![];
+                for (key, value) in obj {
+                    parts.push(format!("{key}: {}", value))
+                }
+
+                let str;
+
+                str = parts.join(",\n  ");
+
+                write!(f, "{{\n{}\n}}", str)
+            }
             Value::Array(elements) => {
                 let mut str = String::from("[");
 
@@ -58,12 +76,16 @@ pub enum RuntimeErrorKind {
     UninitializedVariable,
     IllegalInvocation,
     IndexOutOfBounds { index: usize },
+    InvalidPropertyAccess(String),
 }
 
 impl ToString for RuntimeErrorKind {
     fn to_string(&self) -> String {
         match self {
             RuntimeErrorKind::TypeError => "Type error".to_string(),
+            RuntimeErrorKind::InvalidPropertyAccess(name) => {
+                format!("Cannot access property, reading property \"{name}\"")
+            }
             RuntimeErrorKind::UndefinedReference => "Reference is undefined".to_string(),
             RuntimeErrorKind::UninitializedVariable => "Variable is uninitialized".to_string(),
             RuntimeErrorKind::IllegalInvocation => "Callee was not a valid function".to_string(),
@@ -121,7 +143,7 @@ impl EvaluationContext {
     pub fn register_bultin(&mut self, kind: &BuiltinExpressionKind) {
         let arguments: Vec<String> = (0..=100).map(|n| n.to_string() + "arg").collect();
         let name = kind.name();
-        let function_expression = Fn {
+        let function_expression = FnNode {
             name: name.clone(),
             parameters: arguments.clone(),
             body: ExpressionKind::Builtin(BuiltinExp {
@@ -177,17 +199,53 @@ impl Interpreter {
             ExpressionKind::Array(elements) => self.evaluate_array(elements, ctx),
             ExpressionKind::IndexAccess(access) => self.evaluate_index_access(access, ctx),
             ExpressionKind::ForLoop(for_loop) => self.evaluate_for_loop(for_loop, loc, ctx),
-            ExpressionKind::PropertyAccess { .. } => todo!(),
+            ExpressionKind::PropertyAccess(pa) => self.evaluate_property_access(pa, loc, ctx),
+            ExpressionKind::Object(obj) => self.evaluate_object(obj, ctx),
         }
+    }
+
+    fn evaluate_property_access(
+        &self,
+        pa: &PropertyAccessNode,
+        loc: &Location,
+        ctx: &mut EvaluationContext,
+    ) -> Result<Value, RuntimeError> {
+        let value = self.evaluate_expression(pa.object.as_ref(), ctx)?;
+        let Value::Object(obj) = value else {
+            return Err(RuntimeError {
+                loc: *loc,
+                kind: RuntimeErrorKind::InvalidPropertyAccess(pa.property_name.name().to_string()),
+            });
+        };
+
+        match obj.get(pa.property_name.name()) {
+            Some(v) => Ok(v.clone()),
+            None => Ok(Value::Unit),
+        }
+    }
+
+    fn evaluate_object(
+        &self,
+        obj: &ObjectNode,
+        ctx: &mut EvaluationContext,
+    ) -> Result<Value, RuntimeError> {
+        let mut map = HashMap::new();
+
+        for p in &obj.0 {
+            let value = self.evaluate_expression(p.value.as_ref(), ctx)?;
+            map.insert(p.identifier.0.clone(), value);
+        }
+
+        Ok(Value::Object(map))
     }
 
     fn evaluate_for_loop(
         &self,
-        for_loop: &ForLoop,
+        for_loop: &ForLoopNode,
         loc: &Location,
         ctx: &mut EvaluationContext,
     ) -> Result<Value, RuntimeError> {
-        let ForLoop {
+        let ForLoopNode {
             target,
             iterable,
             body,
@@ -219,10 +277,10 @@ impl Interpreter {
 
     fn evaluate_binary(
         &self,
-        binary: &Binary,
+        binary: &BinaryOperationNode,
         ctx: &mut EvaluationContext,
     ) -> Result<Value, RuntimeError> {
-        let Binary {
+        let BinaryOperationNode {
             left,
             right,
             operation,
@@ -249,10 +307,10 @@ impl Interpreter {
 
     fn evaluate_index_access(
         &self,
-        access: &IndexAccess,
+        access: &IndexAccessNode,
         ctx: &mut EvaluationContext,
     ) -> Result<Value, RuntimeError> {
-        let IndexAccess { indexee, index } = access;
+        let IndexAccessNode { indexee, index } = access;
         let array = self.evaluate_expression(indexee, ctx)?;
         let Value::Array(elements) = array else {
             return Err(RuntimeError::type_error(indexee.loc));
@@ -408,8 +466,12 @@ impl Interpreter {
         Ok(Value::Bool(result))
     }
 
-    fn evaluate_if(&self, exp: &If, ctx: &mut EvaluationContext) -> Result<Value, RuntimeError> {
-        let If {
+    fn evaluate_if(
+        &self,
+        exp: &IfNode,
+        ctx: &mut EvaluationContext,
+    ) -> Result<Value, RuntimeError> {
+        let IfNode {
             predicate,
             alternate,
             consequent,
@@ -432,17 +494,17 @@ impl Interpreter {
 
     fn evaluate_block(
         &self,
-        block: &Block,
+        block: &BlockNode,
         ctx: &mut EvaluationContext,
     ) -> Result<Value, RuntimeError> {
-        let Block { body, return_val } = block;
+        let BlockNode { body, return_val } = block;
         for exp in body {
             self.evaluate_expression(exp, ctx)?;
         }
         self.evaluate_expression(return_val, ctx)
     }
 
-    fn evaluate_fn(&self, f: &Fn, ctx: &mut EvaluationContext) -> Result<Value, RuntimeError> {
+    fn evaluate_fn(&self, f: &FnNode, ctx: &mut EvaluationContext) -> Result<Value, RuntimeError> {
         let value = Value::Fn(f.clone());
         ctx.bindings.insert(f.name.to_string(), value.clone());
         Ok(value)
@@ -450,17 +512,17 @@ impl Interpreter {
 
     fn evaluate_invocation(
         &self,
-        invocation: &Invocation,
+        invocation: &InvocationNode,
         ctx: &mut EvaluationContext,
     ) -> Result<Value, RuntimeError> {
-        let Invocation { arguments, callee } = invocation;
+        let InvocationNode { arguments, callee } = invocation;
         let value = self.evaluate_expression(callee, ctx)?;
 
         let Value::Fn(function) = value else {
             return Err(RuntimeError::illegal_invocation(&callee.loc));
         };
 
-        let Fn {
+        let FnNode {
             name,
             parameters,
             body,
@@ -488,7 +550,7 @@ impl Interpreter {
 
     fn evaluate_identifier(
         &self,
-        id: &Identifier,
+        id: &IdentifierNode,
         loc: &Location,
         ctx: &mut EvaluationContext,
     ) -> Result<Value, RuntimeError> {

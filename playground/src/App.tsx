@@ -70,21 +70,6 @@ const examples: { label: string; value: string }[] = [
   },
 ];
 
-const getModel = (path: string) => {
-  const pathUri = monaco.Uri.parse(path);
-  return monaco.editor.getModel(pathUri);
-};
-
-const createModel = (value: string, language?: string, path?: string) => {
-  const pathUri = path != null ? monaco.Uri.parse(path) : undefined;
-  return monaco.editor.createModel(value, language, pathUri);
-};
-
-const getOrCreateModel = (value: string, language?: string, path?: string) => {
-  const existingModel = path != null ? getModel(path) : null;
-  return existingModel ?? createModel(value, language, path);
-};
-
 const rangeFromLocation = ({
   end,
   start,
@@ -142,12 +127,15 @@ function ExecutionPage() {
       ],
     });
 
+    /**
+     * TODO: I need to register the default monaco worker
+     * monaco.languages.json.getWorker();
+     */
     editor = monaco.editor.create(monacoEl, {
-      model: getOrCreateModel(initScript, "neon"),
       language: "neon",
       theme: "vs-dark",
+      value: initScript,
       fixedOverflowWidgets: true,
-      renderValidationDecorations: "on",
       glyphMargin: true,
       automaticLayout: true,
     });

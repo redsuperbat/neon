@@ -67,6 +67,7 @@ impl TypeChecker<'_> {
             ExpressionKind::Empty => Type::new(TypeKind::Unit),
             ExpressionKind::ForLoop { .. } => todo!(),
             ExpressionKind::PropertyAccess { .. } => todo!(),
+            ExpressionKind::Object(_) => todo!(),
         }
     }
 

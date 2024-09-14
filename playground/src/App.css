@@ -21,6 +21,7 @@
 
 .bool {
   color: var(--bool-color) !important;
+  font-weight: 700;
 }
 
 .int {
