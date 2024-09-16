@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "zx scripts/build.mjs",
+    "build": "zx scripts/build.mjs && tsc -b && vite build --base /neon",
+    "build-deps": "zx scripts/build.mjs",
     "pages": "gh-pages publish -d dist",
     "preview": "vite preview"
   },

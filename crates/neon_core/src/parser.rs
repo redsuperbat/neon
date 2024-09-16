@@ -464,7 +464,7 @@ impl Parser {
 
         loop {
             // If the first iteration returns an empty object
-            if self.next_is(TokenKind::ClosedSquareBracket) {
+            if self.next_is(TokenKind::ClosedCurlyBrace) {
                 break;
             }
 
@@ -478,10 +478,11 @@ impl Parser {
             if self.next_is(TokenKind::Comma) {
                 self.next()?;
             } else {
-                self.assert_next(TokenKind::ClosedCurlyBrace)?;
                 break;
             }
         }
+
+        self.assert_next(TokenKind::ClosedCurlyBrace)?;
 
         Ok(Expression {
             loc: Location::new(start, Pos::start()),

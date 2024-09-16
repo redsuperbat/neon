@@ -1,4 +1,10 @@
-import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
+import * as monaco from "monaco-editor";
+import EditorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker";
+
+self.MonacoEnvironment = {
+  getWorker: () => new EditorWorker(),
+};
+
 import init, {
   compile,
   interpret_src,
@@ -82,13 +88,13 @@ const rangeFromLocation = ({
 
 type Output =
   | {
-    type: "error";
-    message: string;
-  }
+      type: "error";
+      message: string;
+    }
   | {
-    type: "ok";
-    message: string;
-  };
+      type: "ok";
+      message: string;
+    };
 
 function ExecutionPage() {
   const [output, setOutput] = createSignal<Output>();
@@ -108,13 +114,6 @@ function ExecutionPage() {
   onMount(() => {
     if (!monacoEl) return;
     monaco.languages.register({ id: "neon", extensions: ["neon"] });
-    monaco.languages.registerHoverProvider("neon", {
-      provideHover() {
-        console.log("Provide hover");
-        return undefined;
-      },
-    });
-
     monaco.languages.setLanguageConfiguration("neon", {
       brackets: [
         ["{", "}"],
@@ -126,11 +125,12 @@ function ExecutionPage() {
         { open: "[", close: "]" },
       ],
     });
+    monaco.languages.registerHoverProvider("neon", {
+      provideHover() {
+        return undefined;
+      },
+    });
 
-    /**
-     * TODO: I need to register the default monaco worker
-     * monaco.languages.json.getWorker();
-     */
     editor = monaco.editor.create(monacoEl, {
       language: "neon",
       theme: "vs-dark",

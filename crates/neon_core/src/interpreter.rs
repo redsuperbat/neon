@@ -14,14 +14,111 @@ use crate::{
 };
 
 #[derive(Debug, Clone)]
+pub struct Object(pub HashMap<String, Value>);
+
+impl Object {
+    fn single_line_readable(&self) -> String {
+        let mut result = String::from("{ ");
+
+        let mut first = true;
+        for (key, value) in self.0.iter() {
+            if first {
+                first = false;
+            } else {
+                result += ", "
+            }
+
+            let value_str = if let Value::Object(obj) = value {
+                obj.to_readable(0)
+            } else {
+                format!("{}", value)
+            };
+
+            result += &format!("{key}: {}", value_str);
+        }
+        result += " }";
+        result
+    }
+
+    fn multi_line_readable(&self, indent: usize) -> String {
+        let mut result = String::from("{\n");
+        let indentation = " ".repeat(indent);
+
+        let mut first = true;
+        for (key, value) in self.0.iter() {
+            if first {
+                first = false;
+            } else {
+                result += ",\n"
+            }
+
+            let value_str = match value {
+                Value::Array(arr) => arr.to_readable(indent + 1),
+                Value::Object(obj) => obj.to_readable(indent + 1),
+                _ => format!("{}", value),
+            };
+
+            result += &format!("{}{key}: {}", indentation, value_str);
+        }
+        let indentation = " ".repeat(indent - 1);
+        result += &format!("\n{indentation}}}");
+        result
+    }
+
+    pub fn to_readable(&self, indent: usize) -> String {
+        if self.0.len() == 0 {
+            return "{}".to_string();
+        }
+        if self.0.len() < 3 {
+            return self.single_line_readable();
+        }
+        return self.multi_line_readable(indent);
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Array(pub Vec<Value>);
+impl Array {
+    fn single_line_readable(&self) -> String {
+        let arr_str = self
+            .0
+            .iter()
+            .map(|v| format!("{}", v))
+            .collect::<Vec<_>>()
+            .join(",");
+
+        format!("[{arr_str}]")
+    }
+
+    fn multi_line_readable(&self, indent: usize) -> String {
+        let arr_str = self
+            .0
+            .iter()
+            .map(|v| format!("{}{}", " ".repeat(indent), v))
+            .collect::<Vec<_>>()
+            .join(",\n");
+        let indentation = " ".repeat(indent - 1);
+
+        format!("[\n{arr_str}\n{indentation}]")
+    }
+
+    pub fn to_readable(&self, indent: usize) -> String {
+        if self.0.len() > 3 {
+            return self.single_line_readable();
+        }
+        return self.multi_line_readable(indent);
+    }
+}
+
+#[derive(Debug, Clone)]
 pub enum Value {
     Int(i64),
     String(String),
     Bool(bool),
     Fn(FnNode),
-    Array(Vec<Value>),
+    Array(Array),
     Unit,
-    Object(HashMap<String, Value>),
+    Object(Object),
 }
 
 impl Display for Value {
@@ -33,37 +130,12 @@ impl Display for Value {
                 write!(f, "Function: {}", function.name)
             }
             Value::Unit => write!(f, "Unit"),
-            Value::String(value) => write!(f, "{}", value),
+            Value::String(value) => write!(f, "\"{}\"", value),
             Value::Object(obj) => {
-                if obj.len() == 0 {
-                    return write!(f, "{{}}");
-                }
-
-                let mut parts = vec![];
-                for (key, value) in obj {
-                    parts.push(format!("{key}: {}", value))
-                }
-
-                let str;
-
-                str = parts.join(",\n  ");
-
-                write!(f, "{{\n{}\n}}", str)
+                write!(f, "{}", obj.to_readable(1))
             }
-            Value::Array(elements) => {
-                let mut str = String::from("[");
-
-                for (i, element) in elements.iter().enumerate() {
-                    if i == 0 {
-                        str += &format!("{}", element);
-                    } else {
-                        str += &format!(", {}", element);
-                    }
-                }
-
-                str += "]";
-
-                write!(f, "{}", str)
+            Value::Array(arr) => {
+                write!(f, "{}", arr.to_readable(0))
             }
         }
     }
@@ -224,7 +296,7 @@ impl Interpreter {
             });
         };
 
-        match obj.get(pa.property_name.name()) {
+        match obj.0.get(pa.property_name.name()) {
             Some(v) => Ok(v.clone()),
             None => Ok(Value::Unit),
         }
@@ -242,7 +314,7 @@ impl Interpreter {
             map.insert(p.identifier.0.clone(), value);
         }
 
-        Ok(Value::Object(map))
+        Ok(Value::Object(Object(map)))
     }
 
     fn evaluate_for_loop(
@@ -270,14 +342,14 @@ impl Interpreter {
                             self.evaluate_expression(&body, &mut loop_ctx)?;
                         }
                     }
-                    Value::Array(elements) => {
+                    Value::Array(Array(elements)) => {
                         for el in elements {
                             loop_ctx.bindings.insert(name.clone(), el);
                             self.evaluate_expression(&body, &mut loop_ctx)?;
                         }
                     }
-                    Value::Object(elements) => {
-                        for (_, value) in elements {
+                    Value::Object(obj) => {
+                        for (_, value) in obj.0 {
                             loop_ctx.bindings.insert(name.clone(), value);
                             self.evaluate_expression(&body, &mut loop_ctx)?;
                         }
@@ -299,7 +371,7 @@ impl Interpreter {
                         }
                     }
                     Value::Array(elements) => {
-                        for (i, el) in elements.iter().enumerate() {
+                        for (i, el) in elements.0.iter().enumerate() {
                             loop_ctx
                                 .bindings
                                 .insert(first.clone(), Value::Int(i as i64));
@@ -307,8 +379,8 @@ impl Interpreter {
                             self.evaluate_expression(&body, &mut loop_ctx)?;
                         }
                     }
-                    Value::Object(elements) => {
-                        for (key, value) in elements {
+                    Value::Object(obj) => {
+                        for (key, value) in obj.0 {
                             loop_ctx.bindings.insert(first.clone(), Value::String(key));
                             loop_ctx.bindings.insert(second.clone(), value.clone());
                             self.evaluate_expression(&body, &mut loop_ctx)?;
@@ -366,7 +438,7 @@ impl Interpreter {
         let Value::Int(i) = index_value else {
             return Err(RuntimeError::type_error(indexee.loc));
         };
-        let value = elements.get(i as usize);
+        let value = elements.0.get(i as usize);
         match value {
             Some(v) => Ok(v.clone()),
             None => Err(RuntimeError {
@@ -386,7 +458,7 @@ impl Interpreter {
             .map(|e| self.evaluate_expression(e, ctx))
             .collect::<Result<Vec<Value>, RuntimeError>>()?;
 
-        Ok(Value::Array(elements))
+        Ok(Value::Array(Array(elements)))
     }
 
     fn evaluate_internal(
