@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::{
     diagnostic::{Diagnostic, DiagnosticKind, DiagnosticsList},
     location::Location,
-    parser::{Expression, ExpressionKind},
+    parser::Expression,
     symbol_table::SymbolTable,
 };
 
@@ -47,27 +47,27 @@ impl TypeChecker<'_> {
         expression: &Expression,
         env: &mut TypeEnvironment,
     ) -> Type {
-        self.current_loc = expression.loc;
-        match &expression.kind {
-            ExpressionKind::Fn(..) => self.typeof_fn(expression, env),
-            ExpressionKind::Identifier(id) => self.typeof_identifier(id.name(), env),
-            ExpressionKind::Invocation { .. } => self.typeof_invocation(expression, env),
-            ExpressionKind::LetBinding { .. } => self.typeof_let(expression),
-            ExpressionKind::Block { .. } => self.typeof_block(expression, env),
-            ExpressionKind::If { .. } => self.typeof_if(expression),
-            ExpressionKind::Else { .. } => self.typeof_expression(expression, env),
+        self.current_loc = expression.loc();
+        match &expression {
+            Expression::Fn(..) => self.typeof_fn(expression, env),
+            Expression::Identifier(id) => self.typeof_identifier(&id.name, env),
+            Expression::Invocation { .. } => self.typeof_invocation(expression, env),
+            Expression::LetBinding { .. } => self.typeof_let(expression),
+            Expression::Block { .. } => self.typeof_block(expression, env),
+            Expression::If { .. } => self.typeof_if(expression),
+            Expression::Else { .. } => self.typeof_expression(expression, env),
 
-            ExpressionKind::Binary { .. } => self.typeof_binary(expression, env),
-            ExpressionKind::Array { .. } => self.typeof_array(expression),
-            ExpressionKind::IndexAccess { .. } => self.typeof_index_access(expression),
-            ExpressionKind::Builtin { .. } => self.typeof_builtin(expression),
-            ExpressionKind::Int { .. } => Type::new(TypeKind::Int),
-            ExpressionKind::Bool { .. } => Type::new(TypeKind::Bool),
-            ExpressionKind::String { .. } => Type::new(TypeKind::String),
-            ExpressionKind::Empty => Type::new(TypeKind::Unit),
-            ExpressionKind::ForLoop { .. } => todo!(),
-            ExpressionKind::PropertyAccess { .. } => todo!(),
-            ExpressionKind::Object(_) => todo!(),
+            Expression::Binary { .. } => self.typeof_binary(expression, env),
+            Expression::Array { .. } => self.typeof_array(expression),
+            Expression::IndexAccess { .. } => self.typeof_index_access(expression),
+            Expression::Builtin { .. } => self.typeof_builtin(expression),
+            Expression::Int { .. } => Type::new(TypeKind::Int),
+            Expression::Bool { .. } => Type::new(TypeKind::Bool),
+            Expression::String { .. } => Type::new(TypeKind::String),
+            Expression::Empty(..) => Type::new(TypeKind::Unit),
+            Expression::ForLoop { .. } => todo!(),
+            Expression::PropertyAccess { .. } => todo!(),
+            Expression::Object(_) => todo!(),
         }
     }
 
