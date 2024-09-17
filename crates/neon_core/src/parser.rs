@@ -10,25 +10,6 @@ pub struct Parser {
     last_location: Location,
 }
 
-#[derive(Debug, Clone)]
-pub struct Expression {
-    pub loc: Location,
-    pub kind: ExpressionKind,
-}
-
-impl Expression {
-    pub fn kind(kind: ExpressionKind) -> Expression {
-        Expression {
-            kind,
-            loc: Location::beginning(),
-        }
-    }
-
-    pub fn boxed(self) -> Box<Self> {
-        Box::new(self)
-    }
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum BuiltinExpressionKind {
     Print,
@@ -58,6 +39,7 @@ pub enum BinaryOp {
 
 #[derive(Debug, Clone)]
 pub struct IfNode {
+    pub loc: Location,
     pub predicate: Box<Expression>,
     pub consequent: Box<Expression>,
     pub alternate: Box<Option<Expression>>,
@@ -65,6 +47,7 @@ pub struct IfNode {
 
 #[derive(Debug, Clone)]
 pub struct FnNode {
+    pub loc: Location,
     pub name: String,
     pub parameters: Vec<String>,
     pub body: Box<Expression>,
@@ -72,24 +55,28 @@ pub struct FnNode {
 
 #[derive(Debug, Clone)]
 pub struct BlockNode {
+    pub loc: Location,
     pub body: Vec<Expression>,
     pub return_val: Box<Expression>,
 }
 
 #[derive(Debug, Clone)]
 pub struct InvocationNode {
+    pub loc: Location,
     pub callee: Box<Expression>,
     pub arguments: Vec<Expression>,
 }
 
 #[derive(Debug, Clone)]
 pub struct LetBinding {
+    pub loc: Location,
     pub name: String,
     pub right: Box<Expression>,
 }
 
 #[derive(Debug, Clone)]
 pub struct BinaryOperationNode {
+    pub loc: Location,
     pub operation: BinaryOp,
     pub left: Box<Expression>,
     pub right: Box<Expression>,
@@ -97,25 +84,27 @@ pub struct BinaryOperationNode {
 
 #[derive(Debug, Clone)]
 pub struct IndexAccessNode {
+    pub loc: Location,
     pub indexee: Box<Expression>,
     pub index: Box<Expression>,
 }
 
 #[derive(Debug, Clone)]
 pub struct BuiltinNode {
+    pub loc: Location,
     pub kind: BuiltinExpressionKind,
     pub arguments: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
-pub struct IdentifierNode(pub String);
+pub struct IdentifierNode {
+    pub loc: Location,
+    pub name: String,
+}
 
 impl IdentifierNode {
-    pub fn name(&self) -> &str {
-        &self.0
-    }
     pub fn to_string(&self) -> String {
-        self.name().to_string()
+        self.name.to_string()
     }
 }
 
@@ -127,6 +116,7 @@ pub enum ForLoopTarget {
 
 #[derive(Debug, Clone)]
 pub struct ForLoopNode {
+    pub loc: Location,
     pub targets: ForLoopTarget,
     pub iterable: Box<Expression>,
     pub body: Box<Expression>,
@@ -134,44 +124,102 @@ pub struct ForLoopNode {
 
 #[derive(Debug, Clone)]
 pub struct PropertyNode {
+    pub loc: Location,
     pub identifier: IdentifierNode,
     pub value: Box<Expression>,
 }
 
 #[derive(Debug, Clone)]
-pub struct ObjectNode(pub Vec<PropertyNode>);
+pub struct ObjectNode {
+    pub properties: Vec<PropertyNode>,
+    pub loc: Location,
+}
 
 #[derive(Debug, Clone)]
 pub struct PropertyAccessNode {
+    pub loc: Location,
     pub object: Box<Expression>,
     pub property_name: IdentifierNode,
 }
 
 #[derive(Debug, Clone)]
-pub enum ExpressionKind {
-    Array(Vec<Expression>),
+pub struct BoolNode {
+    pub loc: Location,
+    pub value: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct ArrayNode {
+    pub loc: Location,
+    pub elements: Vec<Expression>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ElseNode {
+    pub loc: Location,
+    pub consequent: Box<Expression>,
+}
+
+#[derive(Debug, Clone)]
+pub struct StringNode {
+    pub loc: Location,
+    pub value: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct IntNode {
+    pub loc: Location,
+    pub value: i64,
+}
+
+#[derive(Debug, Clone)]
+pub enum Expression {
+    Array(ArrayNode),
     Binary(BinaryOperationNode),
     Block(BlockNode),
-    Bool(bool),
+    Bool(BoolNode),
     Builtin(BuiltinNode),
-    Else(Box<Expression>),
-    Empty,
+    Else(ElseNode),
+    Empty(Location),
     Fn(FnNode),
     ForLoop(ForLoopNode),
     Identifier(IdentifierNode),
     If(IfNode),
     IndexAccess(IndexAccessNode),
-    Int(i64),
+    Int(IntNode),
     Invocation(InvocationNode),
     LetBinding(LetBinding),
     Object(ObjectNode),
     PropertyAccess(PropertyAccessNode),
-    String(String),
+    String(StringNode),
 }
 
-impl ExpressionKind {
-    pub fn into_exp(self, loc: Location) -> Expression {
-        Expression { kind: self, loc }
+impl Expression {
+    pub fn boxed(self) -> Box<Self> {
+        Box::new(self)
+    }
+
+    pub fn loc(&self) -> Location {
+        match self {
+            Expression::Array(a) => a.loc,
+            Expression::Binary(b) => b.loc,
+            Expression::Block(e) => e.loc,
+            Expression::Bool(e) => e.loc,
+            Expression::Builtin(e) => e.loc,
+            Expression::Else(e) => e.loc,
+            Expression::Fn(e) => e.loc,
+            Expression::ForLoop(e) => e.loc,
+            Expression::Identifier(e) => e.loc,
+            Expression::If(e) => e.loc,
+            Expression::IndexAccess(e) => e.loc,
+            Expression::Int(e) => e.loc,
+            Expression::Invocation(e) => e.loc,
+            Expression::LetBinding(e) => e.loc,
+            Expression::Object(e) => e.loc,
+            Expression::PropertyAccess(e) => e.loc,
+            Expression::String(e) => e.loc,
+            Expression::Empty(loc) => *loc,
+        }
     }
 }
 
@@ -394,24 +442,22 @@ impl Parser {
             _ => return Ok(expression),
         };
 
-        Ok(Expression {
-            loc: Location::new(expression.loc.start, right.loc.end),
-            kind: ExpressionKind::Binary(BinaryOperationNode {
-                operation: kind,
-                left: expression.boxed(),
-                right: right.boxed(),
-            }),
-        })
+        Ok(Expression::Binary(BinaryOperationNode {
+            loc: Location::new(expression.loc().start, right.loc().end),
+            operation: kind,
+            left: expression.boxed(),
+            right: right.boxed(),
+        }))
     }
 
     fn parse_identifier(&mut self) -> Result<Expression, SyntaxError> {
         let Token {
             lexeme, start, end, ..
         } = self.assert_next(TokenKind::Symbol)?;
-        Ok(Expression {
-            kind: ExpressionKind::Identifier(IdentifierNode(lexeme)),
+        Ok(Expression::Identifier(IdentifierNode {
+            name: lexeme,
             loc: Location::new(start, end),
-        })
+        }))
     }
 
     fn parse_accessor_expression(&mut self) -> Result<Expression, SyntaxError> {
@@ -423,33 +469,27 @@ impl Parser {
             };
 
             expression = match next.kind {
-                TokenKind::OpenParen => Expression {
-                    loc: expression.loc,
-                    kind: ExpressionKind::Invocation(InvocationNode {
-                        callee: expression.boxed(),
-                        arguments: self.parse_arguments()?,
-                    }),
-                },
+                TokenKind::OpenParen => Expression::Invocation(InvocationNode {
+                    loc: expression.loc(),
+                    callee: expression.boxed(),
+                    arguments: self.parse_arguments()?,
+                }),
                 TokenKind::Dot => {
                     let Token { start, .. } = self.assert_next(TokenKind::Dot)?;
-                    let Token { lexeme, .. } = self.assert_next(TokenKind::Symbol)?;
-                    Expression {
-                        loc: Location::new(start, expression.loc.end),
-                        kind: ExpressionKind::PropertyAccess(PropertyAccessNode {
-                            property_name: IdentifierNode(lexeme),
-                            object: expression.boxed(),
-                        }),
-                    }
+                    let property_name = self.parse_identifer_node()?;
+                    Expression::PropertyAccess(PropertyAccessNode {
+                        loc: Location::new(start, property_name.loc.end),
+                        property_name,
+                        object: expression.boxed(),
+                    })
                 }
                 TokenKind::OpenSquareBracket => {
                     self.assert_next(TokenKind::OpenSquareBracket)?;
-                    let exp = Expression {
-                        loc: expression.loc,
-                        kind: ExpressionKind::IndexAccess(IndexAccessNode {
-                            indexee: expression.boxed(),
-                            index: self.parse_expression()?.boxed(),
-                        }),
-                    };
+                    let exp = Expression::IndexAccess(IndexAccessNode {
+                        loc: expression.loc(),
+                        indexee: expression.boxed(),
+                        index: self.parse_expression()?.boxed(),
+                    });
                     self.assert_next(TokenKind::ClosedSquareBracket)?;
                     exp
                 }
@@ -468,11 +508,13 @@ impl Parser {
                 break;
             }
 
-            let Token { lexeme, .. } = self.assert_next(TokenKind::Symbol)?;
+            let identifier = self.parse_identifer_node()?;
+            let value = self.parse_expression()?;
             self.assert_next(TokenKind::Colon)?;
             properties.push(PropertyNode {
-                identifier: IdentifierNode(lexeme),
-                value: self.parse_expression()?.boxed(),
+                loc: Location::new(identifier.loc.start, value.loc().end),
+                identifier,
+                value: value.boxed(),
             });
 
             if self.next_is(TokenKind::Comma) {
@@ -482,29 +524,25 @@ impl Parser {
             }
         }
 
-        self.assert_next(TokenKind::ClosedCurlyBrace)?;
+        let Token { end, .. } = self.assert_next(TokenKind::ClosedCurlyBrace)?;
 
-        Ok(Expression {
-            loc: Location::new(start, Pos::start()),
-            kind: ExpressionKind::Object(ObjectNode(properties)),
-        })
+        Ok(Expression::Object(ObjectNode {
+            loc: Location::new(start, end),
+            properties,
+        }))
     }
 
     fn parse_leaf_expression(&mut self) -> Result<Expression, SyntaxError> {
         let next = self.peek_significant();
 
         let Some(next) = next else {
-            return Ok(Expression {
-                kind: ExpressionKind::Empty,
-                loc: self.last_location,
-            });
+            return Ok(self.empty());
         };
 
         match next.kind {
             TokenKind::FnKeyword => self.parse_fn(),
             TokenKind::OpenSquareBracket => self.parse_array(),
             TokenKind::OpenCurlyBrace => self.parse_object(),
-            TokenKind::ClosedCurlyBrace => self.parse_empty(),
             TokenKind::FalseKeyword => self.parse_false_keyword(),
             TokenKind::TrueKeyword => self.parse_true_keyword(),
             TokenKind::IntegerLiteral => self.parse_integer(),
@@ -539,12 +577,12 @@ impl Parser {
         let iterable = self.parse_expression()?.boxed();
         let body = self.parse_block()?.boxed();
 
-        Ok(ExpressionKind::ForLoop(ForLoopNode {
+        Ok(Expression::ForLoop(ForLoopNode {
+            loc: Location::new(start, Pos::start()),
             targets,
             iterable,
             body,
-        })
-        .into_exp(Location::new(start, Pos::start())))
+        }))
     }
 
     fn parse_loop_targets(&mut self) -> Result<ForLoopTarget, SyntaxError> {
@@ -563,8 +601,11 @@ impl Parser {
     }
 
     fn parse_identifer_node(&mut self) -> Result<IdentifierNode, SyntaxError> {
-        let Token { lexeme, .. } = self.assert_next(TokenKind::Symbol)?;
-        Ok(IdentifierNode(lexeme))
+        let symbol = self.assert_next(TokenKind::Symbol)?;
+        Ok(IdentifierNode {
+            loc: (&symbol).into(),
+            name: symbol.lexeme,
+        })
     }
 
     fn parse_array(&mut self) -> Result<Expression, SyntaxError> {
@@ -584,18 +625,19 @@ impl Parser {
 
         let end = self.assert_next(TokenKind::ClosedSquareBracket)?.end;
 
-        Ok(Expression {
+        Ok(Expression::Array(ArrayNode {
             loc: Location::new(start, end),
-            kind: ExpressionKind::Array(elements),
-        })
+            elements,
+        }))
+    }
+
+    fn empty(&self) -> Expression {
+        Expression::Empty(self.last_location)
     }
 
     fn parse_block_body(&mut self) -> Result<(Vec<Expression>, Expression), SyntaxError> {
         let mut body = vec![];
-        let mut return_val = Expression {
-            loc: self.last_location,
-            kind: ExpressionKind::Empty,
-        };
+        let mut return_val = self.empty();
         loop {
             if self.next_is(TokenKind::ClosedCurlyBrace) || self.is_at_end() {
                 break;
@@ -618,60 +660,46 @@ impl Parser {
         let (body, return_val) = self.parse_block_body()?;
         let Token { end, .. } = self.assert_next(TokenKind::ClosedCurlyBrace)?;
 
-        Ok(Expression {
+        Ok(Expression::Block(BlockNode {
             loc: Location::new(start, end),
-            kind: ExpressionKind::Block(BlockNode {
-                return_val: return_val.boxed(),
-                body,
-            }),
-        })
+            return_val: return_val.boxed(),
+            body,
+        }))
     }
 
     pub fn parse_program(&mut self) -> Result<Expression, SyntaxError> {
         let (body, return_val) = self.parse_block_body()?;
-        let start = body.first().unwrap_or(&return_val).loc.start;
+        let start = body.first().unwrap_or(&return_val).loc().start;
 
-        Ok(Expression {
-            loc: Location::new(start, return_val.loc.end),
-            kind: ExpressionKind::Block(BlockNode {
-                body,
-                return_val: return_val.boxed(),
-            }),
-        })
-    }
-
-    fn parse_empty(&mut self) -> Result<Expression, SyntaxError> {
-        let Token { start, end, .. } = self.assert_next(TokenKind::ClosedCurlyBrace)?;
-        Ok(Expression {
-            kind: ExpressionKind::Empty,
-            loc: Location::new(start, end),
-        })
+        Ok(Expression::Block(BlockNode {
+            loc: Location::new(start, return_val.loc().end),
+            return_val: return_val.boxed(),
+            body,
+        }))
     }
 
     fn parse_string(&mut self) -> Result<Expression, SyntaxError> {
-        let Token {
-            start, end, lexeme, ..
-        } = self.assert_next(TokenKind::StringLiteral)?;
-        Ok(Expression {
-            kind: ExpressionKind::String(lexeme),
-            loc: Location::new(start, end),
-        })
+        let token = self.assert_next(TokenKind::StringLiteral)?;
+        Ok(Expression::String(StringNode {
+            loc: (&token).into(),
+            value: token.lexeme,
+        }))
     }
 
     fn parse_true_keyword(&mut self) -> Result<Expression, SyntaxError> {
-        let Token { start, end, .. } = self.assert_next(TokenKind::TrueKeyword)?;
-        Ok(Expression {
-            kind: ExpressionKind::Bool(true),
-            loc: Location::new(start, end),
-        })
+        let token = self.assert_next(TokenKind::TrueKeyword)?;
+        Ok(Expression::Bool(BoolNode {
+            value: true,
+            loc: token.into(),
+        }))
     }
 
     fn parse_false_keyword(&mut self) -> Result<Expression, SyntaxError> {
-        let Token { start, end, .. } = self.assert_next(TokenKind::FalseKeyword)?;
-        Ok(Expression {
-            kind: ExpressionKind::Bool(false),
-            loc: Location::new(start, end),
-        })
+        let token = self.assert_next(TokenKind::FalseKeyword)?;
+        Ok(Expression::Bool(BoolNode {
+            value: false,
+            loc: token.into(),
+        }))
     }
 
     fn parse_if(&mut self) -> Result<Expression, SyntaxError> {
@@ -685,14 +713,12 @@ impl Parser {
             alternate = Some(self.parse_else()?);
         }
 
-        Ok(Expression {
-            loc: Location::new(start, consequent.loc.end),
-            kind: ExpressionKind::If(IfNode {
-                predicate: predicate.boxed(),
-                consequent: consequent.boxed(),
-                alternate: Box::new(alternate),
-            }),
-        })
+        Ok(Expression::If(IfNode {
+            loc: Location::new(start, consequent.loc().end),
+            predicate: predicate.boxed(),
+            consequent: consequent.boxed(),
+            alternate: Box::new(alternate),
+        }))
     }
 
     fn parse_else(&mut self) -> Result<Expression, SyntaxError> {
@@ -706,10 +732,10 @@ impl Parser {
             consequent = self.parse_block()?;
         }
 
-        Ok(Expression {
-            loc: Location::new(start, consequent.loc.end),
-            kind: ExpressionKind::Else(consequent.boxed()),
-        })
+        Ok(Expression::Else(ElseNode {
+            loc: Location::new(start, consequent.loc().end),
+            consequent: consequent.boxed(),
+        }))
     }
 
     fn parse_arguments(&mut self) -> Result<Vec<Expression>, SyntaxError> {
@@ -741,10 +767,10 @@ impl Parser {
 
         let value = lexeme.parse::<i64>().expect("Internal neon error");
 
-        Ok(Expression {
+        Ok(Expression::Int(IntNode {
             loc: Location::new(start, end),
-            kind: ExpressionKind::Int(value),
-        })
+            value,
+        }))
     }
 
     fn parse_let(&mut self) -> Result<Expression, SyntaxError> {
@@ -753,13 +779,11 @@ impl Parser {
         self.assert_next(TokenKind::Equals)?;
         let right = self.parse_expression().map(Box::new)?;
 
-        Ok(Expression {
-            kind: ExpressionKind::LetBinding(LetBinding {
-                name: lexeme,
-                right,
-            }),
+        Ok(Expression::LetBinding(LetBinding {
+            name: lexeme,
+            right,
             loc: Location::new(start, end),
-        })
+        }))
     }
 
     fn parse_parameters(&mut self) -> Result<Vec<String>, SyntaxError> {
@@ -792,14 +816,12 @@ impl Parser {
 
         let block = self.parse_block()?;
 
-        Ok(Expression {
-            loc: Location::new(start, block.loc.end),
-            kind: ExpressionKind::Fn(FnNode {
-                name: name.lexeme,
-                parameters,
-                body: block.boxed(),
-            }),
-        })
+        Ok(Expression::Fn(FnNode {
+            loc: Location::new(start, block.loc().end),
+            name: name.lexeme,
+            parameters,
+            body: block.boxed(),
+        }))
     }
 }
 
@@ -818,28 +840,28 @@ mod tests {
     #[test]
     fn parsing() {
         let ast = parse("let a = 3 let b = 4 fn test() { a + b }");
-        assert!(matches!(ast.kind, ExpressionKind::Block { .. }));
+        assert!(matches!(ast, Expression::Block { .. }));
         let ast = parse("let a = 3 fn t() { 3 + 4 } t()");
-        assert!(matches!(ast.kind, ExpressionKind::Block { .. }));
+        assert!(matches!(ast, Expression::Block { .. }));
         let ast = parse("let a = 4 let b = a + a fn test() { b + b }");
-        assert!(matches!(ast.kind, ExpressionKind::Block { .. }));
+        assert!(matches!(ast, Expression::Block { .. }));
         let ast = parse("a");
-        assert!(matches!(ast.kind, ExpressionKind::Block { .. }));
+        assert!(matches!(ast, Expression::Block { .. }));
         let ast = parse("3 == 3");
-        assert!(matches!(ast.kind, ExpressionKind::Block { .. }));
+        assert!(matches!(ast, Expression::Block { .. }));
         let ast = parse("3 != 3");
-        assert!(matches!(ast.kind, ExpressionKind::Block { .. }));
+        assert!(matches!(ast, Expression::Block { .. }));
         let ast = parse("let a = d");
-        assert!(matches!(ast.kind, ExpressionKind::Block { .. }));
+        assert!(matches!(ast, Expression::Block { .. }));
         let ast = parse("a % d");
-        assert!(matches!(ast.kind, ExpressionKind::Block { .. }));
+        assert!(matches!(ast, Expression::Block { .. }));
         let ast = parse("hello() + hello()");
-        assert!(matches!(ast.kind, ExpressionKind::Block { .. }));
+        assert!(matches!(ast, Expression::Block { .. }));
     }
 
     #[test]
     fn single() {
         let ast = parse("let a = 3 + 3");
-        assert!(matches!(ast.kind, ExpressionKind::Block { .. }));
+        assert!(matches!(ast, Expression::Block { .. }));
     }
 }

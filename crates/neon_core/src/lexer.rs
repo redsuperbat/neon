@@ -1,4 +1,4 @@
-use crate::location::Pos;
+use crate::location::{Location, Pos};
 
 #[derive(Debug)]
 pub struct Lexer {
@@ -14,6 +14,18 @@ pub struct Token {
     pub start: Pos,
     pub end: Pos,
     pub lexeme: String,
+}
+
+impl Into<Location> for &Token {
+    fn into(self) -> Location {
+        Location::new(self.start, self.end)
+    }
+}
+
+impl Into<Location> for Token {
+    fn into(self) -> Location {
+        (&self).into()
+    }
 }
 
 #[derive(Debug, PartialEq, Clone)]
