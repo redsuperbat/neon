@@ -1,32 +1,48 @@
+use core::mem::discriminant as tag;
 use std::collections::HashMap;
 
 use crate::{
-    diagnostic::{Diagnostic, DiagnosticKind, DiagnosticsList},
+    diagnostic::{Diagnostic, DiagnosticsList, ErrorDiagnostic},
     location::Location,
-    parser::Expression,
+    parser::{BoolNode, Expression, IdentifierNode, IfNode, IntNode, ObjectNode, StringNode},
     symbol_table::SymbolTable,
 };
 
-#[derive(PartialEq, Eq)]
-pub enum TypeKind {
+pub struct PropertyType {
+    name: String,
+    value: Type,
+}
+
+pub struct ObjectType {
+    properties: Vec<PropertyType>,
+}
+
+pub struct ArrayType {
+    elements: Box<Type>,
+}
+
+pub struct UnionType {
+    variants: Vec<Type>,
+}
+
+pub enum Type {
     Never,
     Int,
     Bool,
+    Object(ObjectType),
+    Array(ArrayType),
+    Union(UnionType),
     String,
     Unit,
     TypeFn {
-        inputs: Vec<TypeKind>,
-        outputs: Box<TypeKind>,
+        inputs: Vec<Type>,
+        outputs: Box<Type>,
     },
 }
 
-pub struct Type {
-    kind: TypeKind,
-}
-
-impl Type {
-    fn new(kind: TypeKind) -> Type {
-        Type { kind }
+impl PartialEq<Self> for Type {
+    fn eq(&self, other: &Self) -> bool {
+        tag(self) == tag(other)
     }
 }
 
@@ -50,25 +66,39 @@ impl TypeChecker<'_> {
         self.current_loc = expression.loc();
         match &expression {
             Expression::Fn(..) => self.typeof_fn(expression, env),
-            Expression::Identifier(id) => self.typeof_identifier(&id.name, env),
-            Expression::Invocation { .. } => self.typeof_invocation(expression, env),
+            Expression::Identifier(node) => self.typeof_identifier(node, env),
+            Expression::Invocation(..) => self.typeof_invocation(expression, env),
             Expression::LetBinding { .. } => self.typeof_let(expression),
             Expression::Block { .. } => self.typeof_block(expression, env),
-            Expression::If { .. } => self.typeof_if(expression),
+            Expression::If(node) => self.typeof_if(node, env),
             Expression::Else { .. } => self.typeof_expression(expression, env),
 
             Expression::Binary { .. } => self.typeof_binary(expression, env),
             Expression::Array { .. } => self.typeof_array(expression),
             Expression::IndexAccess { .. } => self.typeof_index_access(expression),
             Expression::Builtin { .. } => self.typeof_builtin(expression),
-            Expression::Int { .. } => Type::new(TypeKind::Int),
-            Expression::Bool { .. } => Type::new(TypeKind::Bool),
-            Expression::String { .. } => Type::new(TypeKind::String),
-            Expression::Empty(..) => Type::new(TypeKind::Unit),
+
             Expression::ForLoop { .. } => todo!(),
             Expression::PropertyAccess { .. } => todo!(),
-            Expression::Object(_) => todo!(),
+            Expression::Object(node) => self.typeof_object(node, env),
+
+            Expression::Int(..) => Type::Int,
+            Expression::Bool(..) => Type::Bool,
+            Expression::String(..) => Type::String,
+            Expression::Empty(..) => Type::Unit,
         }
+    }
+
+    fn typeof_object(&mut self, node: &ObjectNode, env: &mut TypeEnvironment) -> Type {
+        let properties = node
+            .properties
+            .iter()
+            .map(|n| PropertyType {
+                name: n.identifier.name.clone(),
+                value: self.typeof_expression(&n.value, env),
+            })
+            .collect::<Vec<_>>();
+        Type::Object(ObjectType { properties })
     }
 
     fn typeof_builtin(&mut self, exp: &Expression) -> Type {
@@ -83,8 +113,14 @@ impl TypeChecker<'_> {
         todo!()
     }
 
-    fn typeof_if(&mut self, exp: &Expression) -> Type {
-        todo!()
+    fn typeof_if(&mut self, node: &IfNode, env: &mut TypeEnvironment) -> Type {
+        let typeof_predicate = self.typeof_expression(&node.predicate, env);
+        if typeof_predicate != Type::Bool {
+            self.diagnostics_list
+                .add(Diagnostic::Error(ErrorDiagnostic { loc: node.loc }));
+            return Type::Never;
+        };
+        return Type::Never;
     }
 
     fn typeof_fn(&mut self, exp: &Expression, env: &mut TypeEnvironment) -> Type {
@@ -99,7 +135,7 @@ impl TypeChecker<'_> {
         todo!()
     }
 
-    fn typeof_identifier(&mut self, identifier: &str, env: &mut TypeEnvironment) -> Type {
+    fn typeof_identifier(&mut self, node: &IdentifierNode, env: &mut TypeEnvironment) -> Type {
         todo!()
     }
 
@@ -112,12 +148,14 @@ impl TypeChecker<'_> {
     }
 
     fn unify(&mut self, lhs: Type, rhs: Type) -> Type {
-        if lhs.kind == TypeKind::Never {
+        if lhs == Type::Never {
             self.diagnostics_list
-                .add(Diagnostic::new(DiagnosticKind::Error, self.current_loc));
+                .add(Diagnostic::Error(ErrorDiagnostic {
+                    loc: self.current_loc,
+                }));
             return lhs;
         }
-        return Type::new(TypeKind::Never);
+        return Type::Never;
     }
 }
 

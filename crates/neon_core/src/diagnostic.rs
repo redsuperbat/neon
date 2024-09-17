@@ -1,20 +1,13 @@
 use crate::location::Location;
 
 #[derive(Debug)]
-pub enum DiagnosticKind {
-    Error,
+pub struct ErrorDiagnostic {
+    pub loc: Location,
 }
 
 #[derive(Debug)]
-pub struct Diagnostic {
-    kind: DiagnosticKind,
-    loc: Location,
-}
-
-impl Diagnostic {
-    pub fn new(kind: DiagnosticKind, loc: Location) -> Diagnostic {
-        Diagnostic { kind, loc }
-    }
+pub enum Diagnostic {
+    Error(ErrorDiagnostic),
 }
 
 #[derive(Debug)]
