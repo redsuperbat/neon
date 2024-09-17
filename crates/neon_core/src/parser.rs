@@ -509,8 +509,8 @@ impl Parser {
             }
 
             let identifier = self.parse_identifer_node()?;
-            let value = self.parse_expression()?;
             self.assert_next(TokenKind::Colon)?;
+            let value = self.parse_expression()?;
             properties.push(PropertyNode {
                 loc: Location::new(identifier.loc.start, value.loc().end),
                 identifier,
