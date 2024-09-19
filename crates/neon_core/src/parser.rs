@@ -173,8 +173,16 @@ pub struct IntNode {
 }
 
 #[derive(Debug, Clone)]
+pub struct AssignmentNode {
+    pub loc: Location,
+    pub identifier: IdentifierNode,
+    pub right: Box<Expression>,
+}
+
+#[derive(Debug, Clone)]
 pub enum Expression {
     Array(ArrayNode),
+    Assignment(AssignmentNode),
     Binary(BinaryOperationNode),
     Block(BlockNode),
     Bool(BoolNode),
@@ -219,6 +227,7 @@ impl Expression {
             Expression::PropertyAccess(e) => e.loc,
             Expression::String(e) => e.loc,
             Expression::Empty(loc) => *loc,
+            Expression::Assignment(e) => e.loc,
         }
     }
 }
@@ -275,62 +284,93 @@ impl SyntaxError {
 
 impl Parser {
     pub fn new(tokens: Vec<Token>) -> Parser {
+        let tokens = Parser::remove_insignificants(tokens);
         Parser {
             tokens: VecDeque::from(tokens),
             last_location: Location::new(Pos::start(), Pos::start()),
         }
     }
 
+    fn remove_insignificants(tokens: Vec<Token>) -> Vec<Token> {
+        let mut significants = vec![];
+        let mut ignore = false;
+        let mut i = 0;
+        while i < tokens.len() {
+            let token = tokens.get(i);
+            let Some(token) = token else {
+                return significants;
+            };
+
+            if token.kind == TokenKind::WhiteSpace {
+                i += 1;
+                continue;
+            };
+
+            if token.kind == TokenKind::Newline {
+                i += 1;
+                continue;
+            };
+
+            let next_is = |kind: TokenKind| match tokens.get(i + 1) {
+                Some(token) => token.kind == kind,
+                None => false,
+            };
+
+            if token.kind == TokenKind::ForwardSlash && next_is(TokenKind::ForwardSlash) {
+                i += 2;
+                ignore = true;
+                continue;
+            };
+
+            if token.kind == TokenKind::Newline && ignore {
+                i += 1;
+                ignore = false;
+                continue;
+            };
+
+            if token.kind == TokenKind::ForwardSlash && next_is(TokenKind::Asterix) {
+                i += 2;
+                ignore = true;
+                continue;
+            };
+
+            if token.kind == TokenKind::Asterix && next_is(TokenKind::ForwardSlash) {
+                i += 2;
+                ignore = false;
+                continue;
+            };
+
+            if ignore {
+                i += 1;
+                continue;
+            };
+
+            i += 1;
+            significants.push(token.clone());
+        }
+        return significants;
+    }
+
     fn next(&mut self) -> Result<Token, SyntaxError> {
-        let token = self.tokens.pop_front().ok_or(SyntaxError {
+        let token = self.tokens.pop_front().ok_or(self.eof())?;
+        self.last_location = (&token).into();
+        Ok(token)
+    }
+
+    fn eof(&self) -> SyntaxError {
+        SyntaxError {
             start: self.last_location.start,
             end: self.last_location.end,
             kind: SyntaxErrorKind::UnexpectedEndOfFile,
-        })?;
-        self.last_location = Location::new(token.start, token.end);
-        Ok(token)
-    }
-
-    fn next_significant(&mut self) -> Result<Token, SyntaxError> {
-        if self.next_sequence_is((TokenKind::ForwardSlash, TokenKind::Asterix)) {
-            self.parse_comment()?;
         }
-
-        let mut token = self.next()?;
-
-        while token.kind == TokenKind::WhiteSpace {
-            token = self.next()?;
-        }
-
-        while token.kind == TokenKind::Newline {
-            token = self.next()?;
-        }
-
-        Ok(token)
-    }
-
-    fn parse_comment(&mut self) -> Result<(), SyntaxError> {
-        // remove /*
-        self.next()?;
-        self.next()?;
-
-        while !self.next_sequence_is((TokenKind::Asterix, TokenKind::ForwardSlash)) {
-            self.next()?;
-        }
-
-        // remove */
-        self.next()?;
-        self.next()?;
-
-        Ok(())
     }
 
     fn is_at_end(&mut self) -> bool {
-        self.peek_significant().is_none()
+        self.peek().is_none()
     }
 
     fn assert_next(&mut self, kind: TokenKind) -> Result<Token, SyntaxError> {
-        let next = self.next_significant()?;
+        let next = self.next()?;
         if next.kind == kind {
             Ok(next)
         } else {
@@ -342,39 +382,23 @@ impl Parser {
         self.peek_at_offset(0)
     }
 
-    fn peek_significant(&mut self) -> Option<&Token> {
-        if self.next_sequence_is((TokenKind::ForwardSlash, TokenKind::Asterix)) {
-            self.parse_comment().ok()?;
-        }
-
-        let mut token = self.peek()?;
-
-        while token.kind == TokenKind::WhiteSpace {
-            self.next().ok()?;
-            token = self.peek()?;
-        }
-
-        while token.kind == TokenKind::Newline {
-            self.next().ok()?;
-            token = self.peek()?;
-        }
-
-        self.peek()
-    }
-
     fn peek_at_offset(&self, i: usize) -> Option<&Token> {
         self.tokens.get(i)
     }
 
-    fn next_sequence_is(&self, tokens: (TokenKind, TokenKind)) -> bool {
+    fn next_pair_is(&self, tokens: (TokenKind, TokenKind)) -> bool {
         match (self.peek(), self.peek_at_offset(1)) {
             (Some(a), Some(b)) => a.kind == tokens.0 && b.kind == tokens.1,
             _ => false,
         }
     }
 
-    fn next_is(&mut self, kind: TokenKind) -> bool {
-        match self.peek_significant() {
+    fn peek_pair(&self) -> (Option<&Token>, Option<&Token>) {
+        (self.peek(), self.peek_at_offset(1))
+    }
+
+    fn next_is(&self, kind: TokenKind) -> bool {
+        match self.peek() {
             Some(token) => token.kind == kind,
             None => false,
         }
@@ -390,7 +414,7 @@ impl Parser {
     pub fn parse_expression(&mut self) -> Result<Expression, SyntaxError> {
         let expression = self.parse_accessor_expression()?;
 
-        let Some(next) = self.peek_significant() else {
+        let Some(next) = self.peek() else {
             return Ok(expression);
         };
 
@@ -430,15 +454,28 @@ impl Parser {
                 self.assert_next(TokenKind::Equals)?;
                 (BinaryOp::Ne, self.parse_expression()?)
             }
-            TokenKind::Equals => {
-                if self.at_offet_is(1, TokenKind::Equals) {
-                    self.assert_next(TokenKind::Equals)?;
-                    self.assert_next(TokenKind::Equals)?;
-                    (BinaryOp::Eq, self.parse_expression()?)
-                } else {
-                    return Ok(expression);
-                }
-            }
+            TokenKind::Equals => match self.peek_pair() {
+                (Some(a), Some(b)) => match (&a.kind, &b.kind) {
+                    (TokenKind::Equals, TokenKind::Equals) => {
+                        self.assert_next(TokenKind::Equals)?;
+                        self.assert_next(TokenKind::Equals)?;
+                        (BinaryOp::Eq, self.parse_expression()?)
+                    }
+                    _ => {
+                        let Token { start, end, .. } = self.assert_next(TokenKind::Equals)?;
+                        let Expression::Identifier(node) = expression else {
+                            return Err(self.eof());
+                        };
+
+                        return Ok(Expression::Assignment(AssignmentNode {
+                            loc: Location::new(start, end),
+                            identifier: node,
+                            right: self.parse_expression()?.boxed(),
+                        }));
+                    }
+                },
+                _ => return Ok(expression),
+            },
             _ => return Ok(expression),
         };
 
@@ -448,6 +485,10 @@ impl Parser {
             left: expression.boxed(),
             right: right.boxed(),
         }))
+    }
+
+    fn parse_assignment(&mut self) -> Result<Expression, SyntaxError> {
+        todo!()
     }
 
     fn parse_identifier(&mut self) -> Result<Expression, SyntaxError> {
@@ -464,7 +505,7 @@ impl Parser {
         let mut expression = self.parse_leaf_expression()?;
 
         loop {
-            let Some(next) = self.peek_significant() else {
+            let Some(next) = self.peek() else {
                 return Ok(expression);
             };
 
@@ -533,7 +574,7 @@ impl Parser {
     }
 
     fn parse_leaf_expression(&mut self) -> Result<Expression, SyntaxError> {
-        let next = self.peek_significant();
+        let next = self.peek();
 
         let Some(next) = next else {
             return Ok(self.empty());
@@ -616,7 +657,7 @@ impl Parser {
             elements.push(self.parse_expression()?);
 
             if self.next_is(TokenKind::Comma) {
-                self.next_significant()?;
+                self.next()?;
                 continue;
             } else {
                 break;
@@ -777,7 +818,7 @@ impl Parser {
         let Token { start, .. } = self.assert_next(TokenKind::LetKeyword)?;
         let Token { lexeme, end, .. } = self.assert_next(TokenKind::Symbol)?;
         self.assert_next(TokenKind::Equals)?;
-        let right = self.parse_expression().map(Box::new)?;
+        let right = self.parse_expression()?.boxed();
 
         Ok(Expression::LetBinding(LetBinding {
             name: lexeme,

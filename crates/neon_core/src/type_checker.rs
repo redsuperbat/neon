@@ -86,6 +86,7 @@ impl TypeChecker<'_> {
             Expression::Bool(..) => Type::Bool,
             Expression::String(..) => Type::String,
             Expression::Empty(..) => Type::Unit,
+            _ => todo!(),
         }
     }
 

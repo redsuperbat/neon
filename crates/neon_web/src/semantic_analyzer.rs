@@ -75,11 +75,21 @@ impl SemanticAnalyzer {
     }
 
     fn peek(&self) -> Option<&Token> {
-        self.tokens.front()
+        self.peek_at_offset(0)
     }
 
     fn is_at_end(&self) -> bool {
         self.peek().is_none()
+    }
+
+    fn next_pair_is(&self, tokens: (TokenKind, TokenKind)) -> bool {
+        match self.peek() {
+            Some(a) => match self.peek_at_offset(1) {
+                Some(b) => a.kind == tokens.0 && b.kind == tokens.1,
+                None => false,
+            },
+            None => false,
+        }
     }
 
     fn is_at_offset(&self, offset: usize, token: TokenKind) -> bool {
@@ -165,9 +175,21 @@ impl SemanticAnalyzer {
 
     fn analyze_forward_slash(&mut self) -> Option<SemanticToken> {
         let Token { start, .. } = self.next()?;
-        while !self.is_at_end() && !self.next_is(TokenKind::ForwardSlash) {
+        // For /* comments
+        if self.next_is(TokenKind::Asterix) {
+            while !self.next_pair_is((TokenKind::Asterix, TokenKind::ForwardSlash)) {
+                self.next()?;
+            }
             self.next()?;
         }
+
+        // For //  comments
+        if self.next_is(TokenKind::ForwardSlash) {
+            while !self.next_is(TokenKind::Newline) {
+                self.next()?;
+            }
+        }
+
         let Token { end, .. } = self.next()?;
 
         Some(SemanticToken {

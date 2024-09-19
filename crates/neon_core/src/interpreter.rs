@@ -6,9 +6,9 @@ use std::{
 use crate::{
     location::Location,
     parser::{
-        ArrayNode, BinaryOp, BinaryOperationNode, BlockNode, BuiltinExpressionKind, BuiltinNode,
-        Expression, FnNode, ForLoopNode, ForLoopTarget, IdentifierNode, IfNode, IndexAccessNode,
-        IntNode, InvocationNode, LetBinding, ObjectNode, PropertyAccessNode,
+        ArrayNode, AssignmentNode, BinaryOp, BinaryOperationNode, BlockNode, BuiltinExpressionKind,
+        BuiltinNode, Expression, FnNode, ForLoopNode, ForLoopTarget, IdentifierNode, IfNode,
+        IndexAccessNode, IntNode, InvocationNode, LetBinding, ObjectNode, PropertyAccessNode,
     },
     symbol_table::SymbolTable,
 };
@@ -272,11 +272,22 @@ impl Interpreter {
             Expression::PropertyAccess(node) => self.evaluate_property_access(node, ctx),
             Expression::Object(node) => self.evaluate_object(node, ctx),
             Expression::Builtin(node) => self.evaluate_internal(node, ctx),
+            Expression::Assignment(node) => self.evaluate_assignment(node, ctx),
 
-            Expression::String(e) => Ok(Value::String(e.value.clone())),
-            Expression::Bool(e) => Ok(Value::Bool(e.value)),
+            Expression::String(node) => Ok(Value::String(node.value.clone())),
+            Expression::Bool(node) => Ok(Value::Bool(node.value)),
             Expression::Empty(..) => Ok(Value::Unit),
         }
+    }
+
+    fn evaluate_assignment(
+        &self,
+        node: &AssignmentNode,
+        ctx: &mut EvaluationContext,
+    ) -> Result<Value, RuntimeError> {
+        let value = self.evaluate_expression(&node.right, ctx)?;
+        ctx.bindings.insert(node.identifier.name.clone(), value);
+        Ok(Value::Unit)
     }
 
     fn evaluate_property_access(

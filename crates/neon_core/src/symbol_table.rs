@@ -1,9 +1,9 @@
 use crate::{
     location::Location,
     parser::{
-        ArrayNode, BinaryOperationNode, BlockNode, BuiltinExpressionKind, Expression, FnNode,
-        ForLoopNode, ForLoopTarget, IdentifierNode, IfNode, IndexAccessNode, InvocationNode,
-        LetBinding, ObjectNode,
+        ArrayNode, AssignmentNode, BinaryOperationNode, BlockNode, BuiltinExpressionKind,
+        Expression, FnNode, ForLoopNode, ForLoopTarget, IdentifierNode, IfNode, IndexAccessNode,
+        InvocationNode, LetBinding, ObjectNode,
     },
 };
 use std::{collections::HashSet, mem};
@@ -78,23 +78,20 @@ impl SymbolTable {
 
     pub fn visit_expression(&mut self, expression: &Expression) -> Result<(), SymbolError> {
         match &expression {
-            Expression::Fn(e) => self.visit_fn(e),
-            Expression::Identifier(e) => self.visit_identifier(e),
-            Expression::Invocation(e) => self.visit_invocation(e),
-            Expression::LetBinding(e) => self.visit_let(e),
-            Expression::Block(e) => self.visit_block(e),
-            Expression::If(e) => self.visit_if(e),
-            Expression::Else(e) => self.visit_expression(&e.consequent),
-            Expression::Binary(e) => self.visit_binary(e),
-            Expression::Object(e) => self.visit_object(e),
-            Expression::Array(e) => self.visit_array(e),
-            Expression::IndexAccess(IndexAccessNode { indexee, index, .. }) => {
-                self.visit_expression(indexee)?;
-                self.visit_expression(index)
-            }
-            Expression::ForLoop(e) => self.visit_for_loop(e),
-
-            Expression::PropertyAccess(e) => self.visit_expression(&e.object),
+            Expression::Fn(node) => self.visit_fn(node),
+            Expression::Identifier(node) => self.visit_identifier(node),
+            Expression::Invocation(node) => self.visit_invocation(node),
+            Expression::LetBinding(node) => self.visit_let(node),
+            Expression::Block(node) => self.visit_block(node),
+            Expression::If(node) => self.visit_if(node),
+            Expression::Else(node) => self.visit_expression(&node.consequent),
+            Expression::Binary(node) => self.visit_binary(node),
+            Expression::Object(node) => self.visit_object(node),
+            Expression::Array(node) => self.visit_array(node),
+            Expression::IndexAccess(node) => self.visit_index_access(&node),
+            Expression::ForLoop(node) => self.visit_for_loop(node),
+            Expression::PropertyAccess(node) => self.visit_expression(&node.object),
+            Expression::Assignment(node) => self.visit_assignment(node),
 
             Expression::Int(..) => Ok(()),
             Expression::Bool(..) => Ok(()),
@@ -102,6 +99,16 @@ impl SymbolTable {
             Expression::Builtin(..) => Ok(()),
             Expression::Empty(..) => Ok(()),
         }
+    }
+
+    fn visit_index_access(&mut self, node: &IndexAccessNode) -> Result<(), SymbolError> {
+        self.visit_expression(&node.indexee)?;
+        self.visit_expression(&node.index)
+    }
+
+    fn visit_assignment(&mut self, node: &AssignmentNode) -> Result<(), SymbolError> {
+        self.scope.declare(&node.identifier.name);
+        self.visit_expression(&node.right)
     }
 
     fn visit_object(&mut self, object: &ObjectNode) -> Result<(), SymbolError> {
@@ -132,9 +139,7 @@ impl SymbolTable {
 
         self.visit_expression(body)?;
 
-        self.exit_scope()?;
-
-        Ok(())
+        self.exit_scope()
     }
 
     fn visit_array(&mut self, array: &ArrayNode) -> Result<(), SymbolError> {
@@ -198,8 +203,7 @@ impl SymbolTable {
         self.scope.declare(name);
         self.enter_scope(parameters);
         self.visit_expression(body)?;
-        self.exit_scope()?;
-        Ok(())
+        self.exit_scope()
     }
 
     fn visit_block(&mut self, block: &BlockNode) -> Result<(), SymbolError> {
@@ -235,16 +239,14 @@ impl SymbolTable {
 
     fn visit_let(&mut self, l: &LetBinding) -> Result<(), SymbolError> {
         let LetBinding { right, name, .. } = l;
-        self.visit_expression(right)?;
         self.scope.declare(name);
-        Ok(())
+        self.visit_expression(right)
     }
 
     fn visit_binary(&mut self, bin: &BinaryOperationNode) -> Result<(), SymbolError> {
         let BinaryOperationNode { left, right, .. } = bin;
         self.visit_expression(left)?;
-        self.visit_expression(right)?;
-        Ok(())
+        self.visit_expression(right)
     }
 }
 
