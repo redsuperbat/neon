@@ -282,73 +282,101 @@ impl SyntaxError {
     }
 }
 
+struct SignificantTokenClassifier {
+    tokens: VecDeque<Token>,
+}
+impl SignificantTokenClassifier {
+    pub fn new(tokens: Vec<Token>) -> SignificantTokenClassifier {
+        SignificantTokenClassifier {
+            tokens: VecDeque::from(tokens),
+        }
+    }
+
+    fn next(&mut self) -> Option<Token> {
+        self.tokens.pop_front()
+    }
+
+    fn peek(&self) -> Option<&Token> {
+        self.peek_at_offset(0)
+    }
+
+    fn peek_at_offset(&self, i: usize) -> Option<&Token> {
+        self.tokens.get(i)
+    }
+
+    fn peek_pair(&self) -> Option<(&Token, &Token)> {
+        Some((self.peek()?, self.peek_at_offset(1)?))
+    }
+
+    fn next_pair_is(&self, tokens: (TokenKind, TokenKind)) -> bool {
+        match self.peek_pair() {
+            Some((a, b)) => a.kind == tokens.0 && b.kind == tokens.1,
+            None => false,
+        }
+    }
+
+    fn next_is(&self, kind: TokenKind) -> bool {
+        match self.peek() {
+            Some(token) => token.kind == kind,
+            None => false,
+        }
+    }
+
+    fn significants(&mut self) -> Vec<Token> {
+        let mut tokens = vec![];
+
+        loop {
+            let next = self.next();
+            match next {
+                Some(first) => match first.kind {
+                    TokenKind::Newline => continue,
+                    TokenKind::WhiteSpace => continue,
+
+                    TokenKind::ForwardSlash => match self.next() {
+                        Some(second) => match second.kind {
+                            TokenKind::ForwardSlash => {
+                                while !self.next_is(TokenKind::Newline) {
+                                    match self.next() {
+                                        None => return tokens,
+                                        Some(_) => (),
+                                    }
+                                }
+                                continue;
+                            }
+
+                            TokenKind::Asterix => {
+                                self.next();
+                                while !self
+                                    .next_pair_is((TokenKind::Asterix, TokenKind::ForwardSlash))
+                                {
+                                    match self.next() {
+                                        Some(_) => (),
+                                        None => return tokens,
+                                    }
+                                }
+                                self.next();
+                                self.next();
+                                continue;
+                            }
+                            _ => tokens.push(second),
+                        },
+                        None => return tokens,
+                    },
+                    _ => tokens.push(first),
+                },
+                None => return tokens,
+            }
+        }
+    }
+}
+
 impl Parser {
     pub fn new(tokens: Vec<Token>) -> Parser {
-        let tokens = Parser::remove_insignificants(tokens);
+        let tokens = SignificantTokenClassifier::new(tokens).significants();
         Parser {
             tokens: VecDeque::from(tokens),
             last_location: Location::new(Pos::start(), Pos::start()),
         }
-    }
-
-    fn remove_insignificants(tokens: Vec<Token>) -> Vec<Token> {
-        let mut significants = vec![];
-        let mut ignore = false;
-        let mut i = 0;
-        while i < tokens.len() {
-            let token = tokens.get(i);
-            let Some(token) = token else {
-                return significants;
-            };
-
-            if token.kind == TokenKind::WhiteSpace {
-                i += 1;
-                continue;
-            };
-
-            if token.kind == TokenKind::Newline {
-                i += 1;
-                continue;
-            };
-
-            let next_is = |kind: TokenKind| match tokens.get(i + 1) {
-                Some(token) => token.kind == kind,
-                None => false,
-            };
-
-            if token.kind == TokenKind::ForwardSlash && next_is(TokenKind::ForwardSlash) {
-                i += 2;
-                ignore = true;
-                continue;
-            };
-
-            if token.kind == TokenKind::Newline && ignore {
-                i += 1;
-                ignore = false;
-                continue;
-            };
-
-            if token.kind == TokenKind::ForwardSlash && next_is(TokenKind::Asterix) {
-                i += 2;
-                ignore = true;
-                continue;
-            };
-
-            if token.kind == TokenKind::Asterix && next_is(TokenKind::ForwardSlash) {
-                i += 2;
-                ignore = false;
-                continue;
-            };
-
-            if ignore {
-                i += 1;
-                continue;
-            };
-
-            i += 1;
-            significants.push(token.clone());
-        }
-        return significants;
     }
 
     fn next(&mut self) -> Result<Token, SyntaxError> {
@@ -386,26 +414,12 @@ impl Parser {
         self.tokens.get(i)
     }
 
-    fn next_pair_is(&self, tokens: (TokenKind, TokenKind)) -> bool {
-        match (self.peek(), self.peek_at_offset(1)) {
-            (Some(a), Some(b)) => a.kind == tokens.0 && b.kind == tokens.1,
-            _ => false,
-        }
-    }
-
-    fn peek_pair(&self) -> (Option<&Token>, Option<&Token>) {
-        (self.peek(), self.peek_at_offset(1))
+    fn peek_pair(&self) -> Option<(&Token, &Token)> {
+        Some((self.peek()?, self.peek_at_offset(1)?))
     }
 
     fn next_is(&self, kind: TokenKind) -> bool {
         match self.peek() {
-            Some(token) => token.kind == kind,
-            None => false,
-        }
-    }
-
-    fn at_offet_is(&self, offset: usize, kind: TokenKind) -> bool {
-        match self.peek_at_offset(offset) {
             Some(token) => token.kind == kind,
             None => false,
         }
@@ -455,7 +469,7 @@ impl Parser {
                 (BinaryOp::Ne, self.parse_expression()?)
             }
             TokenKind::Equals => match self.peek_pair() {
-                (Some(a), Some(b)) => match (&a.kind, &b.kind) {
+                Some((a, b)) => match (&a.kind, &b.kind) {
                     (TokenKind::Equals, TokenKind::Equals) => {
                         self.assert_next(TokenKind::Equals)?;
                         self.assert_next(TokenKind::Equals)?;
@@ -485,10 +499,6 @@ impl Parser {
             left: expression.boxed(),
             right: right.boxed(),
         }))
-    }
-
-    fn parse_assignment(&mut self) -> Result<Expression, SyntaxError> {
-        todo!()
     }
 
     fn parse_identifier(&mut self) -> Result<Expression, SyntaxError> {

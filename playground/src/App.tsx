@@ -88,13 +88,13 @@ const rangeFromLocation = ({
 
 type Output =
   | {
-      type: "error";
-      message: string;
-    }
+    type: "error";
+    message: string;
+  }
   | {
-      type: "ok";
-      message: string;
-    };
+    type: "ok";
+    message: string;
+  };
 
 function ExecutionPage() {
   const [output, setOutput] = createSignal<Output>();
@@ -118,6 +118,7 @@ function ExecutionPage() {
       brackets: [
         ["{", "}"],
         ["(", ")"],
+        ["[", "]"],
       ],
       surroundingPairs: [
         { open: "{", close: "}" },

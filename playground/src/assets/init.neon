@@ -1,84 +1,88 @@
 /**
- *  Welcome to Neon! 👋 Let's take a quick dive into the language.
+ * ⚡️ Welcome to *Neon*! ⚡️
+ * 
+ * Ready to light up the digital horizon with your code? Neon brings simplicity, 
+ * speed, and style to the future of programming. Let's get glowing with a quick 
+ * tour of what makes Neon shine. 🔮
  *
- *  Below is a simple "Hello, World!" example:
+ * First up, let's flash that classic *"Hello, World!"* with Neon's signature brilliance:
  */
 
-fn hello() {
-  "Hello"
+print("💡 Neon Awakens")  // ⚡ Plug in and power up!
+
+/// Now, let's declare a function—Neon-style. It's as easy as flipping a switch. ⚙️
+
+fn ignite() {
+  "⚡ Neon is alive"  // No `return` needed—just pure energy.
 }
 
 /**
- *  As you can see, there's no need for a `return` keyword—the function automatically 
- *  returns the string "Hello" since the body is an expression. ✅
- *
- *  To declare variables, use the `let` keyword:
+ * Boom! The function `ignite` just returns a string without any extra fluff. 
+ * Now, let's store that spark in a variable. 💾
  */
 
-let greeting = hello()
+let signal = ignite()  // ⚡ The neon signal is locked in.
 
-/**
- *  For control flow, use the `if` and `else` keywords:
- */
+/// Control flow? Of course. Neon handles `if` expressions with futuristic ease:
 
-let message = if greeting == "Hello" {
-  " world!"
+let response = if signal == "⚡ Neon is alive" {
+  "💬 Status: ONLINE"  // 🌐 All systems go.
 } else {
-  print("Woopsie 😱")
+  print("🚨 Malfunction detected!")  // Something's off in the grid.
 }
 
 /**
- *  In Neon, `if` statements are also expressions, returning the value of the evaluated branch. 
+ * 💡 Remember, `if` in Neon always returns a value, so you can directly use it 
+ * in expressions, loops, wherever you need! 
  */
 
-let greeting = hello() + message
+let final_signal = ignite() + " | " + response  // Combine the power signals for max output. 🚀
 
 /**
- * Neon has for loops, arrays and objects. To loop over an array you can use the `for` and `in` keywords
- * The below loop will print `1, 2, 3` to the console.
+ * Let's hit the next gear—looping through arrays. 
+ * Imagine these are energy pulses in the grid. 💥
  */
 
-for el in [1, 2, 3] {
-  print(el)
+for pulse in ["🔋1", "🔋2", "🔋3"] {
+  print("Pulse level:", pulse)  // Pulse level 1, 2, 3, flowing through the system.
 }
 
 /**
- * To declare an object use the curly bracket syntax
+ * Neon supports objects too! Let's create a futuristic avatar to keep track of our system:
  */
 
-let david = {
-  age: 12,
-  street: "Stockholm west av. 24",
-  siblings: ["Anne", "Max"],
-  greeting: fn greet() {
-    print(greeting)
-    greeting
+let cyber_entity = {
+  name: "Cybernaut X",
+  age: 2049,  // 🚀 Future-born.
+  location: "Neo Tokyo, Sector 7",
+  upgrades: ["🦾 Bionic Arm", "🧠 Neural Link"],
+  status: fn check_status() {
+    "💡 " + cyber_entity.name + " is fully operational."
   }
 }
 
+/// Accessing the avatar's properties? It's as smooth as slicing through the digital ether:
+
+print("Entity's status:", cyber_entity.status())  // 💡 Cybernaut X is fully operational.
+
 /**
- * To access properties use the dot notation
+ * And of course, since Neon scripts are full expressions, 
+ * we can make our avatar's status the final output of the script. ⚡
  */
 
-print("Davids age", david.age)
-
-
-/**
- * Neon scripts are also expressions, evaluating to a value.
- * Therefore if we add the `greeting` variable as the last
- * expression in this file the script will evaluate to the value
- * contained in the `greeting` variable
- */
-
-david.greeting
+cyber_entity.status()  // The final evaluation—the system's ready to go live. 🔥
 
 /**
- * When you run this script, you should see "Hello world!" as the output. 
+ * 🛠 What's the output? 
+ * **"💡 Cybernaut X is fully operational."** — Naturally. 🚀
  *
- * Neon is written in Rust, and the version you're using now is compiled to 
- * WebAssembly to run in the browser. All error messages and syntax highlighting 
- * are custom-built with Neon's own parser, lexer, interpreter, and semantic analyzer. 🧠
+ * This glowing symphony of code is built with Rust at its core, but you're 
+ * seeing it run effortlessly in WebAssembly, right here in your browser. 🔌 
+ * It's all custom-built—the lexer, parser, interpreter, and semantic analyzer 
+ * combine to give you the smoothest experience.
  *
- * If you want to explore more, check out the examples! 
- * Thanks for trying out Neon, it's been a blast to create it. 🎉
+ * Dive deeper into Neon's wonders—explore the examples, remix the code, and 
+ * let your imagination light up the future. 🪐
+ * 
+ * Thanks for charging up with Neon. We're just getting started! ⚡
  */

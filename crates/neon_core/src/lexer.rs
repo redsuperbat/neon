@@ -141,7 +141,7 @@ impl Lexer {
         self.collect::<Vec<Token>>()
     }
 
-    fn get_pos(&self) -> Pos {
+    fn pos(&self) -> Pos {
         Pos(self.line, self.col)
     }
 
@@ -202,7 +202,7 @@ impl Lexer {
     }
 
     fn string_literal(&mut self) -> Option<Token> {
-        let start = self.get_pos();
+        let start = self.pos();
         self.next()?; // remove first "
         let mut lexeme = String::new();
 
@@ -211,7 +211,7 @@ impl Lexer {
         }
         self.next()?; // remove last "
 
-        let end = self.get_pos();
+        let end = self.pos();
         Some(Token {
             end,
             lexeme,
@@ -221,7 +221,7 @@ impl Lexer {
     }
 
     fn integer_literal(&mut self) -> Option<Token> {
-        let start = self.get_pos();
+        let start = self.pos();
         let mut lexeme = self.next()?.to_string();
 
         while self.peek().is_some() && ('0'..='9').contains(&self.peek()?) {
@@ -229,7 +229,7 @@ impl Lexer {
             lexeme += &next
         }
 
-        let end = self.get_pos();
+        let end = self.pos();
         Some(Token {
             start,
             end,
@@ -243,12 +243,12 @@ impl Lexer {
     }
 
     fn whitespace(&mut self) -> Option<Token> {
-        let start = self.get_pos();
+        let start = self.pos();
         let mut lexeme = String::new();
         while ' ' == self.peek()? {
             lexeme += &self.next()?.to_string();
         }
-        let end = self.get_pos();
+        let end = self.pos();
         Some(Token {
             end,
             lexeme,
@@ -258,9 +258,9 @@ impl Lexer {
     }
 
     fn single_char(&mut self, kind: TokenKind) -> Option<Token> {
-        let start = self.get_pos();
+        let start = self.pos();
         let lexeme = String::from(self.next()?);
-        let end = self.get_pos();
+        let end = self.pos();
         Some(Token {
             kind,
             end,
@@ -270,7 +270,7 @@ impl Lexer {
     }
 
     fn symbol_or_keyword(&mut self) -> Option<Token> {
-        let start = self.get_pos();
+        let start = self.pos();
         let mut lexeme = String::new();
 
         loop {
@@ -286,7 +286,7 @@ impl Lexer {
             }
         }
 
-        let end = self.get_pos();
+        let end = self.pos();
 
         let kind = match lexeme.as_str() {
             "let" => TokenKind::LetKeyword,
