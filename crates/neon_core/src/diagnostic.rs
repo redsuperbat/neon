@@ -1,44 +1,51 @@
 use crate::{location::Location, type_checker::Type};
 use std::fmt::Display;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct UnassignableTypeError {
     pub loc: Location,
     pub lhs: Type,
     pub rhs: Type,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct UndefinedReferenceError {
     pub loc: Location,
     pub name: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct IncompatibleTypesError {
     pub loc: Location,
     pub consequent: Type,
     pub alternate: Type,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ExpressionNotInvokableError {
     pub loc: Location,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct InsufficientOverlapmentError {
     pub loc: Location,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct PropertyDoesNotExistError {
     pub loc: Location,
     pub access_type: Type,
     pub key: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
+pub struct InvalidIndexAccessError {
+    pub loc: Location,
+    pub index_type: Type,
+    pub indexee_type: Type,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum ErrorDiagnostic {
     UnassignableType(UnassignableTypeError),
     UndefinedReference(UndefinedReferenceError),
@@ -46,6 +53,7 @@ pub enum ErrorDiagnostic {
     ExpressionNotInvokable(ExpressionNotInvokableError),
     InsufficientOverlapment(InsufficientOverlapmentError),
     PropertyDoesNotExist(PropertyDoesNotExistError),
+    InvalidIndexAccess(InvalidIndexAccessError),
 }
 
 impl ToString for ErrorDiagnostic {
@@ -62,6 +70,7 @@ impl ToString for ErrorDiagnostic {
             ErrorDiagnostic::ExpressionNotInvokable(_e) => "Expression not invokable".to_string(),
             ErrorDiagnostic::InsufficientOverlapment(_e) => "Binary operation on types seems to be a mistake since none of them overlap sufficiently with each other".to_string(),
             ErrorDiagnostic::PropertyDoesNotExist(e) => format!("Property {} does not exist on type `{}`", e.key, e.access_type),
+            ErrorDiagnostic::InvalidIndexAccess(e) =>format!("Expression of type `{}` can't be used to index type `{}`.", e.index_type, e.indexee_type)
         }
     }
 }
@@ -75,11 +84,12 @@ impl ErrorDiagnostic {
             ErrorDiagnostic::ExpressionNotInvokable(e) => e.loc,
             ErrorDiagnostic::InsufficientOverlapment(e) => e.loc,
             ErrorDiagnostic::PropertyDoesNotExist(e) => e.loc,
+            ErrorDiagnostic::InvalidIndexAccess(e) => e.loc,
         }
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Diagnostic {
     Error(ErrorDiagnostic),
 }
@@ -107,6 +117,9 @@ impl DiagnosticsList {
     }
 
     pub fn add(&mut self, diagnostic: Diagnostic) {
+        if self.diagnostics.iter().any(|d| *d == diagnostic) {
+            return;
+        }
         self.diagnostics.push(diagnostic)
     }
 

@@ -1,4 +1,4 @@
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Pos(pub usize, pub usize);
 
 impl Pos {
@@ -21,7 +21,7 @@ impl Into<Pos> for &Pos {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Location {
     pub start: Pos,
     pub end: Pos,

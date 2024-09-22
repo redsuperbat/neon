@@ -1,42 +1,41 @@
-use core::mem::discriminant as tag;
-use std::{collections::HashMap, fmt::Display};
-
 use crate::{
     diagnostic::{
         Diagnostic, DiagnosticsList, ErrorDiagnostic, ExpressionNotInvokableError,
-        IncompatibleTypesError, PropertyDoesNotExistError, UnassignableTypeError,
+        IncompatibleTypesError, InvalidIndexAccessError, PropertyDoesNotExistError,
+        UnassignableTypeError,
     },
     location::Location,
     parser::{
         ArrayNode, AssignmentNode, BinaryOp, BinaryOperationNode, BlockNode, BuiltinExpressionKind,
-        ElseNode, Expression, FnNode, ForLoopNode, IdentifierNode, IfNode, InvocationNode,
-        LetBindingNode, ObjectNode, PropertyAccessNode,
+        BuiltinNode, ElseNode, Expression, FnNode, ForLoopNode, IdentifierNode, IfNode,
+        IndexAccessNode, InvocationNode, LetBindingNode, ObjectNode, PropertyAccessNode,
     },
 };
+use std::{collections::HashMap, fmt::Display};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct PropertyType {
     name: String,
     value: Type,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ObjectType {
     properties: Vec<PropertyType>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ArrayType {
     elements: Box<Type>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct FnType {
     parameters: Vec<Type>,
     return_type: Box<Type>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Type {
     Never,
     Int,
@@ -91,12 +90,6 @@ impl Display for Type {
         }
 
         write!(f, "{}", fmt_type(0, self))
-    }
-}
-
-impl PartialEq<Self> for Type {
-    fn eq(&self, other: &Self) -> bool {
-        tag(self) == tag(other)
     }
 }
 
@@ -158,13 +151,35 @@ impl TypeChecker {
             Expression::ForLoop(node) => self.typeof_for_loop(node, env),
             Expression::Array(node) => self.typeof_array(node, env),
             Expression::PropertyAccess(node) => self.typeof_property_access(node, env),
+            Expression::IndexAccess(node) => self.typeof_index_access(node, env),
+            Expression::Builtin(node) => self.typeof_builtin(node, env),
 
             Expression::Bool(..) => Type::Bool,
             Expression::Empty(..) => Type::Unit,
             Expression::Int(..) => Type::Int,
             Expression::String(..) => Type::String,
-            e => todo!("{:#?}", e),
         }
+    }
+
+    fn typeof_builtin(&mut self, _node: &BuiltinNode, _env: &mut TypeEnvironment) -> Type {
+        Type::Any
+    }
+
+    fn typeof_index_access(&mut self, node: &IndexAccessNode, env: &mut TypeEnvironment) -> Type {
+        let typeof_index = self.typeof_expression(&node.index, env);
+        self.unify(&Type::Int, &typeof_index);
+        let typeof_indexee = self.typeof_expression(&node.indexee, env);
+        let Type::Array(array_type) = typeof_indexee else {
+            return self.add_error_diagnostic(ErrorDiagnostic::InvalidIndexAccess(
+                InvalidIndexAccessError {
+                    loc: node.index.loc(),
+                    indexee_type: typeof_indexee,
+                    index_type: typeof_index,
+                },
+            ));
+        };
+
+        *array_type.elements
     }
 
     fn typeof_property_access(
@@ -194,9 +209,23 @@ impl TypeChecker {
         prop_type.value.clone()
     }
 
-    fn typeof_array(&mut self, _node: &ArrayNode, _env: &mut TypeEnvironment) -> Type {
+    fn typeof_array(&mut self, node: &ArrayNode, env: &mut TypeEnvironment) -> Type {
+        let arr_types = node
+            .elements
+            .iter()
+            .map(|e| self.typeof_expression(e, env))
+            .collect::<Vec<_>>();
+
+        let arr_type = arr_types.first().map_or(Type::Any, |first| {
+            if arr_types.iter().all(|t| t == first) {
+                first.clone()
+            } else {
+                Type::Any
+            }
+        });
+
         Type::Array(ArrayType {
-            elements: Box::new(Type::Any),
+            elements: Box::new(arr_type),
         })
     }
 
@@ -283,13 +312,15 @@ impl TypeChecker {
     fn typeof_assignment(&mut self, node: &AssignmentNode, env: &mut TypeEnvironment) -> Type {
         let lhs = self.typeof_identifier(&node.identifier, env);
         let rhs = self.typeof_expression(&node.right, env);
-        self.current_loc = node.loc;
+        // We do this to make the error appear on the left part of the assignment
+        self.current_loc = node.identifier.loc;
         self.unify(&lhs, &rhs);
         Type::Unit
     }
 
     fn typeof_if(&mut self, node: &IfNode, env: &mut TypeEnvironment) -> Type {
         let predicate = self.typeof_expression(&node.predicate, env);
+        // We do this to make the error appear on the entire predicate
         self.current_loc = node.predicate.loc();
         self.unify(&Type::Bool, &predicate);
 
