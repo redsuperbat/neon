@@ -22,10 +22,22 @@ pub struct IncompatibleTypesError {
 }
 
 #[derive(Debug, Clone)]
+pub struct ExpressionNotInvokable {
+    pub loc: Location,
+}
+
+#[derive(Debug, Clone)]
+pub struct InsufficientOverlapment {
+    pub loc: Location,
+}
+
+#[derive(Debug, Clone)]
 pub enum ErrorDiagnostic {
     UnassignableType(UnassignableTypeError),
     UndefinedReference(UndefinedReferenceError),
     IncompatibleTypes(IncompatibleTypesError),
+    ExpressionNotInvokable(ExpressionNotInvokable),
+    InsufficientOverlapment(InsufficientOverlapment),
 }
 
 impl ToString for ErrorDiagnostic {
@@ -39,6 +51,8 @@ impl ToString for ErrorDiagnostic {
                 "If expression has incompatible arms, expected `{}` found `{}`",
                 e.consequent, e.alternate
             ),
+            ErrorDiagnostic::ExpressionNotInvokable(_e) => "Expression not invokable".to_string(),
+            ErrorDiagnostic::InsufficientOverlapment(_e) => "Binary operation on types seems to be a mistake since none of them overlap sufficiently with each other".to_string(),
         }
     }
 }
@@ -49,6 +63,8 @@ impl ErrorDiagnostic {
             ErrorDiagnostic::UnassignableType(e) => e.loc,
             ErrorDiagnostic::UndefinedReference(e) => e.loc,
             ErrorDiagnostic::IncompatibleTypes(e) => e.loc,
+            ErrorDiagnostic::ExpressionNotInvokable(e) => e.loc,
+            ErrorDiagnostic::InsufficientOverlapment(e) => e.loc,
         }
     }
 }

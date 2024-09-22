@@ -72,6 +72,7 @@ fn compile_program(src: &str) -> Result<Expression, CompilationDiagnostics> {
 
     let mut ts = TypeChecker::new();
     let mut env = TypeEnvironment::new();
+    env.register_bultin(&BuiltinExpressionKind::Print);
     ts.typeof_expression(&ast, &mut env);
 
     // Handle diagnostics

@@ -27,21 +27,24 @@ impl Builtin for Print {
     }
 }
 
-fn program() -> (EvaluationContext, Interpreter) {
+fn program() -> (EvaluationContext, Interpreter, TypeEnvironment) {
     let mut ctx = EvaluationContext::new();
-    ctx.register_bultin(&BuiltinExpressionKind::Print);
+    let kind = &BuiltinExpressionKind::Print;
+    ctx.register_bultin(kind);
 
     let mut interpreter = Interpreter::new();
-    interpreter.register_bultin(&BuiltinExpressionKind::Print, Box::new(Print {}));
+    interpreter.register_bultin(kind, Box::new(Print {}));
 
-    (ctx, interpreter)
+    let mut env = TypeEnvironment::new();
+    env.register_bultin(kind);
+
+    (ctx, interpreter, env)
 }
 
 fn repl() {
     let handle = io::stdin().lock();
-    let (mut ctx, interpreter) = program();
+    let (mut ctx, interpreter, mut env) = program();
 
-    let mut env = TypeEnvironment::new();
     let mut symbol_table = SymbolTable::new();
 
     print("> ");
@@ -99,8 +102,7 @@ fn file(path: &str) {
         }
     };
 
-    let (mut ctx, interpreter) = program();
-    let mut env = TypeEnvironment::new();
+    let (mut ctx, interpreter, mut env) = program();
     let mut ts = TypeChecker::new();
     let mut symbol_table = SymbolTable::new();
 

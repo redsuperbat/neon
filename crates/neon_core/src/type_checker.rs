@@ -1,15 +1,16 @@
 use core::mem::discriminant as tag;
-use std::{borrow::BorrowMut, collections::HashMap, fmt::Display};
+use std::{collections::HashMap, fmt::Display};
 
 use crate::{
     diagnostic::{
-        Diagnostic, DiagnosticsList, ErrorDiagnostic, IncompatibleTypesError, UnassignableTypeError,
+        Diagnostic, DiagnosticsList, ErrorDiagnostic, ExpressionNotInvokable,
+        IncompatibleTypesError, UnassignableTypeError,
     },
     location::Location,
     parser::{
-        ArrayNode, AssignmentNode, BinaryOperationNode, BlockNode, ElseNode, Expression, FnNode,
-        ForLoopNode, IdentifierNode, IfNode, InvocationNode, LetBindingNode, ObjectNode,
-        PropertyAccessNode,
+        ArrayNode, AssignmentNode, BinaryOp, BinaryOperationNode, BlockNode, BuiltinExpressionKind,
+        ElseNode, Expression, FnNode, ForLoopNode, IdentifierNode, IfNode, InvocationNode,
+        LetBindingNode, ObjectNode, PropertyAccessNode,
     },
 };
 
@@ -30,13 +31,19 @@ pub struct ArrayType {
 }
 
 #[derive(Debug, Clone)]
+pub struct FnType {
+    parameters: Vec<Type>,
+    return_type: Box<Type>,
+}
+
+#[derive(Debug, Clone)]
 pub enum Type {
     Never,
     Int,
     Bool,
     Object(ObjectType),
     Array(ArrayType),
-    TypeFn,
+    Fn(FnType),
 
     String,
     Unit,
@@ -53,7 +60,18 @@ impl Display for Type {
                 Type::Unit => "unit".to_string(),
                 Type::Never => "never".to_string(),
                 Type::Any => "any".to_string(),
-                Type::TypeFn => "fn".to_string(),
+                Type::Fn(FnType {
+                    parameters,
+                    return_type,
+                }) => {
+                    let parameters = parameters
+                        .iter()
+                        .map(|t| format!("{}", t))
+                        .collect::<Vec<_>>()
+                        .join(",");
+
+                    format!("{parameters} -> {}", return_type)
+                }
                 Type::Array(t) => format!("{}[]", t.elements),
                 Type::Object(ObjectType { properties }) => {
                     let mut result = String::from("{\n");
@@ -91,6 +109,19 @@ impl TypeEnvironment {
         TypeEnvironment {
             bindings: HashMap::new(),
         }
+    }
+}
+
+impl TypeEnvironment {
+    pub fn register_bultin(&mut self, kind: &BuiltinExpressionKind) {
+        let parameters = (0..=100).map(|_| Type::Any).collect();
+        let name = kind.name();
+        let fn_type = FnType {
+            return_type: Box::new(Type::Any),
+            parameters,
+        };
+
+        self.bindings.insert(name, Type::Fn(fn_type));
     }
 }
 
@@ -160,25 +191,49 @@ impl TypeChecker {
     }
 
     fn typeof_fn(&mut self, node: &FnNode, env: &mut TypeEnvironment) -> Type {
-        for param in &node.parameters {
-            // TODO: Fix
-            self.typeof_identifier(param, env);
-        }
-        self.typeof_expression(&node.body, env);
-        env.bindings.insert(node.name.clone(), Type::TypeFn);
-        Type::TypeFn
+        let parameters = node.parameters.iter().map(|_| Type::Any).collect();
+        let return_type = self.typeof_expression(&node.body, env);
+        let fn_type = Type::Fn(FnType {
+            parameters,
+            return_type: Box::new(return_type),
+        });
+        env.bindings.insert(node.name.clone(), fn_type.clone());
+        fn_type
     }
 
     fn typeof_invocation(&mut self, node: &InvocationNode, env: &mut TypeEnvironment) -> Type {
         let callee = self.typeof_expression(&node.callee, env);
-        println!("callee, {}", callee);
-        return self.unify(&callee, &Type::TypeFn).clone();
+
+        let Type::Fn(fn_type) = callee else {
+            return self.add_error_diagnostic(ErrorDiagnostic::ExpressionNotInvokable(
+                ExpressionNotInvokable {
+                    loc: node.callee.loc(),
+                },
+            ));
+        };
+
+        for (param, arg) in fn_type.parameters.iter().zip(node.arguments.iter()) {
+            let arg_type = self.typeof_expression(arg, env);
+            self.unify(param, &arg_type);
+        }
+        *fn_type.return_type
     }
 
     fn typeof_binary(&mut self, node: &BinaryOperationNode, env: &mut TypeEnvironment) -> Type {
         let lhs = self.typeof_expression(&node.left, env);
         let rhs = self.typeof_expression(&node.right, env);
-        self.unify(&lhs, &rhs)
+        let unification = self.unify(&lhs, &rhs);
+
+        match node.operation {
+            BinaryOp::Mod | BinaryOp::Add | BinaryOp::Sub => unification,
+
+            BinaryOp::And
+            | BinaryOp::Or
+            | BinaryOp::Lt
+            | BinaryOp::Gt
+            | BinaryOp::Ne
+            | BinaryOp::Eq => Type::Bool,
+        }
     }
 
     fn typeof_block(&mut self, node: &BlockNode, env: &mut TypeEnvironment) -> Type {
@@ -209,14 +264,14 @@ impl TypeChecker {
     fn typeof_assignment(&mut self, node: &AssignmentNode, env: &mut TypeEnvironment) -> Type {
         let lhs = self.typeof_identifier(&node.identifier, env);
         let rhs = self.typeof_expression(&node.right, env);
+        self.current_loc = node.loc;
         self.unify(&lhs, &rhs);
         Type::Unit
     }
 
     fn typeof_if(&mut self, node: &IfNode, env: &mut TypeEnvironment) -> Type {
         let predicate = self.typeof_expression(&node.predicate, env);
-        println!("predicate {}", predicate);
-        println!("{:#?}", node.predicate);
+        self.current_loc = node.predicate.loc();
         self.unify(&Type::Bool, &predicate);
 
         let Some(alternate) = node.alternate.as_ref() else {
