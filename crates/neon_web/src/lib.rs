@@ -115,13 +115,6 @@ pub struct ProgramOk {
     pub result: String,
 }
 
-#[wasm_bindgen(getter_with_clone)]
-pub struct ProgramErr {
-    pub start: JsPos,
-    pub end: JsPos,
-    pub message: String,
-}
-
 impl From<Location> for JsLocation {
     fn from(value: Location) -> Self {
         JsLocation {

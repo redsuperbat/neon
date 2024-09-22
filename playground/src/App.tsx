@@ -11,8 +11,6 @@ import init, {
   interpret_src,
   JsPos,
   JsToken,
-  ProgramErr,
-  ProgramTypeErr,
   tokenize,
 } from "neon-web";
 import {
@@ -180,40 +178,28 @@ function ExecutionPage() {
     editor?.setValue(src);
   }
 
-  function underlineDecoration(e: ProgramErr) {
-    return {
-      range: rangeFromLocation(e),
-      options: {
-        inlineClassName: "diagnostic",
-        className: "diagnostic-container",
-        glyphMarginClassName: "diagnostic-glyph",
-      },
-    };
-  }
-
   function renderDiagnostics(src: string) {
     try {
       compile(src);
     } catch (e) {
-      console.log(e);
-      if (e instanceof CompilationDiagnostics) {
-        console.log(e.errors);
-        return;
-      }
-      if (!(e instanceof ProgramErr)) return;
+      if (!(e instanceof CompilationDiagnostics)) return;
       const model = editor?.getModel();
       if (!model) return;
 
-      const decoration: monaco.editor.IModelDeltaDecoration = {
-        range: rangeFromLocation(e),
-        options: {
-          className: "hover-message",
-          hoverMessage: {
-            value: e.message,
+      const decorations: monaco.editor.IModelDeltaDecoration[] = e.errors.map(
+        (e) => ({
+          range: rangeFromLocation(e.loc),
+          options: {
+            inlineClassName: "diagnostic",
+            className: "diagnostic-container",
+            glyphMarginClassName: "diagnostic-glyph",
+            hoverMessage: {
+              value: e.message,
+            },
           },
-        },
-      };
-      diagnosticsDecorations?.append([decoration, underlineDecoration(e)]);
+        }),
+      );
+      diagnosticsDecorations?.append(decorations);
     }
   }
 
@@ -236,30 +222,11 @@ function ExecutionPage() {
     setLogs(undefined);
     const src = editor?.getValue();
     if (!src) return;
-    try {
-      const res = interpret_src(src);
-      setOutput({
-        type: "ok",
-        message: res.result,
-      });
-    } catch (e) {
-      if (!(e instanceof ProgramErr)) return;
-      runtimeDecorations?.append([
-        {
-          range: rangeFromLocation(e),
-          options: {
-            inlineClassName: "diagnostic",
-            className: "diagnostic-container",
-            glyphMarginClassName: "diagnostic-glyph",
-          },
-        },
-      ]);
-
-      setOutput({
-        type: "error",
-        message: e.message,
-      });
-    }
+    const res = interpret_src(src);
+    setOutput({
+      type: "ok",
+      message: res.result,
+    });
   }
 
   return (

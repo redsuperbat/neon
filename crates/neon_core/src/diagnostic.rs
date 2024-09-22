@@ -15,9 +15,17 @@ pub struct UndefinedReferenceError {
 }
 
 #[derive(Debug, Clone)]
+pub struct IncompatibleTypesError {
+    pub loc: Location,
+    pub consequent: Type,
+    pub alternate: Type,
+}
+
+#[derive(Debug, Clone)]
 pub enum ErrorDiagnostic {
     UnassignableType(UnassignableTypeError),
     UndefinedReference(UndefinedReferenceError),
+    IncompatibleTypes(IncompatibleTypesError),
 }
 
 impl ToString for ErrorDiagnostic {
@@ -27,6 +35,10 @@ impl ToString for ErrorDiagnostic {
                 format!("Type {} is not assignable to type {}", e.rhs, e.lhs)
             }
             ErrorDiagnostic::UndefinedReference(e) => format!("Undefined reference '{}'", e.name),
+            ErrorDiagnostic::IncompatibleTypes(e) => format!(
+                "If expression has incompatible arms, expected `{}` found `{}`",
+                e.consequent, e.alternate
+            ),
         }
     }
 }
@@ -36,6 +48,7 @@ impl ErrorDiagnostic {
         match self {
             ErrorDiagnostic::UnassignableType(e) => e.loc,
             ErrorDiagnostic::UndefinedReference(e) => e.loc,
+            ErrorDiagnostic::IncompatibleTypes(e) => e.loc,
         }
     }
 }

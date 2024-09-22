@@ -215,7 +215,12 @@ impl EvaluationContext {
     }
 
     pub fn register_bultin(&mut self, kind: &BuiltinExpressionKind) {
-        let arguments: Vec<String> = (0..=100).map(|n| n.to_string() + "arg").collect();
+        let arguments: Vec<_> = (0..=100)
+            .map(|n| IdentifierNode {
+                loc: Location::beginning(),
+                name: n.to_string(),
+            })
+            .collect();
         let name = kind.name();
         let function_expression = FnNode {
             loc: Location::beginning(),
@@ -483,7 +488,7 @@ impl Interpreter {
         } = node;
         let values = arguments
             .iter()
-            .map(|a| ctx.bindings.get(a))
+            .map(|a| ctx.bindings.get(&a.name))
             .filter_map(|a| a)
             .collect::<Vec<&Value>>();
         let builtin = self.builtins.get(kind).expect("Internal neon error");
@@ -679,7 +684,9 @@ impl Interpreter {
             .iter()
             .zip(value_args.iter())
             .for_each(|(param, argument)| {
-                func_ctx.bindings.insert(param.clone(), argument.clone());
+                func_ctx
+                    .bindings
+                    .insert(param.name.clone(), argument.clone());
             });
 
         let result = self.evaluate_expression(&body, &mut func_ctx);

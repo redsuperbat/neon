@@ -49,7 +49,7 @@ pub struct IfNode {
 pub struct FnNode {
     pub loc: Location,
     pub name: String,
-    pub parameters: Vec<String>,
+    pub parameters: Vec<IdentifierNode>,
     pub body: Box<Expression>,
 }
 
@@ -93,7 +93,7 @@ pub struct IndexAccessNode {
 pub struct BuiltinNode {
     pub loc: Location,
     pub kind: BuiltinExpressionKind,
-    pub arguments: Vec<String>,
+    pub arguments: Vec<IdentifierNode>,
 }
 
 #[derive(Debug, Clone)]
@@ -759,13 +759,18 @@ impl Parser {
 
         let consequent = self.parse_block()?;
         let mut alternate = None;
+        let mut end = None;
 
         if self.next_is(TokenKind::ElseKeyword) {
-            alternate = Some(self.parse_else()?);
+            let else_node = self.parse_else()?;
+            end = Some((&else_node).loc().end);
+            alternate = Some(else_node);
         }
 
+        let end = end.unwrap_or(consequent.loc().end);
+
         Ok(Expression::If(IfNode {
-            loc: Location::new(start, consequent.loc().end),
+            loc: Location::new(start, end),
             predicate: predicate.boxed(),
             consequent: consequent.boxed(),
             alternate: Box::new(alternate),
@@ -837,7 +842,7 @@ impl Parser {
         }))
     }
 
-    fn parse_parameters(&mut self) -> Result<Vec<String>, SyntaxError> {
+    fn parse_parameters(&mut self) -> Result<Vec<IdentifierNode>, SyntaxError> {
         self.assert_next(TokenKind::OpenParen)?;
         let mut params = vec![];
 
@@ -846,8 +851,7 @@ impl Parser {
                 break;
             }
 
-            let name = self.assert_next(TokenKind::Symbol)?;
-            params.push(name.lexeme);
+            params.push(self.parse_identifer_node()?);
 
             if self.next_is(TokenKind::ClosedParen) {
                 break;

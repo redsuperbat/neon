@@ -2,10 +2,14 @@ use core::mem::discriminant as tag;
 use std::{collections::HashMap, fmt::Display};
 
 use crate::{
-    diagnostic::{Diagnostic, DiagnosticsList, ErrorDiagnostic, UnassignableTypeError},
+    diagnostic::{
+        Diagnostic, DiagnosticsList, ErrorDiagnostic, IncompatibleTypesError, UnassignableTypeError,
+    },
     location::Location,
     parser::{
-        AssignmentNode, BlockNode, Expression, IdentifierNode, IfNode, LetBindingNode, ObjectNode,
+        ArrayNode, AssignmentNode, BinaryOperationNode, BlockNode, ElseNode, Expression, FnNode,
+        ForLoopNode, IdentifierNode, IfNode, InvocationNode, LetBindingNode, ObjectNode,
+        PropertyAccessNode,
     },
 };
 
@@ -38,12 +42,10 @@ pub enum Type {
     Object(ObjectType),
     Array(ArrayType),
     Union(UnionType),
+    Any,
     String,
     Unit,
-    TypeFn {
-        inputs: Vec<Type>,
-        outputs: Box<Type>,
-    },
+    TypeFn,
 }
 
 impl Display for Type {
@@ -54,6 +56,8 @@ impl Display for Type {
             Type::Bool => "boolean".to_string(),
             Type::Unit => "unit".to_string(),
             Type::Never => "never".to_string(),
+            Type::Any => "any".to_string(),
+            Type::TypeFn => "fn".to_string(),
             t => todo!("{:?}", t),
         };
         write!(f, "{name}")
@@ -104,13 +108,61 @@ impl TypeChecker {
             Expression::If(node) => self.typeof_if(node, env),
             Expression::LetBinding(node) => self.typeof_let_binding(node, env),
             Expression::Object(node) => self.typeof_object(node, env),
+            Expression::Binary(node) => self.typeof_binary(node, env),
+            Expression::Invocation(node) => self.typeof_invocation(node, env),
+            Expression::Else(node) => self.typeof_else(node, env),
+            Expression::Fn(node) => self.typeof_fn(node, env),
+            Expression::ForLoop(node) => self.typeof_for_loop(node, env),
+            Expression::Array(node) => self.typeof_array(node, env),
+            Expression::PropertyAccess(node) => self.typeof_property_access(node, env),
 
             Expression::Bool(..) => Type::Bool,
             Expression::Empty(..) => Type::Unit,
             Expression::Int(..) => Type::Int,
             Expression::String(..) => Type::String,
-            e => todo!("{:?}", e),
+            e => todo!("{:#?}", e),
         }
+    }
+
+    fn typeof_property_access(
+        &mut self,
+        node: &PropertyAccessNode,
+        env: &mut TypeEnvironment,
+    ) -> Type {
+        Type::Any
+    }
+
+    fn typeof_array(&mut self, node: &ArrayNode, env: &mut TypeEnvironment) -> Type {
+        Type::Any
+    }
+
+    fn typeof_else(&mut self, node: &ElseNode, env: &mut TypeEnvironment) -> Type {
+        self.typeof_expression(&node.consequent, env)
+    }
+
+    fn typeof_for_loop(&mut self, node: &ForLoopNode, env: &mut TypeEnvironment) -> Type {
+        self.typeof_expression(&node.body, env);
+        Type::Any
+    }
+
+    fn typeof_fn(&mut self, node: &FnNode, env: &mut TypeEnvironment) -> Type {
+        for param in &node.parameters {
+            // TODO: Fix
+            self.typeof_identifier(param, env);
+        }
+        self.typeof_expression(&node.body, env);
+        Type::Any
+    }
+
+    fn typeof_invocation(&mut self, node: &InvocationNode, env: &mut TypeEnvironment) -> Type {
+        let callee = self.typeof_expression(&node.callee, env);
+        return self.unify(callee, Type::TypeFn);
+    }
+
+    fn typeof_binary(&mut self, node: &BinaryOperationNode, env: &mut TypeEnvironment) -> Type {
+        let lhs = self.typeof_expression(&node.left, env);
+        let rhs = self.typeof_expression(&node.right, env);
+        self.unify(lhs, rhs)
     }
 
     fn typeof_block(&mut self, node: &BlockNode, env: &mut TypeEnvironment) -> Type {
@@ -146,11 +198,28 @@ impl TypeChecker {
     }
 
     fn typeof_if(&mut self, node: &IfNode, env: &mut TypeEnvironment) -> Type {
-        let typeof_predicate = self.typeof_expression(&node.predicate, env);
-        if typeof_predicate != Type::Bool {
-            return Type::Never;
+        // TODO: We should do a better check here to make sure that the predicate resolves to a
+        // boolean type
+        self.typeof_expression(&node.predicate, env);
+
+        let Some(alternate) = node.alternate.as_ref() else {
+            return Type::Unit;
         };
-        return Type::Never;
+
+        let consequent = self.typeof_expression(&node.consequent, env);
+        let alternate = self.typeof_expression(&alternate, env);
+
+        if consequent != alternate {
+            println!("{},{}, {:#?}", consequent, alternate, node);
+            return self.add_error_diagnostic(ErrorDiagnostic::IncompatibleTypes(
+                IncompatibleTypesError {
+                    loc: node.loc,
+                    alternate,
+                    consequent,
+                },
+            ));
+        }
+        consequent
     }
 
     fn typeof_identifier(&mut self, node: &IdentifierNode, env: &mut TypeEnvironment) -> Type {
@@ -160,19 +229,25 @@ impl TypeChecker {
         }
     }
 
+    fn add_error_diagnostic(&mut self, d: ErrorDiagnostic) -> Type {
+        self.diagnostics_list.add(Diagnostic::Error(d));
+        Type::Never
+    }
+
     fn type_error(&mut self, lhs: Type, rhs: Type) -> Type {
-        self.diagnostics_list
-            .add(Diagnostic::Error(ErrorDiagnostic::UnassignableType(
-                UnassignableTypeError {
-                    loc: self.current_loc,
-                    lhs,
-                    rhs,
-                },
-            )));
+        self.add_error_diagnostic(ErrorDiagnostic::UnassignableType(UnassignableTypeError {
+            loc: self.current_loc,
+            lhs,
+            rhs,
+        }));
         Type::Never
     }
 
     fn unify(&mut self, lhs: Type, rhs: Type) -> Type {
+        if rhs == Type::Any || lhs == Type::Any {
+            return Type::Any;
+        }
+
         match lhs {
             Type::Int => match rhs {
                 Type::Int => Type::Int,

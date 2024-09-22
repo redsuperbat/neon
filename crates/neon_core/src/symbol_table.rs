@@ -111,10 +111,10 @@ impl SymbolTable {
 
         match targets {
             ForLoopTarget::Single(target) => {
-                self.enter_scope(&vec![target.name.to_string()]);
+                self.enter_scope(&vec![target.clone()]);
             }
             ForLoopTarget::Tuple(first, second) => {
-                self.enter_scope(&vec![first.to_string(), second.to_string()]);
+                self.enter_scope(&vec![first.clone(), second.clone()]);
             }
         };
 
@@ -145,7 +145,7 @@ impl SymbolTable {
         }
     }
 
-    fn enter_scope(&mut self, identifiers: &Vec<String>) {
+    fn enter_scope(&mut self, identifiers: &Vec<IdentifierNode>) {
         let mut set = HashSet::new();
         for id in identifiers {
             set.insert(id.to_string());
