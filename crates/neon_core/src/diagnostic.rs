@@ -24,6 +24,7 @@ pub struct IncompatibleTypesError {
 #[derive(Debug, Clone, PartialEq)]
 pub struct ExpressionNotInvokableError {
     pub loc: Location,
+    pub callee_type: Type,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -67,7 +68,7 @@ impl ToString for ErrorDiagnostic {
                 "If expression has incompatible arms, expected `{}` found `{}`",
                 e.consequent, e.alternate
             ),
-            ErrorDiagnostic::ExpressionNotInvokable(_e) => "Expression not invokable".to_string(),
+            ErrorDiagnostic::ExpressionNotInvokable(e) => format!("Expression with type `{}` not invokable", e.callee_type),
             ErrorDiagnostic::InsufficientOverlapment(_e) => "Binary operation on types seems to be a mistake since none of them overlap sufficiently with each other".to_string(),
             ErrorDiagnostic::PropertyDoesNotExist(e) => format!("Property {} does not exist on type `{}`", e.key, e.access_type),
             ErrorDiagnostic::InvalidIndexAccess(e) =>format!("Expression of type `{}` can't be used to index type `{}`.", e.index_type, e.indexee_type)

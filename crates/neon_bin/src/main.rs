@@ -1,3 +1,4 @@
+use lua_compiler::LuaCompiler;
 use neon_core::{
     interpreter::{Builtin, EvaluationContext, Interpreter, RuntimeError, Value},
     lexer::Lexer,
@@ -6,9 +7,43 @@ use neon_core::{
     type_checker::{TypeChecker, TypeEnvironment},
 };
 use std::{
-    env, fs,
+    fs,
     io::{self, BufRead, Write},
 };
+mod lua_compiler;
+
+use clap::{Parser as ClapParser, Subcommand, ValueEnum};
+
+/// Simple program to greet a person
+#[derive(ClapParser, Debug)]
+#[command(version, about, long_about = None)]
+struct Args {
+    /// Filepath to neon script
+    path: Option<String>,
+
+    #[command(subcommand)]
+    command: Option<Commands>,
+}
+
+#[derive(Subcommand, Debug)]
+enum Commands {
+    /// Compiles the neon code
+    Compile {
+        /// Path to neon file to compile
+        path: String,
+        /// Set the compilation target
+        #[arg(short, long, value_enum)]
+        target: CompilationTarget,
+        /// Set the output file path
+        #[arg(short, long)]
+        filepath: String,
+    },
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Debug)]
+enum CompilationTarget {
+    Lua,
+}
 
 fn print(str: &str) -> () {
     print!("{str}");
@@ -123,14 +158,67 @@ fn file(path: &str) {
     }
 }
 
-fn main() {
-    let args: Vec<String> = env::args().collect();
+fn compile_to_lua(path: &str) -> Result<String, ()> {
+    let src = fs::read_to_string(path).expect("File not found");
+    let tokens = Lexer::new(src).vec();
 
-    let input_args = &args[1..];
+    let ast = match Parser::new(tokens).parse_program() {
+        Ok(v) => v,
+        Err(e) => {
+            println!("{}", e.kind.to_string());
+            return Err(());
+        }
+    };
 
-    if let Some(file_path) = input_args.first() {
-        file(file_path);
-    } else {
-        repl();
+    let mut env = TypeEnvironment::new();
+    env.register_bultin(&BuiltinExpressionKind::Print);
+    let mut ts = TypeChecker::new();
+    let mut symbol_table = SymbolTable::new();
+    symbol_table.register_bultin(&BuiltinExpressionKind::Print);
+
+    ts.typeof_expression(&ast, &mut env);
+    symbol_table.visit_expression(&ast);
+
+    let dl = ts
+        .diagnostics_list
+        .merge(&mut symbol_table.diagnostics_list);
+    if dl.has_errors() {
+        dl.diagnostics.iter().for_each(|d| println!("{}", d));
+        return Err(());
     }
+    let le = LuaCompiler::new();
+
+    Ok(le.compile_expression(&ast))
+}
+
+fn main() {
+    let args = Args::parse();
+
+    match args.command {
+        Some(command) => {
+            match command {
+                Commands::Compile {
+                    path,
+                    target,
+                    filepath,
+                } => {
+                    let result = match target {
+                        CompilationTarget::Lua => compile_to_lua(&path),
+                    };
+                    let Ok(result) = result else {
+                        return;
+                    };
+                    fs::write(filepath, result).expect("Should be able to write");
+                }
+            }
+            // If we hit a command we should not do anything else
+            return;
+        }
+        None => (),
+    };
+
+    match args.path {
+        Some(src_filepath) => file(&src_filepath),
+        None => repl(),
+    };
 }

@@ -8,4 +8,5 @@ name = "neon_bin"
 path = "src/main.rs"
 
 [dependencies]
+clap = { version = "4.5.18", features = ["derive"] }
 neon_core = { path = "../neon_core" }

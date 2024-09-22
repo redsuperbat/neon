@@ -69,7 +69,7 @@ impl Display for Type {
                         .collect::<Vec<_>>()
                         .join(",");
 
-                    format!("{parameters} -> {}", return_type)
+                    format!("({parameters}) -> {}", return_type)
                 }
                 Type::Array(t) => format!("{}[]", t.elements),
                 Type::Object(ObjectType { properties }) => {
@@ -239,7 +239,12 @@ impl TypeChecker {
     }
 
     fn typeof_fn(&mut self, node: &FnNode, env: &mut TypeEnvironment) -> Type {
-        let parameters = node.parameters.iter().map(|_| Type::Any).collect();
+        let mut parameters = vec![];
+        for param in &node.parameters {
+            let param_type = Type::Any;
+            env.bindings.insert(param.name.clone(), param_type.clone());
+            parameters.push(param_type);
+        }
         let return_type = self.typeof_expression(&node.body, env);
         let fn_type = Type::Fn(FnType {
             parameters,
@@ -256,6 +261,7 @@ impl TypeChecker {
             return self.add_error_diagnostic(ErrorDiagnostic::ExpressionNotInvokable(
                 ExpressionNotInvokableError {
                     loc: node.callee.loc(),
+                    callee_type: callee,
                 },
             ));
         };

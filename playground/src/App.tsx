@@ -180,27 +180,28 @@ function ExecutionPage() {
     editor?.setValue(src);
   }
 
+  function diagnosticsToDecorations(
+    e: CompilationDiagnostics,
+  ): monaco.editor.IModelDeltaDecoration[] {
+    return e.errors.map((e) => ({
+      range: rangeFromLocation(e.loc),
+      options: {
+        inlineClassName: "diagnostic",
+        className: "diagnostic-container",
+        glyphMarginClassName: "diagnostic-glyph",
+        hoverMessage: {
+          value: e.message,
+        },
+      },
+    }));
+  }
+
   function renderDiagnostics(src: string) {
     try {
       compile(src);
     } catch (e) {
       if (!(e instanceof CompilationDiagnostics)) return;
-      const model = editor?.getModel();
-      if (!model) return;
-
-      const decorations: monaco.editor.IModelDeltaDecoration[] = e.errors.map(
-        (e) => ({
-          range: rangeFromLocation(e.loc),
-          options: {
-            inlineClassName: "diagnostic",
-            className: "diagnostic-container",
-            glyphMarginClassName: "diagnostic-glyph",
-            hoverMessage: {
-              value: e.message,
-            },
-          },
-        }),
-      );
+      const decorations = diagnosticsToDecorations(e);
       diagnosticsDecorations?.append(decorations);
     }
   }
@@ -222,13 +223,20 @@ function ExecutionPage() {
 
   function exec() {
     setLogs(undefined);
+    runtimeDecorations?.clear();
     const src = editor?.getValue();
     if (!src) return;
-    const res = interpret_src(src);
-    setOutput({
-      type: "ok",
-      message: res.result,
-    });
+    try {
+      const res = interpret_src(src);
+      setOutput({
+        type: "ok",
+        message: res.result,
+      });
+    } catch (e) {
+      if (!(e instanceof CompilationDiagnostics)) return;
+      const decorations = diagnosticsToDecorations(e);
+      runtimeDecorations?.append(decorations);
+    }
   }
 
   return (
