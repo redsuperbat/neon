@@ -6,11 +6,13 @@ self.MonacoEnvironment = {
 };
 
 import init, {
+  CompilationDiagnostics,
   compile,
   interpret_src,
   JsPos,
   JsToken,
   ProgramErr,
+  ProgramTypeErr,
   tokenize,
 } from "neon-web";
 import {
@@ -88,13 +90,13 @@ const rangeFromLocation = ({
 
 type Output =
   | {
-    type: "error";
-    message: string;
-  }
+      type: "error";
+      message: string;
+    }
   | {
-    type: "ok";
-    message: string;
-  };
+      type: "ok";
+      message: string;
+    };
 
 function ExecutionPage() {
   const [output, setOutput] = createSignal<Output>();
@@ -193,6 +195,11 @@ function ExecutionPage() {
     try {
       compile(src);
     } catch (e) {
+      console.log(e);
+      if (e instanceof CompilationDiagnostics) {
+        console.log(e.errors);
+        return;
+      }
       if (!(e instanceof ProgramErr)) return;
       const model = editor?.getModel();
       if (!model) return;

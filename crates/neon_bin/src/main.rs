@@ -1,8 +1,10 @@
 use neon_core::{
+    diagnostic::DiagnosticsList,
     interpreter::{Builtin, EvaluationContext, Interpreter, RuntimeError, Value},
     lexer::Lexer,
     parser::{BuiltinExpressionKind, Parser},
     symbol_table::SymbolTable,
+    type_checker::{TypeChecker, TypeEnvironment},
 };
 use std::{
     env, fs,
@@ -26,14 +28,12 @@ impl Builtin for Print {
 }
 
 fn program() -> (EvaluationContext, Interpreter) {
-    let mut symbol_table = SymbolTable::new();
-    symbol_table.register_bultin(&BuiltinExpressionKind::Print);
-
-    let mut ctx = EvaluationContext::new(symbol_table);
+    let mut ctx = EvaluationContext::new();
     ctx.register_bultin(&BuiltinExpressionKind::Print);
 
     let mut interpreter = Interpreter::new();
     interpreter.register_bultin(&BuiltinExpressionKind::Print, Box::new(Print {}));
+
     (ctx, interpreter)
 }
 
@@ -41,9 +41,14 @@ fn repl() {
     let handle = io::stdin().lock();
     let (mut ctx, interpreter) = program();
 
+    let mut env = TypeEnvironment::new();
+    let mut symbol_table = SymbolTable::new();
+
     print("> ");
     for line in handle.lines() {
         let line = line.expect("Failed to read line");
+
+        let mut ts = TypeChecker::new();
         let tokens = Lexer::new(line).vec();
 
         let ast = match Parser::new(tokens).parse_program() {
@@ -55,13 +60,17 @@ fn repl() {
             }
         };
 
-        match ctx.symbol_table.visit_expression(&ast) {
-            Ok(_) => (),
-            Err(e) => {
-                println!("{}", e.kind.to_string());
-                print("> ");
-                continue;
-            }
+        ts.typeof_expression(&ast, &mut env);
+        symbol_table.visit_expression(&ast);
+
+        let dl = symbol_table
+            .diagnostics_list
+            .merge(&mut ts.diagnostics_list);
+
+        if dl.has_errors() {
+            dl.diagnostics.iter().for_each(|d| println!("{}", d));
+            print("> ");
+            continue;
         }
 
         let result = match interpreter.evaluate_expression(&ast, &mut ctx) {
@@ -91,6 +100,21 @@ fn file(path: &str) {
     };
 
     let (mut ctx, interpreter) = program();
+    let mut env = TypeEnvironment::new();
+    let mut ts = TypeChecker::new();
+    let mut symbol_table = SymbolTable::new();
+
+    ts.typeof_expression(&ast, &mut env);
+    symbol_table.visit_expression(&ast);
+
+    let dl = ts
+        .diagnostics_list
+        .merge(&mut symbol_table.diagnostics_list);
+    if dl.has_errors() {
+        dl.diagnostics.iter().for_each(|d| println!("{}", d));
+        print("> ");
+        return;
+    }
 
     match interpreter.evaluate_expression(&ast, &mut ctx) {
         Ok(result) => println!("{:?}", result),

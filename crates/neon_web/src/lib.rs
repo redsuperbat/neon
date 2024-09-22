@@ -55,7 +55,7 @@ pub fn tokenize(src: &str) -> Array {
         .collect()
 }
 
-pub fn compile_program(src: &str) -> Result<Expression, CompilationDiagnostics> {
+fn compile_program(src: &str) -> Result<Expression, CompilationDiagnostics> {
     let tokens = Lexer::new(src).collect::<Vec<_>>();
     let ast = Parser::new(tokens)
         .parse_program()
