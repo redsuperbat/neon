@@ -1,5 +1,5 @@
 use crate::{
-    location::Location,
+    diagnostic::{Diagnostic, DiagnosticsList, ErrorDiagnostic, UndefinedReferenceError},
     parser::{
         ArrayNode, AssignmentNode, BinaryOperationNode, BlockNode, BuiltinExpressionKind,
         Expression, FnNode, ForLoopNode, ForLoopTarget, IdentifierNode, IfNode, IndexAccessNode,
@@ -40,36 +40,17 @@ impl Scope {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct SymbolTable {
     scope: Scope,
-}
-
-#[derive(Debug)]
-pub struct SymbolError {
-    pub kind: SymbolErrorKind,
-    pub loc: Location,
-}
-
-impl ToString for SymbolErrorKind {
-    fn to_string(&self) -> String {
-        match self {
-            SymbolErrorKind::UndefinedReference(name) => {
-                format!("Undefined reference '{name}'")
-            }
-        }
-    }
-}
-
-#[derive(Debug)]
-pub enum SymbolErrorKind {
-    UndefinedReference(String),
+    pub diagnostics_list: DiagnosticsList,
 }
 
 impl SymbolTable {
     pub fn new() -> SymbolTable {
         SymbolTable {
             scope: Scope::global(),
+            diagnostics_list: DiagnosticsList::new(),
         }
     }
 
@@ -77,7 +58,7 @@ impl SymbolTable {
         self.scope.declarations.insert(kind.name());
     }
 
-    pub fn visit_expression(&mut self, expression: &Expression) -> Result<(), SymbolError> {
+    pub fn visit_expression(&mut self, expression: &Expression) {
         match &expression {
             Expression::Fn(node) => self.visit_fn(node),
             Expression::Identifier(node) => self.visit_identifier(node),
@@ -94,32 +75,31 @@ impl SymbolTable {
             Expression::PropertyAccess(node) => self.visit_expression(&node.object),
             Expression::Assignment(node) => self.visit_assignment(node),
 
-            Expression::Int(..) => Ok(()),
-            Expression::Bool(..) => Ok(()),
-            Expression::String(..) => Ok(()),
-            Expression::Builtin(..) => Ok(()),
-            Expression::Empty(..) => Ok(()),
-        }
+            Expression::Int(..) => (),
+            Expression::Bool(..) => (),
+            Expression::String(..) => (),
+            Expression::Builtin(..) => (),
+            Expression::Empty(..) => (),
+        };
     }
 
-    fn visit_index_access(&mut self, node: &IndexAccessNode) -> Result<(), SymbolError> {
-        self.visit_expression(&node.indexee)?;
-        self.visit_expression(&node.index)
+    fn visit_index_access(&mut self, node: &IndexAccessNode) {
+        self.visit_expression(&node.indexee);
+        self.visit_expression(&node.index);
     }
 
-    fn visit_assignment(&mut self, node: &AssignmentNode) -> Result<(), SymbolError> {
-        self.visit_identifier(&node.identifier)?;
-        self.visit_expression(&node.right)
+    fn visit_assignment(&mut self, node: &AssignmentNode) {
+        self.visit_identifier(&node.identifier);
+        self.visit_expression(&node.right);
     }
 
-    fn visit_object(&mut self, object: &ObjectNode) -> Result<(), SymbolError> {
+    fn visit_object(&mut self, object: &ObjectNode) {
         for property in &object.properties {
-            self.visit_expression(property.value.as_ref())?;
+            self.visit_expression(property.value.as_ref());
         }
-        Ok(())
     }
 
-    fn visit_for_loop(&mut self, for_loop: &ForLoopNode) -> Result<(), SymbolError> {
+    fn visit_for_loop(&mut self, for_loop: &ForLoopNode) {
         let ForLoopNode {
             iterable,
             body,
@@ -127,7 +107,7 @@ impl SymbolTable {
             ..
         } = for_loop;
 
-        self.visit_expression(iterable)?;
+        self.visit_expression(iterable);
 
         match targets {
             ForLoopTarget::Single(target) => {
@@ -138,19 +118,18 @@ impl SymbolTable {
             }
         };
 
-        self.visit_expression(body)?;
+        self.visit_expression(body);
 
         self.exit_scope()
     }
 
-    fn visit_array(&mut self, array: &ArrayNode) -> Result<(), SymbolError> {
+    fn visit_array(&mut self, array: &ArrayNode) {
         for el in &array.elements {
-            self.visit_expression(el)?;
+            self.visit_expression(el);
         }
-        Ok(())
     }
 
-    fn visit_if(&mut self, exp: &IfNode) -> Result<(), SymbolError> {
+    fn visit_if(&mut self, exp: &IfNode) {
         let IfNode {
             predicate,
             consequent,
@@ -158,13 +137,12 @@ impl SymbolTable {
             ..
         } = exp;
 
-        self.visit_expression(predicate)?;
-        self.visit_expression(consequent)?;
+        self.visit_expression(predicate);
+        self.visit_expression(consequent);
 
         if let Some(alternate) = alternate.as_ref() {
-            self.visit_expression(alternate)?;
+            self.visit_expression(alternate);
         }
-        Ok(())
     }
 
     fn enter_scope(&mut self, identifiers: &Vec<String>) {
@@ -183,18 +161,17 @@ impl SymbolTable {
         self.scope.parent = Some(Box::new(parent));
     }
 
-    fn exit_scope(&mut self) -> Result<(), SymbolError> {
+    fn exit_scope(&mut self) {
         let current = mem::replace(&mut self.scope.parent, None);
         match current {
             Some(current) => {
                 self.scope = *current;
-                Ok(())
             }
             None => panic!("Internal neon error"),
         }
     }
 
-    fn visit_fn(&mut self, exp: &FnNode) -> Result<(), SymbolError> {
+    fn visit_fn(&mut self, exp: &FnNode) {
         let FnNode {
             name,
             parameters,
@@ -203,51 +180,52 @@ impl SymbolTable {
         } = exp;
         self.scope.declare(name);
         self.enter_scope(parameters);
-        self.visit_expression(body)?;
-        self.exit_scope()
+        self.visit_expression(body);
+        self.exit_scope();
     }
 
-    fn visit_block(&mut self, block: &BlockNode) -> Result<(), SymbolError> {
+    fn visit_block(&mut self, block: &BlockNode) {
         let BlockNode {
             body, return_val, ..
         } = block;
         for exp in body {
-            self.visit_expression(exp)?;
+            self.visit_expression(exp);
         }
-        self.visit_expression(return_val)
+        self.visit_expression(return_val);
     }
 
-    fn visit_invocation(&mut self, exp: &InvocationNode) -> Result<(), SymbolError> {
+    fn visit_invocation(&mut self, exp: &InvocationNode) {
         let InvocationNode {
             callee, arguments, ..
         } = exp;
-        self.visit_expression(callee)?;
+        self.visit_expression(callee);
         for arg in arguments {
-            self.visit_expression(arg)?;
+            self.visit_expression(arg);
         }
-        Ok(())
     }
 
-    fn visit_identifier(&mut self, identifier: &IdentifierNode) -> Result<(), SymbolError> {
+    fn visit_identifier(&mut self, identifier: &IdentifierNode) {
         if self.scope.has_identifier(&identifier) {
-            Ok(())
-        } else {
-            Err(SymbolError {
-                kind: SymbolErrorKind::UndefinedReference(identifier.name.to_string()),
-                loc: identifier.loc,
-            })
+            return;
         }
+        self.diagnostics_list
+            .add(Diagnostic::Error(ErrorDiagnostic::UndefinedReference(
+                UndefinedReferenceError {
+                    loc: identifier.loc,
+                    name: identifier.name.to_string(),
+                },
+            )));
     }
 
-    fn visit_let(&mut self, l: &LetBindingNode) -> Result<(), SymbolError> {
+    fn visit_let(&mut self, l: &LetBindingNode) {
         let LetBindingNode { right, name, .. } = l;
         self.scope.declare(name);
         self.visit_expression(right)
     }
 
-    fn visit_binary(&mut self, bin: &BinaryOperationNode) -> Result<(), SymbolError> {
+    fn visit_binary(&mut self, bin: &BinaryOperationNode) {
         let BinaryOperationNode { left, right, .. } = bin;
-        self.visit_expression(left)?;
+        self.visit_expression(left);
         self.visit_expression(right)
     }
 }
@@ -265,8 +243,8 @@ mod tests {
         let ast = Parser::new(tokens).parse_expression().expect("Should work");
         let mut st = SymbolTable::new();
 
-        let res = st.visit_expression(&ast);
-        assert!(res.is_ok());
+        st.visit_expression(&ast);
+        assert!(!st.diagnostics_list.has_errors())
     }
 
     #[test]
@@ -275,9 +253,8 @@ mod tests {
         let tokens = Lexer::new(code).collect::<Vec<_>>();
         let ast = Parser::new(tokens).parse_program().expect("Should work");
         let mut st = SymbolTable::new();
+        st.visit_expression(&ast);
 
-        let res = st.visit_expression(&ast);
-
-        assert!(res.is_err());
+        assert!(!st.diagnostics_list.has_errors())
     }
 }

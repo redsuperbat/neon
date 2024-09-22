@@ -7,7 +7,6 @@ use crate::{
     parser::{
         AssignmentNode, BlockNode, Expression, IdentifierNode, IfNode, LetBindingNode, ObjectNode,
     },
-    symbol_table::SymbolTable,
 };
 
 #[derive(Debug, Clone)]
@@ -68,28 +67,26 @@ impl PartialEq<Self> for Type {
 }
 
 pub struct TypeEnvironment {
-    pub symbol_table: SymbolTable,
     pub bindings: HashMap<String, Type>,
 }
 
 impl TypeEnvironment {
-    pub fn new(symbol_table: SymbolTable) -> TypeEnvironment {
+    pub fn new() -> TypeEnvironment {
         TypeEnvironment {
-            symbol_table,
             bindings: HashMap::new(),
         }
     }
 }
 
-pub struct TypeChecker<'a> {
-    diagnostics_list: &'a mut DiagnosticsList,
+pub struct TypeChecker {
+    pub diagnostics_list: DiagnosticsList,
     current_loc: Location,
 }
 
-impl TypeChecker<'_> {
-    pub fn new(diagnostics_list: &mut DiagnosticsList) -> TypeChecker {
+impl TypeChecker {
+    pub fn new() -> TypeChecker {
         TypeChecker {
-            diagnostics_list,
+            diagnostics_list: DiagnosticsList::new(),
             current_loc: Location::beginning(),
         }
     }
@@ -215,17 +212,13 @@ a = true
         );
         let tokens = Lexer::new(code).collect::<Vec<_>>();
         let ast = Parser::new(tokens).parse_program().expect("Should work");
-        let mut st = SymbolTable::new();
-        let _ = st.visit_expression(&ast);
-        let mut dl = DiagnosticsList::new();
-        let mut ts = TypeChecker::new(&mut dl);
+        let mut ts = TypeChecker::new();
         let mut env = TypeEnvironment {
             bindings: HashMap::new(),
-            symbol_table: st,
         };
 
         let t = ts.typeof_expression(&ast, &mut env);
-        println!("{:?}", dl);
+        println!("{:?}", ts.diagnostics_list);
         println!("{:?}", t);
     }
 }

@@ -2,11 +2,11 @@ mod semantic_analyzer;
 
 use js_sys::Array;
 use neon_core::{
-    diagnostic::{Diagnostic, DiagnosticsList},
+    diagnostic::Diagnostic,
     interpreter::{Builtin, EvaluationContext, Interpreter, RuntimeError, Value},
     lexer::Lexer,
     location::{Location, Pos},
-    parser::{BuiltinExpressionKind, Parser},
+    parser::{BuiltinExpressionKind, Expression, Parser},
     symbol_table::SymbolTable,
     type_checker::{TypeChecker, TypeEnvironment},
 };
@@ -55,39 +55,53 @@ pub fn tokenize(src: &str) -> Array {
         .collect()
 }
 
-#[wasm_bindgen]
-pub fn compile(src: &str) -> Result<(), ProgramTypeErr> {
+pub fn compile_program(src: &str) -> Result<Expression, CompilationDiagnostics> {
     let tokens = Lexer::new(src).collect::<Vec<_>>();
     let ast = Parser::new(tokens)
         .parse_program()
-        .map_err(|e| ProgramTypeErr {
-            errors: vec![TypeError {
+        .map_err(|e| CompilationDiagnostics {
+            errors: vec![CompilationDiagnostic {
                 loc: Location::new(e.start, e.end).into(),
                 message: e.kind.to_string(),
             }],
         })?;
+
     let mut symbol_table = SymbolTable::new();
-    let mut dl = DiagnosticsList::new();
-    let mut ts = TypeChecker::new(&mut dl);
-    let mut env = TypeEnvironment::new(symbol_table);
+    symbol_table.register_bultin(&BuiltinExpressionKind::Print);
+    symbol_table.visit_expression(&ast);
+
+    let mut ts = TypeChecker::new();
+    let mut env = TypeEnvironment::new();
     ts.typeof_expression(&ast, &mut env);
+
+    // Handle diagnostics
+    let dl = symbol_table
+        .diagnostics_list
+        .merge(&mut ts.diagnostics_list);
+
     if dl.has_errors() {
-        return Err(ProgramTypeErr {
+        return Err(CompilationDiagnostics {
             errors: dl
                 .diagnostics
                 .iter()
                 .map(|d| match d {
                     Diagnostic::Error(e) => e,
                 })
-                .map(|d| TypeError {
-                    message: d.message(),
+                .map(|d| CompilationDiagnostic {
+                    message: d.to_string(),
                     loc: d.loc().into(),
                 })
                 .collect::<Vec<_>>(),
         });
     } else {
-        Ok(())
+        Ok(ast)
     }
+}
+
+#[wasm_bindgen]
+pub fn compile(src: &str) -> Result<(), CompilationDiagnostics> {
+    compile_program(src)?;
+    Ok(())
 }
 
 #[wasm_bindgen]
@@ -124,15 +138,16 @@ pub struct JsLocation {
     pub end: JsPos,
 }
 
+#[derive(Clone)]
 #[wasm_bindgen(getter_with_clone)]
-pub struct TypeError {
+pub struct CompilationDiagnostic {
     pub loc: JsLocation,
     pub message: String,
 }
 
 #[wasm_bindgen(getter_with_clone)]
-pub struct ProgramTypeErr {
-    errors: Vec<TypeError>,
+pub struct CompilationDiagnostics {
+    pub errors: Vec<CompilationDiagnostic>,
 }
 
 struct Print {}
@@ -148,47 +163,25 @@ impl Builtin for Print {
     }
 }
 
-fn program() -> (EvaluationContext, Interpreter) {
-    let mut symbol_table = SymbolTable::new();
-    symbol_table.register_bultin(&BuiltinExpressionKind::Print);
+#[wasm_bindgen]
+pub fn interpret_src(src: &str) -> Result<ProgramOk, CompilationDiagnostics> {
+    let ast = compile_program(src)?;
 
-    let mut ctx = EvaluationContext::new(symbol_table);
+    let mut ctx = EvaluationContext::new();
     ctx.register_bultin(&BuiltinExpressionKind::Print);
 
     let mut interpreter = Interpreter::new();
     interpreter.register_bultin(&BuiltinExpressionKind::Print, Box::new(Print {}));
-    (ctx, interpreter)
-}
-
-#[wasm_bindgen]
-pub fn interpret_src(src: &str) -> Result<ProgramOk, ProgramErr> {
-    let tokens = Lexer::new(src).collect::<Vec<_>>();
-    let ast = Parser::new(tokens)
-        .parse_program()
-        .map_err(|e| ProgramErr {
-            start: JsPos::from(e.start),
-            end: JsPos::from(e.end),
-            message: e.kind.to_string(),
-        })?;
-
-    let (mut ctx, interpreter) = program();
-
-    ctx.symbol_table
-        .visit_expression(&ast)
-        .map_err(|e| ProgramErr {
-            start: JsPos::from(e.loc.start),
-            end: JsPos::from(e.loc.end),
-            message: e.kind.to_string(),
-        })?;
 
     interpreter
         .evaluate_expression(&ast, &mut ctx)
         .map(|r| ProgramOk {
             result: r.to_string(),
         })
-        .map_err(|e| ProgramErr {
-            start: JsPos::from(e.loc.start),
-            end: JsPos::from(e.loc.end),
-            message: e.kind.to_string(),
+        .map_err(|e| CompilationDiagnostics {
+            errors: vec![CompilationDiagnostic {
+                loc: e.loc.into(),
+                message: e.kind.to_string(),
+            }],
         })
 }

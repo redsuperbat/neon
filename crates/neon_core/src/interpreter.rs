@@ -10,7 +10,6 @@ use crate::{
         BuiltinNode, Expression, FnNode, ForLoopNode, ForLoopTarget, IdentifierNode, IfNode,
         IndexAccessNode, IntNode, InvocationNode, LetBindingNode, ObjectNode, PropertyAccessNode,
     },
-    symbol_table::SymbolTable,
 };
 
 #[derive(Debug, Clone)]
@@ -203,19 +202,18 @@ pub struct Interpreter {
 
 #[derive(Debug, Clone)]
 pub struct EvaluationContext {
-    pub symbol_table: SymbolTable,
     pub bindings: HashMap<String, Value>,
     pub call_stack: Vec<String>,
 }
 
 impl EvaluationContext {
-    pub fn new(symbol_table: SymbolTable) -> EvaluationContext {
+    pub fn new() -> EvaluationContext {
         EvaluationContext {
-            symbol_table,
             bindings: HashMap::new(),
             call_stack: vec![],
         }
     }
+
     pub fn register_bultin(&mut self, kind: &BuiltinExpressionKind) {
         let arguments: Vec<String> = (0..=100).map(|n| n.to_string() + "arg").collect();
         let name = kind.name();
