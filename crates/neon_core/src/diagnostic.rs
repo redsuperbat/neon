@@ -22,13 +22,20 @@ pub struct IncompatibleTypesError {
 }
 
 #[derive(Debug, Clone)]
-pub struct ExpressionNotInvokable {
+pub struct ExpressionNotInvokableError {
     pub loc: Location,
 }
 
 #[derive(Debug, Clone)]
-pub struct InsufficientOverlapment {
+pub struct InsufficientOverlapmentError {
     pub loc: Location,
+}
+
+#[derive(Debug, Clone)]
+pub struct PropertyDoesNotExistError {
+    pub loc: Location,
+    pub access_type: Type,
+    pub key: String,
 }
 
 #[derive(Debug, Clone)]
@@ -36,8 +43,9 @@ pub enum ErrorDiagnostic {
     UnassignableType(UnassignableTypeError),
     UndefinedReference(UndefinedReferenceError),
     IncompatibleTypes(IncompatibleTypesError),
-    ExpressionNotInvokable(ExpressionNotInvokable),
-    InsufficientOverlapment(InsufficientOverlapment),
+    ExpressionNotInvokable(ExpressionNotInvokableError),
+    InsufficientOverlapment(InsufficientOverlapmentError),
+    PropertyDoesNotExist(PropertyDoesNotExistError),
 }
 
 impl ToString for ErrorDiagnostic {
@@ -53,6 +61,7 @@ impl ToString for ErrorDiagnostic {
             ),
             ErrorDiagnostic::ExpressionNotInvokable(_e) => "Expression not invokable".to_string(),
             ErrorDiagnostic::InsufficientOverlapment(_e) => "Binary operation on types seems to be a mistake since none of them overlap sufficiently with each other".to_string(),
+            ErrorDiagnostic::PropertyDoesNotExist(e) => format!("Property {} does not exist on type `{}`", e.key, e.access_type),
         }
     }
 }
@@ -65,6 +74,7 @@ impl ErrorDiagnostic {
             ErrorDiagnostic::IncompatibleTypes(e) => e.loc,
             ErrorDiagnostic::ExpressionNotInvokable(e) => e.loc,
             ErrorDiagnostic::InsufficientOverlapment(e) => e.loc,
+            ErrorDiagnostic::PropertyDoesNotExist(e) => e.loc,
         }
     }
 }

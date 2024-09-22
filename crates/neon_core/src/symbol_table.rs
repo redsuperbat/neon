@@ -219,8 +219,8 @@ impl SymbolTable {
 
     fn visit_let(&mut self, l: &LetBindingNode) {
         let LetBindingNode { right, name, .. } = l;
+        self.visit_expression(right);
         self.scope.declare(name);
-        self.visit_expression(right)
     }
 
     fn visit_binary(&mut self, bin: &BinaryOperationNode) {

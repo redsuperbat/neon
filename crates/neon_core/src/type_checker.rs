@@ -3,8 +3,8 @@ use std::{collections::HashMap, fmt::Display};
 
 use crate::{
     diagnostic::{
-        Diagnostic, DiagnosticsList, ErrorDiagnostic, ExpressionNotInvokable,
-        IncompatibleTypesError, UnassignableTypeError,
+        Diagnostic, DiagnosticsList, ErrorDiagnostic, ExpressionNotInvokableError,
+        IncompatibleTypesError, PropertyDoesNotExistError, UnassignableTypeError,
     },
     location::Location,
     parser::{
@@ -169,10 +169,29 @@ impl TypeChecker {
 
     fn typeof_property_access(
         &mut self,
-        _node: &PropertyAccessNode,
-        _env: &mut TypeEnvironment,
+        node: &PropertyAccessNode,
+        env: &mut TypeEnvironment,
     ) -> Type {
-        Type::Any
+        let access_type = self.typeof_expression(&node.object, env);
+        let error = PropertyDoesNotExistError {
+            loc: node.loc,
+            access_type,
+            key: node.property_name.name.clone(),
+        };
+        let Type::Object(ObjectType { properties }) = self.typeof_expression(&node.object, env)
+        else {
+            return self.add_error_diagnostic(ErrorDiagnostic::PropertyDoesNotExist(error));
+        };
+
+        let prop_type = properties
+            .iter()
+            .find(|p| p.name == node.property_name.name);
+
+        let Some(prop_type) = prop_type else {
+            return self.add_error_diagnostic(ErrorDiagnostic::PropertyDoesNotExist(error));
+        };
+
+        prop_type.value.clone()
     }
 
     fn typeof_array(&mut self, _node: &ArrayNode, _env: &mut TypeEnvironment) -> Type {
@@ -206,7 +225,7 @@ impl TypeChecker {
 
         let Type::Fn(fn_type) = callee else {
             return self.add_error_diagnostic(ErrorDiagnostic::ExpressionNotInvokable(
-                ExpressionNotInvokable {
+                ExpressionNotInvokableError {
                     loc: node.callee.loc(),
                 },
             ));
