@@ -28,7 +28,7 @@ let signal = ignite()  // ⚡ The neon signal is locked in.
 let response = if signal == "⚡ Neon is alive" {
   "💬 Status: ONLINE"  // 🌐 All systems go.
 } else {
-  print("🚨 Malfunction detected!")  // Something's off in the grid.
+  "Status: OFFLINE 🚨"
 }
 
 /**
