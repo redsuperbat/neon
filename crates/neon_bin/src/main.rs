@@ -1,5 +1,4 @@
 use neon_core::{
-    diagnostic::DiagnosticsList,
     interpreter::{Builtin, EvaluationContext, Interpreter, RuntimeError, Value},
     lexer::Lexer,
     parser::{BuiltinExpressionKind, Parser},

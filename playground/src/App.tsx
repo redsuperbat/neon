@@ -124,8 +124,10 @@ function ExecutionPage() {
         { open: "{", close: "}" },
         { open: '"', close: '"' },
         { open: "[", close: "]" },
+        { open: "(", close: ")" },
       ],
     });
+
     monaco.languages.registerHoverProvider("neon", {
       provideHover() {
         return undefined;

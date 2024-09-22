@@ -249,7 +249,7 @@ mod tests {
 
     #[test]
     fn visit_fail() {
-        let code = String::from("fn t() {5}; f()");
+        let code = String::from("fn f(){5} f()");
         let tokens = Lexer::new(code).collect::<Vec<_>>();
         let ast = Parser::new(tokens).parse_program().expect("Should work");
         let mut st = SymbolTable::new();

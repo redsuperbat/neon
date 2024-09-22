@@ -78,10 +78,6 @@ impl SemanticAnalyzer {
         self.peek_at_offset(0)
     }
 
-    fn is_at_end(&self) -> bool {
-        self.peek().is_none()
-    }
-
     fn next_pair_is(&self, tokens: (TokenKind, TokenKind)) -> bool {
         match self.peek() {
             Some(a) => match self.peek_at_offset(1) {

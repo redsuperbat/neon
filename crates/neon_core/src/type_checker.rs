@@ -270,6 +270,7 @@ impl TypeChecker {
     fn typeof_binary(&mut self, node: &BinaryOperationNode, env: &mut TypeEnvironment) -> Type {
         let lhs = self.typeof_expression(&node.left, env);
         let rhs = self.typeof_expression(&node.right, env);
+        self.current_loc = node.left.loc();
         let unification = self.unify(&lhs, &rhs);
 
         match node.operation {

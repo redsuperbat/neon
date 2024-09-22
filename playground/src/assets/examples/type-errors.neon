@@ -6,10 +6,21 @@ print(a)
  *  Neon does not coerce types therefore it's a compilation error if you try to add
  *  an int and a string try to fix this 👇 so the type error goes away.
  */
-let b = 3 + "3"
-print(b)
+let six = 3 + "3"
+print(six)
 
 /**
  * The same goes for other data types
  */
-let a = true + "false"
+let truth = true + "false"
+print(truth)
+
+let bobby = {
+  name: "Bobby b"
+}
+let helen = {
+  age: 32
+}
+
+bobby = helen
+

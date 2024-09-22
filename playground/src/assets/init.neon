@@ -57,7 +57,7 @@ let cyber_entity = {
   location: "Neo Tokyo, Sector 7",
   upgrades: ["🦾 Bionic Arm", "🧠 Neural Link"],
   status: fn check_status() {
-    "💡 " + cyber_entity.name + " is fully operational."
+    "💡: is fully operational."
   }
 }
 
