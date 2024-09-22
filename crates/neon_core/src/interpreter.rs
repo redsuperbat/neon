@@ -8,7 +8,7 @@ use crate::{
     parser::{
         ArrayNode, AssignmentNode, BinaryOp, BinaryOperationNode, BlockNode, BuiltinExpressionKind,
         BuiltinNode, Expression, FnNode, ForLoopNode, ForLoopTarget, IdentifierNode, IfNode,
-        IndexAccessNode, IntNode, InvocationNode, LetBinding, ObjectNode, PropertyAccessNode,
+        IndexAccessNode, IntNode, InvocationNode, LetBindingNode, ObjectNode, PropertyAccessNode,
     },
     symbol_table::SymbolTable,
 };
@@ -704,10 +704,10 @@ impl Interpreter {
 
     fn evaluate_let(
         &self,
-        let_bind: &LetBinding,
+        let_bind: &LetBindingNode,
         ctx: &mut EvaluationContext,
     ) -> Result<Value, RuntimeError> {
-        let LetBinding { name, right, .. } = let_bind;
+        let LetBindingNode { name, right, .. } = let_bind;
         let value = self.evaluate_expression(right, ctx)?;
         ctx.bindings.insert(name.to_string(), value);
         Ok(Value::Unit)

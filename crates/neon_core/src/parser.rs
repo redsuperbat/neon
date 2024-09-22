@@ -68,7 +68,7 @@ pub struct InvocationNode {
 }
 
 #[derive(Debug, Clone)]
-pub struct LetBinding {
+pub struct LetBindingNode {
     pub loc: Location,
     pub name: String,
     pub right: Box<Expression>,
@@ -196,7 +196,7 @@ pub enum Expression {
     IndexAccess(IndexAccessNode),
     Int(IntNode),
     Invocation(InvocationNode),
-    LetBinding(LetBinding),
+    LetBinding(LetBindingNode),
     Object(ObjectNode),
     PropertyAccess(PropertyAccessNode),
     String(StringNode),
@@ -830,7 +830,7 @@ impl Parser {
         self.assert_next(TokenKind::Equals)?;
         let right = self.parse_expression()?.boxed();
 
-        Ok(Expression::LetBinding(LetBinding {
+        Ok(Expression::LetBinding(LetBindingNode {
             name: lexeme,
             right,
             loc: Location::new(start, end),

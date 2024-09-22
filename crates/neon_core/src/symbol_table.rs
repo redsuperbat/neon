@@ -3,7 +3,7 @@ use crate::{
     parser::{
         ArrayNode, AssignmentNode, BinaryOperationNode, BlockNode, BuiltinExpressionKind,
         Expression, FnNode, ForLoopNode, ForLoopTarget, IdentifierNode, IfNode, IndexAccessNode,
-        InvocationNode, LetBinding, ObjectNode,
+        InvocationNode, LetBindingNode, ObjectNode,
     },
 };
 use std::{collections::HashSet, mem};
@@ -26,16 +26,17 @@ impl Scope {
         self.declarations.insert(id.to_string());
     }
 
-    pub fn has_identifier(&self, id: &str) -> Option<String> {
+    pub fn has_identifier(&self, identifier: &IdentifierNode) -> bool {
+        let id = &identifier.name;
         if self.declarations.contains(id) {
-            return Some(id.to_string());
+            return true;
         }
 
         if let Some(parent) = &self.parent {
-            return parent.has_identifier(id);
+            return parent.has_identifier(identifier);
         }
 
-        return None;
+        false
     }
 }
 
@@ -107,7 +108,7 @@ impl SymbolTable {
     }
 
     fn visit_assignment(&mut self, node: &AssignmentNode) -> Result<(), SymbolError> {
-        self.scope.declare(&node.identifier.name);
+        self.visit_identifier(&node.identifier)?;
         self.visit_expression(&node.right)
     }
 
@@ -228,17 +229,18 @@ impl SymbolTable {
     }
 
     fn visit_identifier(&mut self, identifier: &IdentifierNode) -> Result<(), SymbolError> {
-        self.scope
-            .has_identifier(&identifier.name)
-            .map(|_| ())
-            .ok_or(SymbolError {
+        if self.scope.has_identifier(&identifier) {
+            Ok(())
+        } else {
+            Err(SymbolError {
                 kind: SymbolErrorKind::UndefinedReference(identifier.name.to_string()),
                 loc: identifier.loc,
             })
+        }
     }
 
-    fn visit_let(&mut self, l: &LetBinding) -> Result<(), SymbolError> {
-        let LetBinding { right, name, .. } = l;
+    fn visit_let(&mut self, l: &LetBindingNode) -> Result<(), SymbolError> {
+        let LetBindingNode { right, name, .. } = l;
         self.scope.declare(name);
         self.visit_expression(right)
     }
