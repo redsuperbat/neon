@@ -1,7 +1,7 @@
-use lua_compiler::LuaCompiler;
 use neon_core::{
     interpreter::{Builtin, EvaluationContext, Interpreter, RuntimeError, Value},
     lexer::Lexer,
+    lua_compiler::LuaCompiler,
     parser::{BuiltinExpressionKind, Parser},
     symbol_table::SymbolTable,
     type_checker::{TypeChecker, TypeEnvironment},
@@ -10,7 +10,6 @@ use std::{
     fs,
     io::{self, BufRead, Write},
 };
-mod lua_compiler;
 
 use clap::{Parser as ClapParser, Subcommand, ValueEnum};
 

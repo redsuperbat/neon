@@ -1,4 +1,4 @@
-use neon_core::parser::{
+use crate::parser::{
     ArrayNode, AssignmentNode, BinaryOp, BinaryOperationNode, BlockNode, Expression, FnNode,
     IfNode, InvocationNode, LetBindingNode,
 };
@@ -22,9 +22,10 @@ impl LuaCompiler {
             Expression::Fn(node) => self.compile_fn(node),
             Expression::If(node) => self.compile_if(node),
 
+            Expression::ForLoop(node) => todo!("{:?}", node),
+
             Expression::Builtin(node) => todo!("{:?}", node),
             Expression::Else(node) => todo!("{:?}", node),
-            Expression::ForLoop(node) => todo!("{:?}", node),
             Expression::Object(node) => todo!("{:?}", node),
             Expression::PropertyAccess(node) => todo!("{:?}", node),
             Expression::IndexAccess(node) => todo!("{:?}", node),
@@ -133,7 +134,7 @@ impl LuaCompiler {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use neon_core::{lexer::Lexer, parser::Parser};
+    use crate::{lexer::Lexer, parser::Parser};
 
     #[test]
     fn compile_lua() {
