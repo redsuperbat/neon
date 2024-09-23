@@ -1,3 +1,12 @@
+/**
+ * Neon has a type system for working with data types
+ * to declare a type write it after a variable declaration
+ */
+
+let a string
+
+
+
 /* Works fine */
 let a = 3 + 3
 print(a)
@@ -12,12 +21,13 @@ print(six)
 /**
  * The same goes for other data types
  */
-let truth = true + "false"
+let truth = true == "false"
 print(truth)
 
-let bobby = {
+let bobby { name: string } = {
   name: "Bobby b"
 }
+
 let helen = {
   age: 32
 }

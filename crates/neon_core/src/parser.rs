@@ -58,6 +58,7 @@ pub struct FnNode {
     pub identifier: IdentifierNode,
     pub parameters: Vec<TypedIdentifierNode>,
     pub body: Box<Expression>,
+    pub return_type: Option<TypeExpression>,
 }
 
 #[derive(Debug, Clone)]
@@ -78,7 +79,7 @@ pub struct InvocationNode {
 pub struct LetBindingNode {
     pub loc: Location,
     pub binding: TypedIdentifierNode,
-    pub right: Box<Expression>,
+    pub right: Box<Option<Expression>>,
 }
 
 #[derive(Debug, Clone)]
@@ -581,6 +582,8 @@ impl Parser {
     }
 
     fn parse_type_expression(&mut self) -> Result<TypeExpression, SyntaxError> {
+        self.assert_next(TokenKind::Colon)?;
+
         let mut type_exp = self.parse_leaf_type_expression()?;
 
         loop {
@@ -737,7 +740,7 @@ impl Parser {
         let next = self.peek();
 
         let Some(next) = next else {
-            return Ok(self.empty());
+            return Err(self.eof());
         };
 
         match next.kind {
@@ -804,10 +807,8 @@ impl Parser {
     fn parse_typed_identifier_node(&mut self) -> Result<TypedIdentifierNode, SyntaxError> {
         let identifier = self.parse_identifier_node()?;
 
-        let mut typed = None;
-        if self.next_is(TokenKind::Symbol) || self.next_is(TokenKind::OpenCurlyBrace) {
-            typed = Some(self.parse_type_expression()?);
-        };
+        let typed = self.parse_type_expression().ok();
+
         let end = typed
             .as_ref()
             .map(|t| t.loc().end)
@@ -928,16 +929,12 @@ impl Parser {
         let predicate = self.parse_expression()?;
 
         let consequent = self.parse_block()?;
-        let mut alternate = None;
-        let mut end = None;
+        let alternate = self.parse_else().ok();
 
-        if self.next_is(TokenKind::ElseKeyword) {
-            let else_node = self.parse_else()?;
-            end = Some((&else_node).loc().end);
-            alternate = Some(else_node);
-        }
-
-        let end = end.unwrap_or(consequent.loc().end);
+        let end = alternate
+            .as_ref()
+            .map(|a| a.loc().end)
+            .unwrap_or(consequent.loc().end);
 
         Ok(Expression::If(IfNode {
             loc: Location::new(start, end),
@@ -950,13 +947,7 @@ impl Parser {
     fn parse_else(&mut self) -> Result<Expression, SyntaxError> {
         let Token { start, .. } = self.assert_next(TokenKind::ElseKeyword)?;
 
-        let consequent;
-
-        if self.next_is(TokenKind::IfKeyword) {
-            consequent = self.parse_if()?;
-        } else {
-            consequent = self.parse_block()?;
-        }
+        let consequent = self.parse_if().ok().unwrap_or(self.parse_block()?);
 
         Ok(Expression::Else(ElseNode {
             loc: Location::new(start, consequent.loc().end),
@@ -1002,13 +993,18 @@ impl Parser {
     fn parse_let(&mut self) -> Result<Expression, SyntaxError> {
         let Token { start, .. } = self.assert_next(TokenKind::LetKeyword)?;
         let name = self.parse_typed_identifier_node()?;
-        self.assert_next(TokenKind::Equals)?;
-        let right = self.parse_expression()?.boxed();
+        let mut right = None;
+        if self.next_is(TokenKind::Equals) {
+            self.assert_next(TokenKind::Equals)?;
+            right = Some(self.parse_expression()?);
+        };
+
+        let end = right.as_ref().map(|r| r.loc().end).unwrap_or(name.loc.end);
 
         Ok(Expression::LetBinding(LetBindingNode {
             binding: name,
-            loc: Location::new(start, (&right).loc().end),
-            right,
+            loc: Location::new(start, end),
+            right: Box::new(right),
         }))
     }
 
@@ -1038,10 +1034,12 @@ impl Parser {
         let Token { start, .. } = self.assert_next(TokenKind::FnKeyword)?;
         let name = self.parse_identifier_node()?;
         let parameters = self.parse_parameters()?;
+        let return_type = self.parse_type_expression().ok();
 
         let block = self.parse_block()?;
 
         Ok(Expression::Fn(FnNode {
+            return_type,
             loc: Location::new(start, block.loc().end),
             identifier: name,
             parameters,

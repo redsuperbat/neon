@@ -79,8 +79,10 @@ impl LuaCompiler {
     fn compile_let_binding(&self, node: &LetBindingNode) -> String {
         let mut str = String::from("local ");
         str += &node.binding.identifier.name;
-        str += "=";
-        str += &self.compile_expression(&node.right);
+        if let Some(right) = &node.right.as_ref() {
+            str += "=";
+            str += &self.compile_expression(right);
+        };
         str
     }
 

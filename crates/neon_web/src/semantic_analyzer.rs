@@ -22,6 +22,7 @@ pub enum SemanticTokenKind {
     Int,
     Keyword,
     Operator,
+    PrimitiveType,
     Builtin,
 }
 
@@ -38,6 +39,7 @@ impl ToString for SemanticTokenKind {
             SemanticTokenKind::Keyword => "keyword",
             SemanticTokenKind::Operator => "operator",
             SemanticTokenKind::Builtin => "builtin",
+            SemanticTokenKind::PrimitiveType => "primitive",
         };
         str.to_string()
     }
@@ -126,6 +128,8 @@ impl SemanticAnalyzer {
             | TokenKind::IfKeyword
             | TokenKind::ElseKeyword
             | TokenKind::ForKeyword
+            | TokenKind::WhileKeyword
+            | TokenKind::LoopKeyword
             | TokenKind::InKeyword => self.single(SemanticTokenKind::Keyword),
 
             TokenKind::Ampersand
@@ -200,7 +204,10 @@ impl SemanticAnalyzer {
         let is_fn = self.is_at_offset(1, TokenKind::OpenParen);
 
         if !is_fn {
-            return self.single(SemanticTokenKind::VariableName);
+            return match symbol.lexeme.as_str() {
+                "int" | "string" | "bool" => self.single(SemanticTokenKind::PrimitiveType),
+                _ => self.single(SemanticTokenKind::VariableName),
+            };
         }
 
         match symbol.lexeme.as_str() {

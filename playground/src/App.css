@@ -1,5 +1,5 @@
 :root {
-  --fn-color: #9cbacf;
+  --fn-color: #80aacf;
   --variable-color: #d4c79a;
   --bool-color: orange;
   --int-color: darkorange;
@@ -8,6 +8,7 @@
   --string-color: #9fcca5;
   --keyword-color: #b599b5;
   --builtin-color: #c97c7c;
+  --primitive-color: #add8e6;
 }
 
 .fn-name,
@@ -66,4 +67,8 @@
 
 .debug {
   background: red !important;
+}
+
+.primitive {
+  color: var(--primitive-color) !important;
 }

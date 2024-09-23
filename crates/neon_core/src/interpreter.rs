@@ -228,6 +228,7 @@ impl EvaluationContext {
             .collect();
         let name = kind.name();
         let function_expression = FnNode {
+            return_type: None,
             loc: Location::beginning(),
             identifier: IdentifierNode {
                 name: name.clone(),
@@ -721,7 +722,13 @@ impl Interpreter {
         ctx: &mut EvaluationContext,
     ) -> Result<Value, RuntimeError> {
         let LetBindingNode { binding, right, .. } = let_bind;
-        let value = self.evaluate_expression(right, ctx)?;
+
+        let value = if let Some(right) = right.as_ref() {
+            self.evaluate_expression(right, ctx)?
+        } else {
+            Value::Unit
+        };
+
         ctx.bindings
             .insert(binding.identifier.name.to_string(), value);
         Ok(Value::Unit)

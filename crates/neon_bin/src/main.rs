@@ -103,6 +103,8 @@ fn repl() {
             .diagnostics_list
             .merge(&mut ts.diagnostics_list);
 
+        symbol_table.diagnostics_list.clear();
+
         if dl.has_errors() {
             dl.diagnostics.iter().for_each(|d| println!("{}", d));
             print("> ");

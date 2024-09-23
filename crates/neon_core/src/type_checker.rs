@@ -190,10 +190,11 @@ impl TypeChecker {
     ) -> Type {
         let access_type = self.typeof_expression(&node.object, env);
         let error = PropertyDoesNotExistError {
-            loc: node.loc,
             access_type,
+            loc: node.property_name.loc,
             key: node.property_name.name.clone(),
         };
+
         let Type::Object(ObjectType { properties }) = self.typeof_expression(&node.object, env)
         else {
             return self.add_error_diagnostic(ErrorDiagnostic::PropertyDoesNotExist(error));
@@ -252,7 +253,17 @@ impl TypeChecker {
                 .insert(param.identifier.name.clone(), param_type.clone());
             parameters.push(param_type);
         }
-        let return_type = self.typeof_expression(&node.body, env);
+
+        let inferred_return_type = self.typeof_expression(&node.body, env);
+
+        let return_type = if let Some(return_type) = node.return_type.as_ref() {
+            let return_type = self.typeof_type_expression(return_type, env);
+            self.unify(&return_type, &inferred_return_type);
+            return_type
+        } else {
+            inferred_return_type
+        };
+
         let fn_type = Type::Fn(FnType {
             parameters,
             return_type: Box::new(return_type),
@@ -329,15 +340,21 @@ impl TypeChecker {
     }
 
     fn typeof_let_binding(&mut self, node: &LetBindingNode, env: &mut TypeEnvironment) -> Type {
-        let rhs = self.typeof_expression(&node.right, env);
-        if let Some(type_exp) = &node.binding.typed {
-            let lhs = self.typeof_type_expression(&type_exp, env);
-            env.bindings
-                .insert(node.binding.identifier.name.clone(), self.unify(&lhs, &rhs));
+        let rhs = if let Some(right) = &node.right.as_ref() {
+            self.typeof_expression(right, env)
         } else {
-            env.bindings
-                .insert(node.binding.identifier.name.clone(), rhs);
-        }
+            Type::Unit
+        };
+
+        let t = if let Some(type_exp) = &node.binding.typed {
+            let lhs = self.typeof_type_expression(&type_exp, env);
+            self.unify(&lhs, &rhs);
+            lhs
+        } else {
+            rhs
+        };
+
+        env.bindings.insert(node.binding.identifier.name.clone(), t);
         Type::Unit
     }
 
@@ -358,7 +375,10 @@ impl TypeChecker {
         let rhs = self.typeof_expression(&node.right, env);
         // We do this to make the error appear on the left part of the assignment
         self.current_loc = node.identifier.loc;
-        self.unify(&lhs, &rhs);
+        let t = self.unify(&lhs, &rhs);
+        if t != Type::Never {
+            env.bindings.insert(node.identifier.to_string(), t);
+        }
         Type::Unit
     }
 
@@ -413,6 +433,11 @@ impl TypeChecker {
             return Type::Any;
         }
 
+        // If left hand side is unit type it turns into the right hand side
+        if *lhs == Type::Unit {
+            return rhs.clone();
+        }
+
         match &lhs {
             Type::Int => match &rhs {
                 Type::Int => Type::Int,
@@ -453,7 +478,10 @@ impl TypeChecker {
                         let Some(b_prop) = b_prop else {
                             return self.type_error(lhs, rhs);
                         };
-                        self.unify(value, &b_prop.value);
+
+                        if Type::Never == self.unify(value, &b_prop.value) {
+                            return self.type_error(lhs, rhs);
+                        };
                     }
 
                     lhs.clone()

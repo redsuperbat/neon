@@ -38,6 +38,8 @@ pub enum TokenKind {
     InKeyword,    // in
     LetKeyword,   // let
     TrueKeyword,  // true
+    LoopKeyword,  // loop
+    WhileKeyword, // while
 
     Bang,   // !
     Equals, // =
@@ -85,6 +87,8 @@ impl ToString for TokenKind {
             TokenKind::FalseKeyword => "false",
             TokenKind::ForKeyword => "for",
             TokenKind::InKeyword => "in",
+            TokenKind::LoopKeyword => "loop",
+            TokenKind::WhileKeyword => "while",
 
             TokenKind::OpenAngleBracket => "<",
             TokenKind::ClosedAngleBracket => ">",
@@ -297,6 +301,8 @@ impl Lexer {
             "false" => TokenKind::FalseKeyword,
             "for" => TokenKind::ForKeyword,
             "in" => TokenKind::InKeyword,
+            "loop" => TokenKind::LoopKeyword,
+            "while" => TokenKind::WhileKeyword,
 
             _ => TokenKind::Symbol,
         };

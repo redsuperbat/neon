@@ -220,7 +220,9 @@ impl SymbolTable {
 
     fn visit_let(&mut self, l: &LetBindingNode) {
         let LetBindingNode { right, binding, .. } = l;
-        self.visit_expression(right);
+        if let Some(right) = right.as_ref() {
+            self.visit_expression(right);
+        };
         self.scope.declare(&binding.identifier.name);
     }
 
