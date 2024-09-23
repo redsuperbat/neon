@@ -61,7 +61,7 @@ fn compile_program(src: &str) -> Result<Expression, CompilationDiagnostics> {
         .parse_program()
         .map_err(|e| CompilationDiagnostics {
             errors: vec![CompilationDiagnostic {
-                loc: Location::new(e.start, e.end).into(),
+                loc: e.loc.into(),
                 message: e.kind.to_string(),
             }],
         })?;

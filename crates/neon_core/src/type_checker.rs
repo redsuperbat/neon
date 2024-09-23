@@ -4,7 +4,7 @@ use crate::{
         IncompatibleTypesError, InvalidIndexAccessError, PropertyDoesNotExistError,
         UnassignableTypeError,
     },
-    location::Location,
+    location::{Location, WithLocation},
     parser::{
         ArrayNode, AssignmentNode, BinaryOp, BinaryOperationNode, BlockNode, BuiltinExpressionKind,
         BuiltinNode, ElseNode, Expression, FnNode, ForLoopNode, IdentifierNode, IfNode,
@@ -242,7 +242,8 @@ impl TypeChecker {
         let mut parameters = vec![];
         for param in &node.parameters {
             let param_type = Type::Any;
-            env.bindings.insert(param.name.clone(), param_type.clone());
+            env.bindings
+                .insert(param.identifier.name.clone(), param_type.clone());
             parameters.push(param_type);
         }
         let return_type = self.typeof_expression(&node.body, env);
@@ -250,7 +251,8 @@ impl TypeChecker {
             parameters,
             return_type: Box::new(return_type),
         });
-        env.bindings.insert(node.name.clone(), fn_type.clone());
+        env.bindings
+            .insert(node.identifier.name.clone(), fn_type.clone());
         fn_type
     }
 
@@ -300,7 +302,8 @@ impl TypeChecker {
 
     fn typeof_let_binding(&mut self, node: &LetBindingNode, env: &mut TypeEnvironment) -> Type {
         let rhs = self.typeof_expression(&node.right, env);
-        env.bindings.insert(node.name.clone(), rhs);
+        env.bindings
+            .insert(node.binding.identifier.name.clone(), rhs);
         Type::Unit
     }
 
@@ -309,7 +312,7 @@ impl TypeChecker {
             .properties
             .iter()
             .map(|n| PropertyType {
-                name: n.identifier.name.clone(),
+                name: n.name.value.clone(),
                 value: self.typeof_expression(&n.value, env),
             })
             .collect::<Vec<_>>();
@@ -391,6 +394,21 @@ impl TypeChecker {
             },
             Type::Unit => match &rhs {
                 Type::Unit => Type::Unit,
+                _ => self.type_error(lhs, rhs),
+            },
+            Type::Fn(a) => match &rhs {
+                Type::Fn(b) => {
+                    a.parameters
+                        .iter()
+                        .zip(b.parameters.iter())
+                        .for_each(|(a, b)| {
+                            self.unify(a, b);
+                        });
+
+                    self.unify(&a.return_type, &b.return_type);
+
+                    lhs.clone()
+                }
                 _ => self.type_error(lhs, rhs),
             },
             Type::Object(a) => match &rhs {

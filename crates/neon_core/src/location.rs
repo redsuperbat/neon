@@ -27,6 +27,10 @@ pub struct Location {
     pub end: Pos,
 }
 
+pub trait WithLocation {
+    fn loc(&self) -> Location;
+}
+
 impl Into<Location> for &Location {
     fn into(self) -> Location {
         *self

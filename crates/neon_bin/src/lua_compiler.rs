@@ -47,13 +47,13 @@ impl LuaCompiler {
 
     fn compile_fn(&self, node: &FnNode) -> String {
         let mut fn_str = String::from("local function ");
-        fn_str += &node.name;
+        fn_str += &node.identifier.name;
         fn_str += "(";
         for (i, param) in node.parameters.iter().enumerate() {
             if i != 0 {
                 fn_str += ","
             }
-            fn_str += &param.name;
+            fn_str += &param.identifier.name;
         }
         fn_str += ")\n";
         fn_str += &self.compile_expression(&node.body);
@@ -77,7 +77,7 @@ impl LuaCompiler {
 
     fn compile_let_binding(&self, node: &LetBindingNode) -> String {
         let mut str = String::from("local ");
-        str += &node.name;
+        str += &node.binding.identifier.name;
         str += "=";
         str += &self.compile_expression(&node.right);
         str

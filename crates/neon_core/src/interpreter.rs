@@ -4,11 +4,12 @@ use std::{
 };
 
 use crate::{
-    location::Location,
+    location::{Location, WithLocation},
     parser::{
         ArrayNode, AssignmentNode, BinaryOp, BinaryOperationNode, BlockNode, BuiltinExpressionKind,
         BuiltinNode, Expression, FnNode, ForLoopNode, ForLoopTarget, IdentifierNode, IfNode,
         IndexAccessNode, IntNode, InvocationNode, LetBindingNode, ObjectNode, PropertyAccessNode,
+        TypedIdentifierNode,
     },
 };
 
@@ -127,7 +128,7 @@ impl Display for Value {
             Value::Int(value) => write!(f, "{}", value),
             Value::Bool(value) => write!(f, "{}", value),
             Value::Fn(function) => {
-                write!(f, "Function: {}", function.name)
+                write!(f, "Function: {}", function.identifier.name)
             }
             Value::Unit => write!(f, "Unit"),
             Value::String(value) => write!(f, "\"{}\"", value),
@@ -216,15 +217,22 @@ impl EvaluationContext {
 
     pub fn register_bultin(&mut self, kind: &BuiltinExpressionKind) {
         let arguments: Vec<_> = (0..=100)
-            .map(|n| IdentifierNode {
+            .map(|n| TypedIdentifierNode {
                 loc: Location::beginning(),
-                name: n.to_string(),
+                identifier: IdentifierNode {
+                    name: n.to_string(),
+                    loc: Location::beginning(),
+                },
+                typed: None,
             })
             .collect();
         let name = kind.name();
         let function_expression = FnNode {
             loc: Location::beginning(),
-            name: name.clone(),
+            identifier: IdentifierNode {
+                name: name.clone(),
+                loc: Location::beginning(),
+            },
             parameters: arguments.clone(),
             body: Expression::Builtin(BuiltinNode {
                 loc: Location::beginning(),
@@ -325,7 +333,7 @@ impl Interpreter {
 
         for p in &obj.properties {
             let value = self.evaluate_expression(p.value.as_ref(), ctx)?;
-            map.insert(p.identifier.name.clone(), value);
+            map.insert(p.name.value.clone(), value);
         }
 
         Ok(Value::Object(Object(map)))
@@ -488,7 +496,7 @@ impl Interpreter {
         } = node;
         let values = arguments
             .iter()
-            .map(|a| ctx.bindings.get(&a.name))
+            .map(|a| ctx.bindings.get(&a.identifier.name))
             .filter_map(|a| a)
             .collect::<Vec<&Value>>();
         let builtin = self.builtins.get(kind).expect("Internal neon error");
@@ -647,7 +655,7 @@ impl Interpreter {
 
     fn evaluate_fn(&self, f: &FnNode, ctx: &mut EvaluationContext) -> Result<Value, RuntimeError> {
         let value = Value::Fn(f.clone());
-        ctx.bindings.insert(f.name.to_string(), value.clone());
+        ctx.bindings.insert(f.identifier.to_string(), value.clone());
         Ok(value)
     }
 
@@ -666,7 +674,7 @@ impl Interpreter {
         };
 
         let FnNode {
-            name,
+            identifier: name,
             parameters,
             body,
             ..
@@ -678,7 +686,7 @@ impl Interpreter {
             .collect::<Result<Vec<Value>, RuntimeError>>()?;
 
         let mut func_ctx = ctx.clone();
-        func_ctx.call_stack.push(name);
+        func_ctx.call_stack.push(name.name);
 
         parameters
             .iter()
@@ -686,7 +694,7 @@ impl Interpreter {
             .for_each(|(param, argument)| {
                 func_ctx
                     .bindings
-                    .insert(param.name.clone(), argument.clone());
+                    .insert(param.identifier.name.clone(), argument.clone());
             });
 
         let result = self.evaluate_expression(&body, &mut func_ctx);
@@ -712,9 +720,10 @@ impl Interpreter {
         let_bind: &LetBindingNode,
         ctx: &mut EvaluationContext,
     ) -> Result<Value, RuntimeError> {
-        let LetBindingNode { name, right, .. } = let_bind;
+        let LetBindingNode { binding, right, .. } = let_bind;
         let value = self.evaluate_expression(right, ctx)?;
-        ctx.bindings.insert(name.to_string(), value);
+        ctx.bindings
+            .insert(binding.identifier.name.to_string(), value);
         Ok(Value::Unit)
     }
 

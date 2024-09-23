@@ -173,13 +173,14 @@ impl SymbolTable {
 
     fn visit_fn(&mut self, exp: &FnNode) {
         let FnNode {
-            name,
+            identifier,
             parameters,
             body,
             ..
         } = exp;
-        self.scope.declare(name);
-        self.enter_scope(parameters);
+        self.scope.declare(&identifier.name);
+        let identifiers = parameters.iter().map(|t| t.identifier.clone()).collect();
+        self.enter_scope(&identifiers);
         self.visit_expression(body);
         self.exit_scope();
     }
@@ -218,9 +219,9 @@ impl SymbolTable {
     }
 
     fn visit_let(&mut self, l: &LetBindingNode) {
-        let LetBindingNode { right, name, .. } = l;
+        let LetBindingNode { right, binding, .. } = l;
         self.visit_expression(right);
-        self.scope.declare(name);
+        self.scope.declare(&binding.identifier.name);
     }
 
     fn visit_binary(&mut self, bin: &BinaryOperationNode) {

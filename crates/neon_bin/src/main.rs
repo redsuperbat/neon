@@ -14,7 +14,7 @@ mod lua_compiler;
 
 use clap::{Parser as ClapParser, Subcommand, ValueEnum};
 
-/// Simple program to greet a person
+/// Neon CLI
 #[derive(ClapParser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {
@@ -27,7 +27,7 @@ struct Args {
 
 #[derive(Subcommand, Debug)]
 enum Commands {
-    /// Compiles the neon code
+    /// Compiles neon code to specified target
     Compile {
         /// Path to neon file to compile
         path: String,
