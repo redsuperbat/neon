@@ -638,6 +638,12 @@ impl Parser {
                 name,
                 property_type: Box::new(property_type),
             });
+
+            if self.next_is(TokenKind::Comma) {
+                self.next()?;
+            } else {
+                break;
+            }
         }
 
         let Token { end, .. } = self.assert_next(TokenKind::ClosedCurlyBrace)?;

@@ -61,16 +61,16 @@ impl ToString for ErrorDiagnostic {
     fn to_string(&self) -> String {
         match self {
             ErrorDiagnostic::UnassignableType(e) => {
-                format!("Type {} is not assignable to type {}", e.rhs, e.lhs)
+                format!("Type `{}` is not assignable to type `{}`", e.rhs, e.lhs)
             }
-            ErrorDiagnostic::UndefinedReference(e) => format!("Undefined reference '{}'", e.name),
+            ErrorDiagnostic::UndefinedReference(e) => format!("Undefined reference `{}`", e.name),
             ErrorDiagnostic::IncompatibleTypes(e) => format!(
                 "If expression has incompatible arms, expected `{}` found `{}`",
                 e.consequent, e.alternate
             ),
             ErrorDiagnostic::ExpressionNotInvokable(e) => format!("Expression with type `{}` not invokable", e.callee_type),
             ErrorDiagnostic::InsufficientOverlapment(_e) => "Binary operation on types seems to be a mistake since none of them overlap sufficiently with each other".to_string(),
-            ErrorDiagnostic::PropertyDoesNotExist(e) => format!("Property {} does not exist on type `{}`", e.key, e.access_type),
+            ErrorDiagnostic::PropertyDoesNotExist(e) => format!("Property `{}` does not exist on type `{}`", e.key, e.access_type),
             ErrorDiagnostic::InvalidIndexAccess(e) =>format!("Expression of type `{}` can't be used to index type `{}`.", e.index_type, e.indexee_type)
         }
     }

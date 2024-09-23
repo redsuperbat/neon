@@ -9,6 +9,7 @@ use crate::{
         ArrayNode, AssignmentNode, BinaryOp, BinaryOperationNode, BlockNode, BuiltinExpressionKind,
         BuiltinNode, ElseNode, Expression, FnNode, ForLoopNode, IdentifierNode, IfNode,
         IndexAccessNode, InvocationNode, LetBindingNode, ObjectNode, PropertyAccessNode,
+        TypeExpression,
     },
 };
 use std::{collections::HashMap, fmt::Display};
@@ -241,7 +242,12 @@ impl TypeChecker {
     fn typeof_fn(&mut self, node: &FnNode, env: &mut TypeEnvironment) -> Type {
         let mut parameters = vec![];
         for param in &node.parameters {
-            let param_type = Type::Any;
+            let param_type = param
+                .typed
+                .as_ref()
+                .map(|t| self.typeof_type_expression(&t, env))
+                .unwrap_or(Type::Any);
+
             env.bindings
                 .insert(param.identifier.name.clone(), param_type.clone());
             parameters.push(param_type);
@@ -300,10 +306,38 @@ impl TypeChecker {
         self.typeof_expression(&node.return_val, env)
     }
 
+    fn typeof_type_expression(&mut self, node: &TypeExpression, env: &mut TypeEnvironment) -> Type {
+        match node {
+            TypeExpression::Int(..) => Type::Int,
+            TypeExpression::String(..) => Type::String,
+            TypeExpression::Bool(..) => Type::Bool,
+            TypeExpression::Array(node) => Type::Array(ArrayType {
+                elements: Box::new(self.typeof_type_expression(&node.elements, env)),
+            }),
+            TypeExpression::Object(node) => Type::Object(ObjectType {
+                properties: node
+                    .properties
+                    .iter()
+                    .map(|p| PropertyType {
+                        name: p.name.value.clone(),
+                        value: self.typeof_type_expression(&p.property_type, env),
+                    })
+                    .collect(),
+            }),
+            TypeExpression::Identifier(node) => todo!("{:?}", node),
+        }
+    }
+
     fn typeof_let_binding(&mut self, node: &LetBindingNode, env: &mut TypeEnvironment) -> Type {
         let rhs = self.typeof_expression(&node.right, env);
-        env.bindings
-            .insert(node.binding.identifier.name.clone(), rhs);
+        if let Some(type_exp) = &node.binding.typed {
+            let lhs = self.typeof_type_expression(&type_exp, env);
+            env.bindings
+                .insert(node.binding.identifier.name.clone(), self.unify(&lhs, &rhs));
+        } else {
+            env.bindings
+                .insert(node.binding.identifier.name.clone(), rhs);
+        }
         Type::Unit
     }
 
@@ -398,14 +432,15 @@ impl TypeChecker {
             },
             Type::Fn(a) => match &rhs {
                 Type::Fn(b) => {
-                    a.parameters
-                        .iter()
-                        .zip(b.parameters.iter())
-                        .for_each(|(a, b)| {
-                            self.unify(a, b);
-                        });
+                    for (a, b) in a.parameters.iter().zip(b.parameters.iter()) {
+                        if self.unify(a, b) == Type::Never {
+                            return self.type_error(lhs, rhs);
+                        }
+                    }
 
-                    self.unify(&a.return_type, &b.return_type);
+                    if self.unify(&a.return_type, &b.return_type) == Type::Never {
+                        return self.type_error(lhs, rhs);
+                    }
 
                     lhs.clone()
                 }
