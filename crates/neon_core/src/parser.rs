@@ -769,8 +769,16 @@ impl Parser {
             }
 
             let name = self.parse_property_name_node()?;
-            self.assert_next(TokenKind::Colon)?;
-            let value = self.parse_expression()?;
+            let value = if self.next_is(TokenKind::Colon) {
+                self.assert_next(TokenKind::Colon)?;
+                self.parse_expression()?
+            } else {
+                Expression::Identifier(IdentifierNode {
+                    name: name.value.clone(),
+                    loc: name.loc,
+                })
+            };
+
             properties.push(PropertyNode {
                 loc: Location::new(name.loc.start, value.loc().end),
                 name,

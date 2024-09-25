@@ -36,4 +36,5 @@ Everything is made from scratch, the neon_core library has no dependencies and t
 - [ ] Async runtime
 - [ ] IO std lib
 - [ ] String interpolation
-- [ ] Type syntax for functions
+- [ ] Object property assignment
+- [x] Type syntax for functions

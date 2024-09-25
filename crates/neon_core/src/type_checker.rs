@@ -251,8 +251,6 @@ impl TypeChecker {
 
         let inferred_return_type = self.typeof_expression(&node.body, env);
 
-        println!("lhs: {} rhs: {}", return_type, inferred_return_type);
-
         self.unify(&return_type, &inferred_return_type);
 
         fn_type
@@ -406,11 +404,11 @@ impl TypeChecker {
         self.current_loc = node.predicate.loc();
         self.unify(&Type::Bool, &predicate);
 
+        let consequent = self.typeof_expression(&node.consequent, env);
+
         let Some(alternate) = node.alternate.as_ref() else {
             return Type::Unit;
         };
-
-        let consequent = self.typeof_expression(&node.consequent, env);
         let alternate = self.typeof_expression(&alternate, env);
 
         if consequent != alternate {
