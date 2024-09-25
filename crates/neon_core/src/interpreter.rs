@@ -9,7 +9,6 @@ use crate::{
         ArrayNode, AssignmentNode, BinaryOp, BinaryOperationNode, BlockNode, BuiltinExpressionKind,
         BuiltinNode, Expression, FnNode, ForLoopNode, ForLoopTarget, IdentifierNode, IfNode,
         IndexAccessNode, IntNode, InvocationNode, LetBindingNode, ObjectNode, PropertyAccessNode,
-        TypedIdentifierNode,
     },
 };
 
@@ -117,6 +116,7 @@ pub enum Value {
     String(String),
     Bool(bool),
     Fn(FnNode),
+    Builtin(BuiltinNode),
     Array(Array),
     Unit,
     Object(Object),
@@ -138,6 +138,7 @@ impl Display for Value {
             Value::Array(arr) => {
                 write!(f, "{}", arr.to_readable(1))
             }
+            Value::Builtin(builtin) => write!(f, "Builtin: {}", builtin.kind.name()),
         }
     }
 }
@@ -194,7 +195,7 @@ impl RuntimeError {
 }
 
 pub trait Builtin {
-    fn exec(&self, values: Vec<&Value>) -> Result<Value, RuntimeError>;
+    fn exec(&self, values: Vec<Value>) -> Result<Value, RuntimeError>;
 }
 
 pub struct Interpreter {
@@ -214,38 +215,6 @@ impl EvaluationContext {
             call_stack: vec![],
         }
     }
-
-    pub fn register_bultin(&mut self, kind: &BuiltinExpressionKind) {
-        let arguments: Vec<_> = (0..=100)
-            .map(|n| TypedIdentifierNode {
-                loc: Location::beginning(),
-                identifier: IdentifierNode {
-                    name: n.to_string(),
-                    loc: Location::beginning(),
-                },
-                typed: None,
-            })
-            .collect();
-        let name = kind.name();
-        let function_expression = FnNode {
-            return_type: None,
-            loc: Location::beginning(),
-            identifier: IdentifierNode {
-                name: name.clone(),
-                loc: Location::beginning(),
-            },
-            parameters: arguments.clone(),
-            body: Expression::Builtin(BuiltinNode {
-                loc: Location::beginning(),
-                kind: kind.clone(),
-                arguments,
-            })
-            .boxed(),
-        };
-
-        let func = Value::Fn(function_expression);
-        self.bindings.insert(name, func);
-    }
 }
 
 impl Interpreter {
@@ -253,14 +222,6 @@ impl Interpreter {
         Interpreter {
             builtins: HashMap::new(),
         }
-    }
-
-    pub fn register_bultin(
-        &mut self,
-        kind: &BuiltinExpressionKind,
-        builtin: Box<dyn Builtin>,
-    ) -> () {
-        self.builtins.insert(kind.clone(), builtin);
     }
 
     pub fn evaluate_expression(
@@ -283,7 +244,7 @@ impl Interpreter {
             Expression::ForLoop(node) => self.evaluate_for_loop(node, ctx),
             Expression::PropertyAccess(node) => self.evaluate_property_access(node, ctx),
             Expression::Object(node) => self.evaluate_object(node, ctx),
-            Expression::Builtin(node) => self.evaluate_internal(node, ctx),
+            Expression::Builtin(node) => self.evaluate_builtin(node, ctx),
             Expression::Assignment(node) => self.evaluate_assignment(node, ctx),
 
             Expression::String(node) => Ok(Value::String(node.value.clone())),
@@ -313,13 +274,13 @@ impl Interpreter {
             return Err(RuntimeError {
                 loc: node.loc,
                 kind: RuntimeErrorKind::InvalidPropertyAccess {
-                    name: node.property_name.name.to_string(),
+                    name: node.identifier.name.to_string(),
                     value,
                 },
             });
         };
 
-        match obj.0.get(&node.property_name.name) {
+        match obj.0.get(&node.identifier.name) {
             Some(v) => Ok(v.clone()),
             None => Ok(Value::Unit),
         }
@@ -487,7 +448,7 @@ impl Interpreter {
         Ok(Value::Array(Array(elements)))
     }
 
-    fn evaluate_internal(
+    fn evaluate_builtin(
         &self,
         node: &BuiltinNode,
         ctx: &mut EvaluationContext,
@@ -497,9 +458,8 @@ impl Interpreter {
         } = node;
         let values = arguments
             .iter()
-            .map(|a| ctx.bindings.get(&a.identifier.name))
-            .filter_map(|a| a)
-            .collect::<Vec<&Value>>();
+            .map(|a| self.evaluate_expression(a, ctx))
+            .collect::<Result<Vec<Value>, RuntimeError>>()?;
         let builtin = self.builtins.get(kind).expect("Internal neon error");
         builtin.exec(values)
     }
@@ -669,6 +629,10 @@ impl Interpreter {
             arguments, callee, ..
         } = invocation;
         let value = self.evaluate_expression(callee, ctx)?;
+
+        if let Value::Builtin(builtin) = value {
+            return self.evaluate_builtin(&builtin, ctx);
+        };
 
         let Value::Fn(function) = value else {
             return Err(RuntimeError::illegal_invocation(&callee.loc()));

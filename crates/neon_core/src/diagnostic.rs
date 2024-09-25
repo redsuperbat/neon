@@ -47,11 +47,26 @@ pub struct InvalidIndexAccessError {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct InsufficientArgumentsError {
+    pub loc: Location,
+    pub expected: usize,
+    pub got: usize,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct UndefinedTypeError {
+    pub loc: Location,
+    pub name: String,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum ErrorDiagnostic {
     UnassignableType(UnassignableTypeError),
     UndefinedReference(UndefinedReferenceError),
     IncompatibleTypes(IncompatibleTypesError),
     ExpressionNotInvokable(ExpressionNotInvokableError),
+    InsufficientArguments(InsufficientArgumentsError),
+    UndefinedType(UndefinedTypeError),
     InsufficientOverlapment(InsufficientOverlapmentError),
     PropertyDoesNotExist(PropertyDoesNotExistError),
     InvalidIndexAccess(InvalidIndexAccessError),
@@ -71,7 +86,9 @@ impl ToString for ErrorDiagnostic {
             ErrorDiagnostic::ExpressionNotInvokable(e) => format!("Expression with type `{}` is not invokable.", e.callee_type),
             ErrorDiagnostic::InsufficientOverlapment(_e) => "Binary operation on types seems to be a mistake since none of them overlap sufficiently with each other.".to_string(),
             ErrorDiagnostic::PropertyDoesNotExist(e) => format!("Property `{}` does not exist on type `{}`.", e.key, e.access_type),
-            ErrorDiagnostic::InvalidIndexAccess(e) =>format!("Expression of type `{}` can't be used to index type `{}`.", e.index_type, e.indexee_type)
+            ErrorDiagnostic::InvalidIndexAccess(e) => format!("Expression of type `{}` can't be used to index type `{}`.", e.index_type, e.indexee_type),
+            ErrorDiagnostic::InsufficientArguments(e) => format!("Expected `{}` arguments got `{}`.", e.expected, e.got),
+            ErrorDiagnostic::UndefinedType(e) => format!("Type `{}` is not defined in current scope.", e.name),
         }
     }
 }
@@ -86,6 +103,8 @@ impl ErrorDiagnostic {
             ErrorDiagnostic::InsufficientOverlapment(e) => e.loc,
             ErrorDiagnostic::PropertyDoesNotExist(e) => e.loc,
             ErrorDiagnostic::InvalidIndexAccess(e) => e.loc,
+            ErrorDiagnostic::InsufficientArguments(e) => e.loc,
+            ErrorDiagnostic::UndefinedType(e) => e.loc,
         }
     }
 }

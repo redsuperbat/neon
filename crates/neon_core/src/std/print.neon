@@ -1,0 +1,3 @@
+let fmt = {
+  print: fn print(message: string): unit {}
+}

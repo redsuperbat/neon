@@ -1,6 +1,6 @@
-fn count_to_ten(a) {
+fn count_to_ten(a: int): int {
   if a == 10 {
-      a
+    a
   } else {
     count_to_ten(a + 1)
   }

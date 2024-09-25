@@ -205,7 +205,7 @@ impl SemanticAnalyzer {
 
         if !is_fn {
             return match symbol.lexeme.as_str() {
-                "int" | "string" | "bool" => self.single(SemanticTokenKind::PrimitiveType),
+                "int" | "string" | "bool" | "unit" => self.single(SemanticTokenKind::PrimitiveType),
                 _ => self.single(SemanticTokenKind::VariableName),
             };
         }

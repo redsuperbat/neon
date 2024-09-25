@@ -2,7 +2,7 @@ use neon_core::{
     interpreter::{Builtin, EvaluationContext, Interpreter, RuntimeError, Value},
     lexer::Lexer,
     lua_compiler::LuaCompiler,
-    parser::{BuiltinExpressionKind, Parser},
+    parser::Parser,
     symbol_table::SymbolTable,
     type_checker::{TypeChecker, TypeEnvironment},
 };
@@ -51,7 +51,7 @@ fn print(str: &str) -> () {
 
 struct Print {}
 impl Builtin for Print {
-    fn exec(&self, values: Vec<&Value>) -> Result<Value, RuntimeError> {
+    fn exec(&self, values: Vec<Value>) -> Result<Value, RuntimeError> {
         for value in values {
             print!("{} ", value);
         }
@@ -61,19 +61,10 @@ impl Builtin for Print {
 }
 
 fn program() -> (EvaluationContext, Interpreter, TypeEnvironment, SymbolTable) {
-    let mut ctx = EvaluationContext::new();
-    let kind = &BuiltinExpressionKind::Print;
-    ctx.register_bultin(kind);
-
-    let mut interpreter = Interpreter::new();
-    interpreter.register_bultin(kind, Box::new(Print {}));
-
-    let mut env = TypeEnvironment::new();
-    env.register_bultin(kind);
-
-    let mut symbol_table = SymbolTable::new();
-    symbol_table.register_bultin(kind);
-
+    let ctx = EvaluationContext::new();
+    let interpreter = Interpreter::new();
+    let env = TypeEnvironment::new();
+    let symbol_table = SymbolTable::new();
     (ctx, interpreter, env, symbol_table)
 }
 
@@ -172,10 +163,8 @@ fn compile_to_lua(path: &str) -> Result<String, ()> {
     };
 
     let mut env = TypeEnvironment::new();
-    env.register_bultin(&BuiltinExpressionKind::Print);
     let mut ts = TypeChecker::new();
     let mut symbol_table = SymbolTable::new();
-    symbol_table.register_bultin(&BuiltinExpressionKind::Print);
 
     ts.typeof_expression(&ast, &mut env);
     symbol_table.visit_expression(&ast);

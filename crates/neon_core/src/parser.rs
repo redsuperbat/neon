@@ -53,12 +53,19 @@ pub struct TypedIdentifierNode {
 }
 
 #[derive(Debug, Clone)]
+pub struct ParameterNode {
+    pub loc: Location,
+    pub identifier: IdentifierNode,
+    pub typed: TypeExpression,
+}
+
+#[derive(Debug, Clone)]
 pub struct FnNode {
     pub loc: Location,
     pub identifier: IdentifierNode,
-    pub parameters: Vec<TypedIdentifierNode>,
+    pub parameters: Vec<ParameterNode>,
     pub body: Box<Expression>,
-    pub return_type: Option<TypeExpression>,
+    pub return_type: TypeExpression,
 }
 
 #[derive(Debug, Clone)]
@@ -101,7 +108,7 @@ pub struct IndexAccessNode {
 pub struct BuiltinNode {
     pub loc: Location,
     pub kind: BuiltinExpressionKind,
-    pub arguments: Vec<TypedIdentifierNode>,
+    pub arguments: Vec<Expression>,
 }
 
 #[derive(Debug, Clone)]
@@ -145,7 +152,7 @@ pub struct IdentifierTypeNode {
 }
 
 #[derive(Debug, Clone)]
-pub struct AnyTypeNode {
+pub struct UnitTypeNode {
     pub loc: Location,
 }
 
@@ -155,9 +162,9 @@ pub enum TypeExpression {
     String(StringTypeNode),
     Bool(BoolTypeNode),
     Array(ArrayTypeNode),
+    Unit(UnitTypeNode),
     Object(ObjectTypeNode),
     Identifier(IdentifierTypeNode),
-    Any(AnyTypeNode),
 }
 
 impl WithLocation for TypeExpression {
@@ -169,7 +176,7 @@ impl WithLocation for TypeExpression {
             TypeExpression::Array(t) => t.loc,
             TypeExpression::Object(t) => t.loc,
             TypeExpression::Identifier(t) => t.loc,
-            TypeExpression::Any(t) => t.loc,
+            TypeExpression::Unit(t) => t.loc,
         }
     }
 }
@@ -223,7 +230,7 @@ pub struct ObjectNode {
 pub struct PropertyAccessNode {
     pub loc: Location,
     pub object: Box<Expression>,
-    pub property_name: IdentifierNode,
+    pub identifier: IdentifierNode,
 }
 
 #[derive(Debug, Clone)]
@@ -623,6 +630,7 @@ impl Parser {
                 "int" => TypeExpression::Int(IntTypeNode { loc }),
                 "string" => TypeExpression::String(StringTypeNode { loc }),
                 "bool" => TypeExpression::Bool(BoolTypeNode { loc }),
+                "unit" => TypeExpression::Unit(UnitTypeNode { loc }),
                 _ => TypeExpression::Identifier(IdentifierTypeNode { loc, name: lexeme }),
             };
             return Ok(exp);
@@ -681,7 +689,7 @@ impl Parser {
                     let property_name = self.parse_identifier_node()?;
                     Expression::PropertyAccess(PropertyAccessNode {
                         loc: Location::new(start, property_name.loc.end),
-                        property_name,
+                        identifier: property_name,
                         object: expression.boxed(),
                     })
                 }
@@ -1014,7 +1022,7 @@ impl Parser {
         }))
     }
 
-    fn parse_parameters(&mut self) -> Result<Vec<TypedIdentifierNode>, SyntaxError> {
+    fn parse_parameters(&mut self) -> Result<Vec<ParameterNode>, SyntaxError> {
         self.assert_next(TokenKind::OpenParen)?;
         let mut params = vec![];
 
@@ -1022,8 +1030,14 @@ impl Parser {
             if self.next_is(TokenKind::ClosedParen) {
                 break;
             }
+            let identifier = self.parse_identifier_node()?;
+            let typed = self.parse_type_expression()?;
 
-            params.push(self.parse_typed_identifier_node()?);
+            params.push(ParameterNode {
+                loc: Location::new(identifier.loc.start, typed.loc().end),
+                identifier,
+                typed,
+            });
 
             if self.next_is(TokenKind::ClosedParen) {
                 break;
@@ -1040,7 +1054,7 @@ impl Parser {
         let Token { start, .. } = self.assert_next(TokenKind::FnKeyword)?;
         let name = self.parse_identifier_node()?;
         let parameters = self.parse_parameters()?;
-        let return_type = self.parse_type_expression().ok();
+        let return_type = self.parse_type_expression()?;
 
         let block = self.parse_block()?;
 

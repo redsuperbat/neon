@@ -1,8 +1,8 @@
 use crate::{
     diagnostic::{
         Diagnostic, DiagnosticsList, ErrorDiagnostic, ExpressionNotInvokableError,
-        IncompatibleTypesError, InvalidIndexAccessError, PropertyDoesNotExistError,
-        UnassignableTypeError,
+        IncompatibleTypesError, InsufficientArgumentsError, InvalidIndexAccessError,
+        PropertyDoesNotExistError, UnassignableTypeError, UndefinedTypeError,
     },
     location::{Location, WithLocation},
     parser::{
@@ -63,6 +63,7 @@ impl Display for Type {
                 Type::Fn(FnType {
                     parameters,
                     return_type,
+                    ..
                 }) => {
                     let parameters = parameters
                         .iter()
@@ -106,18 +107,7 @@ impl TypeEnvironment {
     }
 }
 
-impl TypeEnvironment {
-    pub fn register_bultin(&mut self, kind: &BuiltinExpressionKind) {
-        let t = match kind {
-            BuiltinExpressionKind::Print => Type::Fn(FnType {
-                return_type: Box::new(Type::Unit),
-                parameters: vec![Type::Any],
-            }),
-        };
-
-        self.bindings.insert(kind.name(), t);
-    }
-}
+impl TypeEnvironment {}
 
 pub struct TypeChecker {
     pub diagnostics_list: DiagnosticsList,
@@ -191,8 +181,8 @@ impl TypeChecker {
         let access_type = self.typeof_expression(&node.object, env);
         let error = PropertyDoesNotExistError {
             access_type,
-            loc: node.property_name.loc,
-            key: node.property_name.name.clone(),
+            loc: node.identifier.loc,
+            key: node.identifier.name.clone(),
         };
 
         let Type::Object(ObjectType { properties }) = self.typeof_expression(&node.object, env)
@@ -200,9 +190,7 @@ impl TypeChecker {
             return self.add_error_diagnostic(ErrorDiagnostic::PropertyDoesNotExist(error));
         };
 
-        let prop_type = properties
-            .iter()
-            .find(|p| p.name == node.property_name.name);
+        let prop_type = properties.iter().find(|p| p.name == node.identifier.name);
 
         let Some(prop_type) = prop_type else {
             return self.add_error_diagnostic(ErrorDiagnostic::PropertyDoesNotExist(error));
@@ -243,33 +231,22 @@ impl TypeChecker {
     fn typeof_fn(&mut self, node: &FnNode, env: &mut TypeEnvironment) -> Type {
         let mut parameters = vec![];
         for param in &node.parameters {
-            let param_type = param
-                .typed
-                .as_ref()
-                .map(|t| self.typeof_type_expression(&t, env))
-                .unwrap_or(Type::Any);
-
+            let param_type = self.typeof_type_expression(&param.typed, env);
             env.bindings
                 .insert(param.identifier.name.clone(), param_type.clone());
             parameters.push(param_type);
         }
 
-        let inferred_return_type = self.typeof_expression(&node.body, env);
-
-        let return_type = if let Some(return_type) = node.return_type.as_ref() {
-            let return_type = self.typeof_type_expression(return_type, env);
-            self.unify(&return_type, &inferred_return_type);
-            return_type
-        } else {
-            inferred_return_type
-        };
-
+        let return_type = self.typeof_type_expression(&node.return_type, env);
         let fn_type = Type::Fn(FnType {
             parameters,
             return_type: Box::new(return_type),
         });
+
         env.bindings
             .insert(node.identifier.name.clone(), fn_type.clone());
+
+        self.typeof_expression(&node.body, env);
         fn_type
     }
 
@@ -285,7 +262,17 @@ impl TypeChecker {
             ));
         };
 
-        for (param, arg) in fn_type.parameters.iter().zip(node.arguments.iter()) {
+        for (i, param) in fn_type.parameters.iter().enumerate() {
+            let arg = node.arguments.get(i);
+            let Some(arg) = arg else {
+                return self.add_error_diagnostic(ErrorDiagnostic::InsufficientArguments(
+                    InsufficientArgumentsError {
+                        loc: node.loc,
+                        expected: fn_type.parameters.len(),
+                        got: node.arguments.len(),
+                    },
+                ));
+            };
             let arg_type = self.typeof_expression(arg, env);
             self.unify(param, &arg_type);
         }
@@ -322,6 +309,7 @@ impl TypeChecker {
             TypeExpression::Int(..) => Type::Int,
             TypeExpression::String(..) => Type::String,
             TypeExpression::Bool(..) => Type::Bool,
+            TypeExpression::Unit(..) => Type::Unit,
             TypeExpression::Array(node) => Type::Array(ArrayType {
                 elements: Box::new(self.typeof_type_expression(&node.elements, env)),
             }),
@@ -335,9 +323,15 @@ impl TypeChecker {
                     })
                     .collect(),
             }),
-            TypeExpression::Identifier(node) => {
-                env.bindings.get(&node.name).unwrap_or(&Type::Never).clone()
-            }
+            TypeExpression::Identifier(node) => match env.bindings.get(&node.name) {
+                Some(t) => t.clone(),
+                None => {
+                    self.add_error_diagnostic(ErrorDiagnostic::UndefinedType(UndefinedTypeError {
+                        loc: node.loc,
+                        name: node.name.clone(),
+                    }))
+                }
+            },
         }
     }
 
@@ -441,6 +435,8 @@ impl TypeChecker {
         }
 
         match &lhs {
+            Type::Never => self.type_error(lhs, rhs),
+
             Type::Int => match &rhs {
                 Type::Int => Type::Int,
                 _ => self.type_error(&lhs, rhs),

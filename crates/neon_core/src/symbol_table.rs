@@ -1,9 +1,9 @@
 use crate::{
     diagnostic::{Diagnostic, DiagnosticsList, ErrorDiagnostic, UndefinedReferenceError},
     parser::{
-        ArrayNode, AssignmentNode, BinaryOperationNode, BlockNode, BuiltinExpressionKind,
-        Expression, FnNode, ForLoopNode, ForLoopTarget, IdentifierNode, IfNode, IndexAccessNode,
-        InvocationNode, LetBindingNode, ObjectNode,
+        ArrayNode, AssignmentNode, BinaryOperationNode, BlockNode, Expression, FnNode, ForLoopNode,
+        ForLoopTarget, IdentifierNode, IfNode, IndexAccessNode, InvocationNode, LetBindingNode,
+        ObjectNode,
     },
 };
 use std::{collections::HashSet, mem};
@@ -52,10 +52,6 @@ impl SymbolTable {
             scope: Scope::global(),
             diagnostics_list: DiagnosticsList::new(),
         }
-    }
-
-    pub fn register_bultin(&mut self, kind: &BuiltinExpressionKind) {
-        self.scope.declarations.insert(kind.name());
     }
 
     pub fn visit_expression(&mut self, expression: &Expression) {
