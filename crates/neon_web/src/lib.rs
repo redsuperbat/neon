@@ -6,7 +6,7 @@ use neon_core::{
     interpreter::{Builtin, EvaluationContext, Interpreter, RuntimeError, Value},
     lexer::Lexer,
     location::{Location, Pos},
-    parser::{BuiltinExpressionKind, Expression, Parser},
+    parser::{Expression, Parser},
     symbol_table::SymbolTable,
     type_checker::{TypeChecker, TypeEnvironment},
 };
@@ -67,12 +67,10 @@ fn compile_program(src: &str) -> Result<Expression, CompilationDiagnostics> {
         })?;
 
     let mut symbol_table = SymbolTable::new();
-    symbol_table.register_bultin(&BuiltinExpressionKind::Print);
     symbol_table.visit_expression(&ast);
 
     let mut ts = TypeChecker::new();
     let mut env = TypeEnvironment::new();
-    env.register_bultin(&BuiltinExpressionKind::Print);
     ts.typeof_expression(&ast, &mut env);
 
     // Handle diagnostics
@@ -146,7 +144,7 @@ pub struct CompilationDiagnostics {
 
 struct Print {}
 impl Builtin for Print {
-    fn exec(&self, values: Vec<&Value>) -> Result<Value, RuntimeError> {
+    fn exec(&self, values: Vec<Value>) -> Result<Value, RuntimeError> {
         let str = values
             .iter()
             .map(|v| v.to_string())
@@ -162,10 +160,8 @@ pub fn interpret_src(src: &str) -> Result<ProgramOk, CompilationDiagnostics> {
     let ast = compile_program(src)?;
 
     let mut ctx = EvaluationContext::new();
-    ctx.register_bultin(&BuiltinExpressionKind::Print);
 
-    let mut interpreter = Interpreter::new();
-    interpreter.register_bultin(&BuiltinExpressionKind::Print, Box::new(Print {}));
+    let interpreter = Interpreter::new();
 
     interpreter
         .evaluate_expression(&ast, &mut ctx)

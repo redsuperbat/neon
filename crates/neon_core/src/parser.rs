@@ -65,7 +65,7 @@ pub struct FnNode {
     pub identifier: IdentifierNode,
     pub parameters: Vec<ParameterNode>,
     pub body: Box<Expression>,
-    pub return_type: TypeExpression,
+    pub return_type: Option<TypeExpression>,
 }
 
 #[derive(Debug, Clone)]
@@ -157,6 +157,13 @@ pub struct UnitTypeNode {
 }
 
 #[derive(Debug, Clone)]
+pub struct FnTypeNode {
+    pub loc: Location,
+    pub parameters: Vec<TypeExpression>,
+    pub return_type: Box<TypeExpression>,
+}
+
+#[derive(Debug, Clone)]
 pub enum TypeExpression {
     Int(IntTypeNode),
     String(StringTypeNode),
@@ -164,6 +171,7 @@ pub enum TypeExpression {
     Array(ArrayTypeNode),
     Unit(UnitTypeNode),
     Object(ObjectTypeNode),
+    Fn(FnTypeNode),
     Identifier(IdentifierTypeNode),
 }
 
@@ -177,6 +185,7 @@ impl WithLocation for TypeExpression {
             TypeExpression::Object(t) => t.loc,
             TypeExpression::Identifier(t) => t.loc,
             TypeExpression::Unit(t) => t.loc,
+            TypeExpression::Fn(t) => t.loc,
         }
     }
 }
@@ -596,8 +605,6 @@ impl Parser {
     }
 
     fn parse_type_expression(&mut self) -> Result<TypeExpression, SyntaxError> {
-        self.assert_next(TokenKind::Colon)?;
-
         let mut type_exp = self.parse_leaf_type_expression()?;
 
         loop {
@@ -635,7 +642,42 @@ impl Parser {
             };
             return Ok(exp);
         }
+        if self.next_is(TokenKind::OpenParen) {
+            return self.parse_fn_type_expression();
+        };
         self.parse_object_type_expression()
+    }
+
+    fn parse_fn_type_expression(&mut self) -> Result<TypeExpression, SyntaxError> {
+        let mut parameters = vec![];
+        let Token { start, .. } = self.assert_next(TokenKind::OpenParen)?;
+
+        loop {
+            // If the first iteration returns an empty object
+            if self.next_is(TokenKind::ClosedParen) {
+                break;
+            }
+
+            parameters.push(self.parse_type_expression()?);
+
+            if self.next_is(TokenKind::Comma) {
+                self.next()?;
+            } else {
+                break;
+            }
+        }
+        println!("{:?}", parameters);
+
+        self.assert_next(TokenKind::ClosedParen)?;
+        self.assert_next(TokenKind::Minus)?;
+        self.assert_next(TokenKind::ClosedAngleBracket)?;
+        let return_type = self.parse_type_expression()?;
+
+        Ok(TypeExpression::Fn(FnTypeNode {
+            loc: Location::new(start, return_type.loc().end),
+            parameters,
+            return_type: Box::new(return_type),
+        }))
     }
 
     fn parse_object_type_expression(&mut self) -> Result<TypeExpression, SyntaxError> {
@@ -649,7 +691,7 @@ impl Parser {
             }
 
             let name = self.parse_property_name_node()?;
-            let property_type = self.parse_type_expression()?;
+            let property_type = self.parse_mandatory_type()?;
             properties.push(ObjectPropertyTypeNode {
                 loc: Location::new(name.loc.start, property_type.loc().end),
                 name,
@@ -818,10 +860,20 @@ impl Parser {
         return Ok(ForLoopTarget::Tuple(first, second));
     }
 
+    fn parse_optional_type(&mut self) -> Option<TypeExpression> {
+        self.assert_next(TokenKind::Colon).ok()?;
+        self.parse_type_expression().ok()
+    }
+
+    fn parse_mandatory_type(&mut self) -> Result<TypeExpression, SyntaxError> {
+        self.assert_next(TokenKind::Colon)?;
+        self.parse_type_expression()
+    }
+
     fn parse_typed_identifier_node(&mut self) -> Result<TypedIdentifierNode, SyntaxError> {
         let identifier = self.parse_identifier_node()?;
 
-        let typed = self.parse_type_expression().ok();
+        let typed = self.parse_optional_type();
 
         let end = typed
             .as_ref()
@@ -1031,7 +1083,7 @@ impl Parser {
                 break;
             }
             let identifier = self.parse_identifier_node()?;
-            let typed = self.parse_type_expression()?;
+            let typed = self.parse_mandatory_type()?;
 
             params.push(ParameterNode {
                 loc: Location::new(identifier.loc.start, typed.loc().end),
@@ -1054,7 +1106,7 @@ impl Parser {
         let Token { start, .. } = self.assert_next(TokenKind::FnKeyword)?;
         let name = self.parse_identifier_node()?;
         let parameters = self.parse_parameters()?;
-        let return_type = self.parse_type_expression()?;
+        let return_type = self.parse_optional_type();
 
         let block = self.parse_block()?;
 

@@ -43,6 +43,7 @@ pub enum TokenKind {
     StructKeyword, // struct
     SelfKeyword,   // self
     PubKeyword,    // pub
+    TypeKeyword,   // type
 
     Bang,   // !
     Equals, // =
@@ -96,6 +97,7 @@ impl ToString for TokenKind {
             TokenKind::StructKeyword => "struct",
             TokenKind::SelfKeyword => "self",
             TokenKind::PubKeyword => "pub",
+            TokenKind::TypeKeyword => "type",
 
             TokenKind::OpenAngleBracket => "<",
             TokenKind::ClosedAngleBracket => ">",
@@ -313,6 +315,8 @@ impl Lexer {
             "while" => TokenKind::WhileKeyword,
             "struct" => TokenKind::StructKeyword,
             "self" => TokenKind::SelfKeyword,
+            "pub" => TokenKind::PubKeyword,
+            "type" => TokenKind::TypeKeyword,
 
             _ => TokenKind::Symbol,
         };

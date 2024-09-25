@@ -130,6 +130,10 @@ impl SemanticAnalyzer {
             | TokenKind::ForKeyword
             | TokenKind::WhileKeyword
             | TokenKind::LoopKeyword
+            | TokenKind::SelfKeyword
+            | TokenKind::StructKeyword
+            | TokenKind::PubKeyword
+            | TokenKind::TypeKeyword
             | TokenKind::InKeyword => self.single(SemanticTokenKind::Keyword),
 
             TokenKind::Ampersand

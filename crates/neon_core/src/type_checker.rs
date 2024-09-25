@@ -6,10 +6,9 @@ use crate::{
     },
     location::{Location, WithLocation},
     parser::{
-        ArrayNode, AssignmentNode, BinaryOp, BinaryOperationNode, BlockNode, BuiltinExpressionKind,
-        BuiltinNode, ElseNode, Expression, FnNode, ForLoopNode, IdentifierNode, IfNode,
-        IndexAccessNode, InvocationNode, LetBindingNode, ObjectNode, PropertyAccessNode,
-        TypeExpression,
+        ArrayNode, AssignmentNode, BinaryOp, BinaryOperationNode, BlockNode, BuiltinNode, ElseNode,
+        Expression, FnNode, ForLoopNode, IdentifierNode, IfNode, IndexAccessNode, InvocationNode,
+        LetBindingNode, ObjectNode, PropertyAccessNode, TypeExpression,
     },
 };
 use std::{collections::HashMap, fmt::Display};
@@ -237,16 +236,25 @@ impl TypeChecker {
             parameters.push(param_type);
         }
 
-        let return_type = self.typeof_type_expression(&node.return_type, env);
+        let return_type = match &node.return_type {
+            Some(t) => self.typeof_type_expression(&t, env),
+            None => Type::Unit,
+        };
+
         let fn_type = Type::Fn(FnType {
             parameters,
-            return_type: Box::new(return_type),
+            return_type: Box::new(return_type.clone()),
         });
 
         env.bindings
             .insert(node.identifier.name.clone(), fn_type.clone());
 
-        self.typeof_expression(&node.body, env);
+        let inferred_return_type = self.typeof_expression(&node.body, env);
+
+        println!("lhs: {} rhs: {}", return_type, inferred_return_type);
+
+        self.unify(&return_type, &inferred_return_type);
+
         fn_type
     }
 
@@ -310,6 +318,14 @@ impl TypeChecker {
             TypeExpression::String(..) => Type::String,
             TypeExpression::Bool(..) => Type::Bool,
             TypeExpression::Unit(..) => Type::Unit,
+            TypeExpression::Fn(node) => Type::Fn(FnType {
+                return_type: Box::new(self.typeof_type_expression(&node.return_type, env)),
+                parameters: node
+                    .parameters
+                    .iter()
+                    .map(|t| self.typeof_type_expression(t, env))
+                    .collect(),
+            }),
             TypeExpression::Array(node) => Type::Array(ArrayType {
                 elements: Box::new(self.typeof_type_expression(&node.elements, env)),
             }),
@@ -367,10 +383,16 @@ impl TypeChecker {
     }
 
     fn typeof_assignment(&mut self, node: &AssignmentNode, env: &mut TypeEnvironment) -> Type {
-        let lhs = self.typeof_identifier(&node.identifier, env);
+        let mut lhs = self.typeof_identifier(&node.identifier, env);
         let rhs = self.typeof_expression(&node.right, env);
         // We do this to make the error appear on the left part of the assignment
         self.current_loc = node.identifier.loc;
+
+        // If the lhs is unit we give it the type of the rhs
+        if lhs == Type::Unit {
+            lhs = rhs.clone();
+        };
+
         let t = self.unify(&lhs, &rhs);
         if t != Type::Never {
             env.bindings.insert(node.identifier.to_string(), t);
@@ -427,11 +449,6 @@ impl TypeChecker {
     fn unify(&mut self, lhs: &Type, rhs: &Type) -> Type {
         if *rhs == Type::Any || *lhs == Type::Any {
             return Type::Any;
-        }
-
-        // If left hand side is unit type it turns into the right hand side
-        if *lhs == Type::Unit {
-            return rhs.clone();
         }
 
         match &lhs {
