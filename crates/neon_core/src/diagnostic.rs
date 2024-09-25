@@ -60,8 +60,15 @@ pub struct UndefinedTypeError {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct NotIterableError {
+    pub loc: Location,
+    pub non_iterable: Type,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum ErrorDiagnostic {
     UnassignableType(UnassignableTypeError),
+    NotIterable(NotIterableError),
     UndefinedReference(UndefinedReferenceError),
     IncompatibleTypes(IncompatibleTypesError),
     ExpressionNotInvokable(ExpressionNotInvokableError),
@@ -89,6 +96,7 @@ impl ToString for ErrorDiagnostic {
             ErrorDiagnostic::InvalidIndexAccess(e) => format!("Expression of type `{}` can't be used to index type `{}`.", e.index_type, e.indexee_type),
             ErrorDiagnostic::InsufficientArguments(e) => format!("Expected `{}` arguments got `{}`.", e.expected, e.got),
             ErrorDiagnostic::UndefinedType(e) => format!("Type `{}` is not defined in current scope.", e.name),
+            ErrorDiagnostic::NotIterable(e) => format!("Type `{}` is not iterable.", e.non_iterable)
         }
     }
 }
@@ -105,6 +113,7 @@ impl ErrorDiagnostic {
             ErrorDiagnostic::InvalidIndexAccess(e) => e.loc,
             ErrorDiagnostic::InsufficientArguments(e) => e.loc,
             ErrorDiagnostic::UndefinedType(e) => e.loc,
+            ErrorDiagnostic::NotIterable(e) => e.loc,
         }
     }
 }

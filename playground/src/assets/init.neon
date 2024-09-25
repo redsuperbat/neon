@@ -54,6 +54,7 @@ for pulse in ["🔋1", "🔋2", "🔋3"] {
 let cyber_entity = {
   name: "Cybernaut X",
   age: 2049,  // 🚀 Future-born.
+  ignite, // We can use shorthand syntax for adding properties to objects
   location: "Neo Tokyo, Sector 7",
   upgrades: ["🦾 Bionic Arm", "🧠 Neural Link"],
   status: fn check_status(): string {

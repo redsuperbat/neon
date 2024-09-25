@@ -2,13 +2,13 @@ use crate::{
     diagnostic::{
         Diagnostic, DiagnosticsList, ErrorDiagnostic, ExpressionNotInvokableError,
         IncompatibleTypesError, InsufficientArgumentsError, InvalidIndexAccessError,
-        PropertyDoesNotExistError, UnassignableTypeError, UndefinedTypeError,
+        NotIterableError, PropertyDoesNotExistError, UnassignableTypeError, UndefinedTypeError,
     },
     location::{Location, WithLocation},
     parser::{
         ArrayNode, AssignmentNode, BinaryOp, BinaryOperationNode, BlockNode, BuiltinNode, ElseNode,
-        Expression, FnNode, ForLoopNode, IdentifierNode, IfNode, IndexAccessNode, InvocationNode,
-        LetBindingNode, ObjectNode, PropertyAccessNode, TypeExpression,
+        Expression, FnNode, ForLoopNode, ForLoopTarget, IdentifierNode, IfNode, IndexAccessNode,
+        InvocationNode, LetBindingNode, ObjectNode, PropertyAccessNode, TypeExpression,
     },
 };
 use std::{collections::HashMap, fmt::Display};
@@ -205,6 +205,7 @@ impl TypeChecker {
             .map(|e| self.typeof_expression(e, env))
             .collect::<Vec<_>>();
 
+        // TODO: When union types are implemented fix this
         let arr_type = arr_types.first().map_or(Type::Any, |first| {
             if arr_types.iter().all(|t| t == first) {
                 first.clone()
@@ -223,6 +224,45 @@ impl TypeChecker {
     }
 
     fn typeof_for_loop(&mut self, node: &ForLoopNode, env: &mut TypeEnvironment) -> Type {
+        let typeof_iterable = self.typeof_expression(&node.iterable, env);
+
+        match typeof_iterable {
+            Type::Object(..) => match &node.targets {
+                ForLoopTarget::Single(node) => {
+                    // TODO: when union type is implemented use here
+                    env.bindings.insert(node.name.clone(), Type::Any);
+                }
+                ForLoopTarget::Tuple(a, b) => {
+                    env.bindings.insert(a.name.clone(), Type::String);
+                    env.bindings.insert(b.name.clone(), Type::Any);
+                }
+            },
+            Type::Array(array_type) => match &node.targets {
+                ForLoopTarget::Single(node) => {
+                    env.bindings.insert(node.name.clone(), *array_type.elements);
+                }
+                ForLoopTarget::Tuple(a, b) => {
+                    env.bindings.insert(a.name.clone(), Type::Int);
+                    env.bindings.insert(b.name.clone(), *array_type.elements);
+                }
+            },
+            Type::String => match &node.targets {
+                ForLoopTarget::Single(node) => {
+                    env.bindings.insert(node.name.clone(), Type::String);
+                }
+                ForLoopTarget::Tuple(a, b) => {
+                    env.bindings.insert(a.name.clone(), Type::Int);
+                    env.bindings.insert(b.name.clone(), Type::String);
+                }
+            },
+            _ => {
+                return self.add_error_diagnostic(ErrorDiagnostic::NotIterable(NotIterableError {
+                    loc: node.iterable.loc(),
+                    non_iterable: typeof_iterable,
+                }))
+            }
+        }
+
         self.typeof_expression(&node.body, env);
         Type::Unit
     }
