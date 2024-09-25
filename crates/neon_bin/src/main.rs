@@ -60,7 +60,7 @@ impl Builtin for Print {
     }
 }
 
-fn program() -> (EvaluationContext, Interpreter, TypeEnvironment) {
+fn program() -> (EvaluationContext, Interpreter, TypeEnvironment, SymbolTable) {
     let mut ctx = EvaluationContext::new();
     let kind = &BuiltinExpressionKind::Print;
     ctx.register_bultin(kind);
@@ -71,14 +71,15 @@ fn program() -> (EvaluationContext, Interpreter, TypeEnvironment) {
     let mut env = TypeEnvironment::new();
     env.register_bultin(kind);
 
-    (ctx, interpreter, env)
+    let mut symbol_table = SymbolTable::new();
+    symbol_table.register_bultin(kind);
+
+    (ctx, interpreter, env, symbol_table)
 }
 
 fn repl() {
     let handle = io::stdin().lock();
-    let (mut ctx, interpreter, mut env) = program();
-
-    let mut symbol_table = SymbolTable::new();
+    let (mut ctx, interpreter, mut env, mut symbol_table) = program();
 
     print("> ");
     for line in handle.lines() {
@@ -137,9 +138,8 @@ fn file(path: &str) {
         }
     };
 
-    let (mut ctx, interpreter, mut env) = program();
+    let (mut ctx, interpreter, mut env, mut symbol_table) = program();
     let mut ts = TypeChecker::new();
-    let mut symbol_table = SymbolTable::new();
 
     ts.typeof_expression(&ast, &mut env);
     symbol_table.visit_expression(&ast);

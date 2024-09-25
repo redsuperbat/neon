@@ -108,14 +108,14 @@ impl TypeEnvironment {
 
 impl TypeEnvironment {
     pub fn register_bultin(&mut self, kind: &BuiltinExpressionKind) {
-        let parameters = (0..=100).map(|_| Type::Any).collect();
-        let name = kind.name();
-        let fn_type = FnType {
-            return_type: Box::new(Type::Any),
-            parameters,
+        let t = match kind {
+            BuiltinExpressionKind::Print => Type::Fn(FnType {
+                return_type: Box::new(Type::Unit),
+                parameters: vec![Type::Any],
+            }),
         };
 
-        self.bindings.insert(name, Type::Fn(fn_type));
+        self.bindings.insert(kind.name(), t);
     }
 }
 
@@ -335,7 +335,9 @@ impl TypeChecker {
                     })
                     .collect(),
             }),
-            TypeExpression::Identifier(node) => todo!("{:?}", node),
+            TypeExpression::Identifier(node) => {
+                env.bindings.get(&node.name).unwrap_or(&Type::Never).clone()
+            }
         }
     }
 

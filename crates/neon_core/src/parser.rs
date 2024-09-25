@@ -145,6 +145,11 @@ pub struct IdentifierTypeNode {
 }
 
 #[derive(Debug, Clone)]
+pub struct AnyTypeNode {
+    pub loc: Location,
+}
+
+#[derive(Debug, Clone)]
 pub enum TypeExpression {
     Int(IntTypeNode),
     String(StringTypeNode),
@@ -152,6 +157,7 @@ pub enum TypeExpression {
     Array(ArrayTypeNode),
     Object(ObjectTypeNode),
     Identifier(IdentifierTypeNode),
+    Any(AnyTypeNode),
 }
 
 impl WithLocation for TypeExpression {
@@ -163,6 +169,7 @@ impl WithLocation for TypeExpression {
             TypeExpression::Array(t) => t.loc,
             TypeExpression::Object(t) => t.loc,
             TypeExpression::Identifier(t) => t.loc,
+            TypeExpression::Any(t) => t.loc,
         }
     }
 }
@@ -474,9 +481,9 @@ impl Parser {
     }
 
     fn assert_next(&mut self, kind: TokenKind) -> Result<Token, SyntaxError> {
-        let next = self.next()?;
+        let next = self.peek().ok_or(self.eof())?;
         if next.kind == kind {
-            Ok(next)
+            Ok(self.next()?)
         } else {
             SyntaxError::unexpected_token(vec![kind], &next)
         }
@@ -634,7 +641,6 @@ impl Parser {
             }
 
             let name = self.parse_property_name_node()?;
-            self.assert_next(TokenKind::Colon)?;
             let property_type = self.parse_type_expression()?;
             properties.push(ObjectPropertyTypeNode {
                 loc: Location::new(name.loc.start, property_type.loc().end),
