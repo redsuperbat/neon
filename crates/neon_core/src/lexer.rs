@@ -30,16 +30,19 @@ impl Into<Location> for Token {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum TokenKind {
-    ElseKeyword,  // else
-    FalseKeyword, // false
-    FnKeyword,    // fn
-    ForKeyword,   // for
-    IfKeyword,    // if
-    InKeyword,    // in
-    LetKeyword,   // let
-    TrueKeyword,  // true
-    LoopKeyword,  // loop
-    WhileKeyword, // while
+    ElseKeyword,   // else
+    FalseKeyword,  // false
+    FnKeyword,     // fn
+    ForKeyword,    // for
+    IfKeyword,     // if
+    InKeyword,     // in
+    LetKeyword,    // let
+    TrueKeyword,   // true
+    LoopKeyword,   // loop
+    WhileKeyword,  // while
+    StructKeyword, // struct
+    SelfKeyword,   // self
+    PubKeyword,    // pub
 
     Bang,   // !
     Equals, // =
@@ -52,6 +55,7 @@ pub enum TokenKind {
     Dot, // .
 
     Ampersand,           // &
+    DollarSign,          // $
     Asterix,             // *
     ClosedCurlyBrace,    // }
     ClosedParen,         // )
@@ -89,6 +93,9 @@ impl ToString for TokenKind {
             TokenKind::InKeyword => "in",
             TokenKind::LoopKeyword => "loop",
             TokenKind::WhileKeyword => "while",
+            TokenKind::StructKeyword => "struct",
+            TokenKind::SelfKeyword => "self",
+            TokenKind::PubKeyword => "pub",
 
             TokenKind::OpenAngleBracket => "<",
             TokenKind::ClosedAngleBracket => ">",
@@ -118,6 +125,7 @@ impl ToString for TokenKind {
             TokenKind::WhiteSpace => "whitespace",
             TokenKind::Unknown => "unknown",
             TokenKind::Dot => ".",
+            TokenKind::DollarSign => "$",
         };
         s.to_string()
     }
@@ -303,6 +311,8 @@ impl Lexer {
             "in" => TokenKind::InKeyword,
             "loop" => TokenKind::LoopKeyword,
             "while" => TokenKind::WhileKeyword,
+            "struct" => TokenKind::StructKeyword,
+            "self" => TokenKind::SelfKeyword,
 
             _ => TokenKind::Symbol,
         };

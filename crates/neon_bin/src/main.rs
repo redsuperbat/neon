@@ -1,5 +1,5 @@
 use neon_core::{
-    interpreter::{Builtin, EvaluationContext, Interpreter, RuntimeError, Value},
+    interpreter::{EvaluationContext, Interpreter},
     lexer::Lexer,
     lua_compiler::LuaCompiler,
     parser::Parser,
@@ -47,17 +47,6 @@ enum CompilationTarget {
 fn print(str: &str) -> () {
     print!("{str}");
     io::stdout().flush().expect("Failed to flush to stdout");
-}
-
-struct Print {}
-impl Builtin for Print {
-    fn exec(&self, values: Vec<Value>) -> Result<Value, RuntimeError> {
-        for value in values {
-            print!("{} ", value);
-        }
-        print!("\n");
-        Ok(Value::Unit)
-    }
 }
 
 fn program() -> (EvaluationContext, Interpreter, TypeEnvironment, SymbolTable) {
