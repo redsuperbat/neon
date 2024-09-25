@@ -30,20 +30,23 @@ impl Into<Location> for Token {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum TokenKind {
-    ElseKeyword,   // else
-    FalseKeyword,  // false
-    FnKeyword,     // fn
-    ForKeyword,    // for
-    IfKeyword,     // if
-    InKeyword,     // in
-    LetKeyword,    // let
-    TrueKeyword,   // true
-    LoopKeyword,   // loop
-    WhileKeyword,  // while
-    StructKeyword, // struct
-    SelfKeyword,   // self
-    PubKeyword,    // pub
-    TypeKeyword,   // type
+    ElseKeyword,     // else
+    FalseKeyword,    // false
+    FnKeyword,       // fn
+    ForKeyword,      // for
+    IfKeyword,       // if
+    InKeyword,       // in
+    LetKeyword,      // let
+    TrueKeyword,     // true
+    LoopKeyword,     // loop
+    WhileKeyword,    // while
+    StructKeyword,   // struct
+    SelfKeyword,     // self
+    PubKeyword,      // pub
+    TypeKeyword,     // type
+    MatchKeyword,    // match
+    BreakKeyword,    // break
+    ContinueKeyword, // continue
 
     Bang,   // !
     Equals, // =
@@ -98,6 +101,9 @@ impl ToString for TokenKind {
             TokenKind::SelfKeyword => "self",
             TokenKind::PubKeyword => "pub",
             TokenKind::TypeKeyword => "type",
+            TokenKind::MatchKeyword => "match",
+            TokenKind::BreakKeyword => "break",
+            TokenKind::ContinueKeyword => "continue",
 
             TokenKind::OpenAngleBracket => "<",
             TokenKind::ClosedAngleBracket => ">",
@@ -317,6 +323,9 @@ impl Lexer {
             "self" => TokenKind::SelfKeyword,
             "pub" => TokenKind::PubKeyword,
             "type" => TokenKind::TypeKeyword,
+            "match" => TokenKind::MatchKeyword,
+            "continue" => TokenKind::ContinueKeyword,
+            "break" => TokenKind::BreakKeyword,
 
             _ => TokenKind::Symbol,
         };
