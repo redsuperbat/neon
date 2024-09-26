@@ -30,23 +30,28 @@ impl Into<Location> for Token {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum TokenKind {
-    ElseKeyword,     // else
-    FalseKeyword,    // false
-    FnKeyword,       // fn
-    ForKeyword,      // for
-    IfKeyword,       // if
-    InKeyword,       // in
-    LetKeyword,      // let
-    TrueKeyword,     // true
-    LoopKeyword,     // loop
-    WhileKeyword,    // while
-    StructKeyword,   // struct
-    SelfKeyword,     // self
-    PubKeyword,      // pub
-    TypeKeyword,     // type
-    MatchKeyword,    // match
-    BreakKeyword,    // break
-    ContinueKeyword, // continue
+    ElseKeyword,
+    FalseKeyword,
+    FnKeyword,
+    ForKeyword,
+    IfKeyword,
+    InKeyword,
+    LetKeyword,
+    TrueKeyword,
+    LoopKeyword,
+    WhileKeyword,
+    StructKeyword,
+    SelfKeyword,
+    PubKeyword,
+    TypeKeyword,
+    MatchKeyword,
+    BreakKeyword,
+    ContinueKeyword,
+    UseKeyword,
+    AsKeyword,
+    ImportKeyword,
+    FromKeyword,
+    ReturnKeyword,
 
     Bang,   // !
     Equals, // =
@@ -81,7 +86,7 @@ pub enum TokenKind {
     Colon,      // :
     WhiteSpace, // ' '
 
-    Unknown,
+    Unknown(String),
 }
 
 impl ToString for TokenKind {
@@ -104,6 +109,11 @@ impl ToString for TokenKind {
             TokenKind::MatchKeyword => "match",
             TokenKind::BreakKeyword => "break",
             TokenKind::ContinueKeyword => "continue",
+            TokenKind::UseKeyword => "use",
+            TokenKind::AsKeyword => "as",
+            TokenKind::ImportKeyword => "import",
+            TokenKind::FromKeyword => "from",
+            TokenKind::ReturnKeyword => "return",
 
             TokenKind::OpenAngleBracket => "<",
             TokenKind::ClosedAngleBracket => ">",
@@ -131,7 +141,7 @@ impl ToString for TokenKind {
             TokenKind::StringLiteral => "string",
             TokenKind::Symbol => "symbol",
             TokenKind::WhiteSpace => "whitespace",
-            TokenKind::Unknown => "unknown",
+            TokenKind::Unknown(lexeme) => lexeme,
             TokenKind::Dot => ".",
             TokenKind::DollarSign => "$",
         };
@@ -203,7 +213,7 @@ impl Lexer {
             'a'..='z' | 'A'..='Z' => self.symbol_or_keyword(),
             '0'..='9' => self.integer_literal(),
 
-            _ => self.single_char(TokenKind::Unknown),
+            _ => self.single_char(TokenKind::Unknown(next_char.to_string())),
         }
     }
 
@@ -326,6 +336,11 @@ impl Lexer {
             "match" => TokenKind::MatchKeyword,
             "continue" => TokenKind::ContinueKeyword,
             "break" => TokenKind::BreakKeyword,
+            "as" => TokenKind::AsKeyword,
+            "use" => TokenKind::UseKeyword,
+            "import" => TokenKind::ImportKeyword,
+            "from" => TokenKind::FromKeyword,
+            "return" => TokenKind::ReturnKeyword,
 
             _ => TokenKind::Symbol,
         };

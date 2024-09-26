@@ -1,11 +1,4 @@
-use neon_core::{
-    interpreter::{EvaluationContext, Interpreter},
-    lexer::Lexer,
-    lua_compiler::LuaCompiler,
-    parser::Parser,
-    symbol_table::SymbolTable,
-    type_checker::{TypeChecker, TypeEnvironment},
-};
+use neon_core::compiler::Compiler;
 use std::{
     fs,
     io::{self, BufRead, Write},
@@ -49,58 +42,18 @@ fn print(str: &str) -> () {
     io::stdout().flush().expect("Failed to flush to stdout");
 }
 
-fn program() -> (EvaluationContext, Interpreter, TypeEnvironment, SymbolTable) {
-    let ctx = EvaluationContext::new();
-    let interpreter = Interpreter::new();
-    let env = TypeEnvironment::new();
-    let symbol_table = SymbolTable::new();
-    (ctx, interpreter, env, symbol_table)
-}
-
 fn repl() {
     let handle = io::stdin().lock();
-    let (mut ctx, interpreter, mut env, mut symbol_table) = program();
-
+    let mut compiler = Compiler::new();
+    let _ = compiler.register_libraries();
     print("> ");
     for line in handle.lines() {
         let line = line.expect("Failed to read line");
 
-        let mut ts = TypeChecker::new();
-        let tokens = Lexer::new(line).vec();
-
-        let ast = match Parser::new(tokens).parse_program() {
-            Ok(ast) => ast,
-            Err(e) => {
-                println!("{}", e.kind.to_string());
-                print("> ");
-                continue;
-            }
+        match compiler.run(&line) {
+            Ok(v) => println!("{}", v),
+            Err(e) => println!("{}", e),
         };
-
-        ts.typeof_expression(&ast, &mut env);
-        symbol_table.visit_expression(&ast);
-
-        let dl = symbol_table
-            .diagnostics_list
-            .merge(&mut ts.diagnostics_list);
-
-        symbol_table.diagnostics_list.clear();
-
-        if dl.has_errors() {
-            dl.diagnostics.iter().for_each(|d| println!("{}", d));
-            print("> ");
-            continue;
-        }
-
-        let result = match interpreter.evaluate_expression(&ast, &mut ctx) {
-            Ok(ast) => ast,
-            Err(e) => {
-                println!("{}", e.kind.to_string());
-                print("> ");
-                continue;
-            }
-        };
-        println!("{}", result);
 
         print("> ");
     }
@@ -108,66 +61,25 @@ fn repl() {
 
 fn file(path: &str) {
     let src = fs::read_to_string(path).expect("File not found");
-    let tokens = Lexer::new(src).vec();
-
-    let ast = match Parser::new(tokens).parse_program() {
-        Ok(v) => v,
-        Err(e) => {
-            println!("{}", e.kind.to_string());
-            return;
-        }
+    let mut compiler = Compiler::new();
+    let _ = compiler.register_libraries();
+    match compiler.run(&src) {
+        Ok(v) => println!("{}", v),
+        Err(e) => println!("{}", e),
     };
-
-    let (mut ctx, interpreter, mut env, mut symbol_table) = program();
-    let mut ts = TypeChecker::new();
-
-    ts.typeof_expression(&ast, &mut env);
-    symbol_table.visit_expression(&ast);
-
-    let dl = ts
-        .diagnostics_list
-        .merge(&mut symbol_table.diagnostics_list);
-    if dl.has_errors() {
-        dl.diagnostics.iter().for_each(|d| println!("{}", d));
-        print("> ");
-        return;
-    }
-
-    match interpreter.evaluate_expression(&ast, &mut ctx) {
-        Ok(result) => println!("{:?}", result),
-        Err(e) => println!("{}", e.kind.to_string()),
-    }
 }
 
 fn compile_to_lua(path: &str) -> Result<String, ()> {
     let src = fs::read_to_string(path).expect("File not found");
-    let tokens = Lexer::new(src).vec();
-
-    let ast = match Parser::new(tokens).parse_program() {
-        Ok(v) => v,
-        Err(e) => {
-            println!("{}", e.kind.to_string());
-            return Err(());
+    let mut compiler = Compiler::new();
+    let _ = compiler.register_libraries();
+    match compiler.compile_lua(&src) {
+        Ok(v) => Ok(v),
+        Err(dl) => {
+            dl.diagnostics.iter().for_each(|d| println!("{}", d));
+            Err(())
         }
-    };
-
-    let mut env = TypeEnvironment::new();
-    let mut ts = TypeChecker::new();
-    let mut symbol_table = SymbolTable::new();
-
-    ts.typeof_expression(&ast, &mut env);
-    symbol_table.visit_expression(&ast);
-
-    let dl = ts
-        .diagnostics_list
-        .merge(&mut symbol_table.diagnostics_list);
-    if dl.has_errors() {
-        dl.diagnostics.iter().for_each(|d| println!("{}", d));
-        return Err(());
     }
-    let le = LuaCompiler::new();
-
-    Ok(le.compile_expression(&ast))
 }
 
 fn main() {

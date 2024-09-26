@@ -109,14 +109,12 @@ impl TypeEnvironment {
 impl TypeEnvironment {}
 
 pub struct TypeChecker {
-    pub diagnostics_list: DiagnosticsList,
     current_loc: Location,
 }
 
 impl TypeChecker {
     pub fn new() -> TypeChecker {
         TypeChecker {
-            diagnostics_list: DiagnosticsList::new(),
             current_loc: Location::beginning(),
         }
     }
@@ -125,23 +123,24 @@ impl TypeChecker {
         &mut self,
         expression: &Expression,
         env: &mut TypeEnvironment,
+        dl: &mut DiagnosticsList,
     ) -> Type {
         self.current_loc = expression.loc();
         match &expression {
-            Expression::Assignment(node) => self.typeof_assignment(node, env),
-            Expression::Block(node) => self.typeof_block(node, env),
+            Expression::Assignment(node) => self.typeof_assignment(node, env, dl),
+            Expression::Block(node) => self.typeof_block(node, env, dl),
             Expression::Identifier(node) => self.typeof_identifier(node, env),
-            Expression::If(node) => self.typeof_if(node, env),
-            Expression::LetBinding(node) => self.typeof_let_binding(node, env),
-            Expression::Object(node) => self.typeof_object(node, env),
-            Expression::Binary(node) => self.typeof_binary(node, env),
-            Expression::Invocation(node) => self.typeof_invocation(node, env),
-            Expression::Else(node) => self.typeof_else(node, env),
-            Expression::Fn(node) => self.typeof_fn(node, env),
-            Expression::ForLoop(node) => self.typeof_for_loop(node, env),
-            Expression::Array(node) => self.typeof_array(node, env),
-            Expression::PropertyAccess(node) => self.typeof_property_access(node, env),
-            Expression::IndexAccess(node) => self.typeof_index_access(node, env),
+            Expression::If(node) => self.typeof_if(node, env, dl),
+            Expression::LetBinding(node) => self.typeof_let_binding(node, env, dl),
+            Expression::Object(node) => self.typeof_object(node, env, dl),
+            Expression::Binary(node) => self.typeof_binary(node, env, dl),
+            Expression::Invocation(node) => self.typeof_invocation(node, env, dl),
+            Expression::Else(node) => self.typeof_else(node, env, dl),
+            Expression::Fn(node) => self.typeof_fn(node, env, dl),
+            Expression::ForLoop(node) => self.typeof_for_loop(node, env, dl),
+            Expression::Array(node) => self.typeof_array(node, env, dl),
+            Expression::PropertyAccess(node) => self.typeof_property_access(node, env, dl),
+            Expression::IndexAccess(node) => self.typeof_index_access(node, env, dl),
             Expression::Builtin(node) => self.typeof_builtin(node, env),
 
             Expression::Bool(..) => Type::Bool,
@@ -155,18 +154,24 @@ impl TypeChecker {
         Type::Any
     }
 
-    fn typeof_index_access(&mut self, node: &IndexAccessNode, env: &mut TypeEnvironment) -> Type {
-        let typeof_index = self.typeof_expression(&node.index, env);
-        self.unify(&Type::Int, &typeof_index);
-        let typeof_indexee = self.typeof_expression(&node.indexee, env);
+    fn typeof_index_access(
+        &mut self,
+        node: &IndexAccessNode,
+        env: &mut TypeEnvironment,
+        dl: &mut DiagnosticsList,
+    ) -> Type {
+        let typeof_index = self.typeof_expression(&node.index, env, dl);
+        self.unify(&Type::Int, &typeof_index, dl);
+        let typeof_indexee = self.typeof_expression(&node.indexee, env, dl);
         let Type::Array(array_type) = typeof_indexee else {
-            return self.add_error_diagnostic(ErrorDiagnostic::InvalidIndexAccess(
-                InvalidIndexAccessError {
+            return self.add_error_diagnostic(
+                ErrorDiagnostic::InvalidIndexAccess(InvalidIndexAccessError {
                     loc: node.index.loc(),
                     indexee_type: typeof_indexee,
                     index_type: typeof_index,
-                },
-            ));
+                }),
+                dl,
+            );
         };
 
         *array_type.elements
@@ -176,33 +181,39 @@ impl TypeChecker {
         &mut self,
         node: &PropertyAccessNode,
         env: &mut TypeEnvironment,
+        dl: &mut DiagnosticsList,
     ) -> Type {
-        let access_type = self.typeof_expression(&node.object, env);
+        let access_type = self.typeof_expression(&node.object, env, dl);
         let error = PropertyDoesNotExistError {
             access_type,
             loc: node.identifier.loc,
             key: node.identifier.name.clone(),
         };
 
-        let Type::Object(ObjectType { properties }) = self.typeof_expression(&node.object, env)
+        let Type::Object(ObjectType { properties }) = self.typeof_expression(&node.object, env, dl)
         else {
-            return self.add_error_diagnostic(ErrorDiagnostic::PropertyDoesNotExist(error));
+            return self.add_error_diagnostic(ErrorDiagnostic::PropertyDoesNotExist(error), dl);
         };
 
         let prop_type = properties.iter().find(|p| p.name == node.identifier.name);
 
         let Some(prop_type) = prop_type else {
-            return self.add_error_diagnostic(ErrorDiagnostic::PropertyDoesNotExist(error));
+            return self.add_error_diagnostic(ErrorDiagnostic::PropertyDoesNotExist(error), dl);
         };
 
         prop_type.value.clone()
     }
 
-    fn typeof_array(&mut self, node: &ArrayNode, env: &mut TypeEnvironment) -> Type {
+    fn typeof_array(
+        &mut self,
+        node: &ArrayNode,
+        env: &mut TypeEnvironment,
+        dl: &mut DiagnosticsList,
+    ) -> Type {
         let arr_types = node
             .elements
             .iter()
-            .map(|e| self.typeof_expression(e, env))
+            .map(|e| self.typeof_expression(e, env, dl))
             .collect::<Vec<_>>();
 
         // TODO: When union types are implemented fix this
@@ -219,12 +230,22 @@ impl TypeChecker {
         })
     }
 
-    fn typeof_else(&mut self, node: &ElseNode, env: &mut TypeEnvironment) -> Type {
-        self.typeof_expression(&node.consequent, env)
+    fn typeof_else(
+        &mut self,
+        node: &ElseNode,
+        env: &mut TypeEnvironment,
+        dl: &mut DiagnosticsList,
+    ) -> Type {
+        self.typeof_expression(&node.consequent, env, dl)
     }
 
-    fn typeof_for_loop(&mut self, node: &ForLoopNode, env: &mut TypeEnvironment) -> Type {
-        let typeof_iterable = self.typeof_expression(&node.iterable, env);
+    fn typeof_for_loop(
+        &mut self,
+        node: &ForLoopNode,
+        env: &mut TypeEnvironment,
+        dl: &mut DiagnosticsList,
+    ) -> Type {
+        let typeof_iterable = self.typeof_expression(&node.iterable, env, dl);
 
         match typeof_iterable {
             Type::Object(..) => match &node.targets {
@@ -256,28 +277,36 @@ impl TypeChecker {
                 }
             },
             _ => {
-                return self.add_error_diagnostic(ErrorDiagnostic::NotIterable(NotIterableError {
-                    loc: node.iterable.loc(),
-                    non_iterable: typeof_iterable,
-                }))
+                return self.add_error_diagnostic(
+                    ErrorDiagnostic::NotIterable(NotIterableError {
+                        loc: node.iterable.loc(),
+                        non_iterable: typeof_iterable,
+                    }),
+                    dl,
+                )
             }
         }
 
-        self.typeof_expression(&node.body, env);
+        self.typeof_expression(&node.body, env, dl);
         Type::Unit
     }
 
-    fn typeof_fn(&mut self, node: &FnNode, env: &mut TypeEnvironment) -> Type {
+    fn typeof_fn(
+        &mut self,
+        node: &FnNode,
+        env: &mut TypeEnvironment,
+        dl: &mut DiagnosticsList,
+    ) -> Type {
         let mut parameters = vec![];
         for param in &node.parameters {
-            let param_type = self.typeof_type_expression(&param.typed, env);
+            let param_type = self.typeof_type_expression(&param.typed, env, dl);
             env.bindings
                 .insert(param.identifier.name.clone(), param_type.clone());
             parameters.push(param_type);
         }
 
         let return_type = match &node.return_type {
-            Some(t) => self.typeof_type_expression(&t, env),
+            Some(t) => self.typeof_type_expression(&t, env, dl),
             None => Type::Unit,
         };
 
@@ -289,47 +318,59 @@ impl TypeChecker {
         env.bindings
             .insert(node.identifier.name.clone(), fn_type.clone());
 
-        let inferred_return_type = self.typeof_expression(&node.body, env);
+        let inferred_return_type = self.typeof_expression(&node.body, env, dl);
 
-        self.unify(&return_type, &inferred_return_type);
+        self.unify(&return_type, &inferred_return_type, dl);
 
         fn_type
     }
 
-    fn typeof_invocation(&mut self, node: &InvocationNode, env: &mut TypeEnvironment) -> Type {
-        let callee = self.typeof_expression(&node.callee, env);
+    fn typeof_invocation(
+        &mut self,
+        node: &InvocationNode,
+        env: &mut TypeEnvironment,
+        dl: &mut DiagnosticsList,
+    ) -> Type {
+        let callee = self.typeof_expression(&node.callee, env, dl);
 
         let Type::Fn(fn_type) = callee else {
-            return self.add_error_diagnostic(ErrorDiagnostic::ExpressionNotInvokable(
-                ExpressionNotInvokableError {
+            return self.add_error_diagnostic(
+                ErrorDiagnostic::ExpressionNotInvokable(ExpressionNotInvokableError {
                     loc: node.callee.loc(),
                     callee_type: callee,
-                },
-            ));
+                }),
+                dl,
+            );
         };
 
         for (i, param) in fn_type.parameters.iter().enumerate() {
             let arg = node.arguments.get(i);
             let Some(arg) = arg else {
-                return self.add_error_diagnostic(ErrorDiagnostic::InsufficientArguments(
-                    InsufficientArgumentsError {
+                return self.add_error_diagnostic(
+                    ErrorDiagnostic::InsufficientArguments(InsufficientArgumentsError {
                         loc: node.loc,
                         expected: fn_type.parameters.len(),
                         got: node.arguments.len(),
-                    },
-                ));
+                    }),
+                    dl,
+                );
             };
-            let arg_type = self.typeof_expression(arg, env);
-            self.unify(param, &arg_type);
+            let arg_type = self.typeof_expression(arg, env, dl);
+            self.unify(param, &arg_type, dl);
         }
         *fn_type.return_type
     }
 
-    fn typeof_binary(&mut self, node: &BinaryOperationNode, env: &mut TypeEnvironment) -> Type {
-        let lhs = self.typeof_expression(&node.left, env);
-        let rhs = self.typeof_expression(&node.right, env);
+    fn typeof_binary(
+        &mut self,
+        node: &BinaryOperationNode,
+        env: &mut TypeEnvironment,
+        dl: &mut DiagnosticsList,
+    ) -> Type {
+        let lhs = self.typeof_expression(&node.left, env, dl);
+        let rhs = self.typeof_expression(&node.right, env, dl);
         self.current_loc = node.left.loc();
-        let unification = self.unify(&lhs, &rhs);
+        let unification = self.unify(&lhs, &rhs, dl);
 
         match node.operation {
             BinaryOp::Mod | BinaryOp::Add | BinaryOp::Sub => unification,
@@ -343,29 +384,39 @@ impl TypeChecker {
         }
     }
 
-    fn typeof_block(&mut self, node: &BlockNode, env: &mut TypeEnvironment) -> Type {
+    fn typeof_block(
+        &mut self,
+        node: &BlockNode,
+        env: &mut TypeEnvironment,
+        dl: &mut DiagnosticsList,
+    ) -> Type {
         for e in &node.body {
-            self.typeof_expression(e, env);
+            self.typeof_expression(e, env, dl);
         }
-        self.typeof_expression(&node.return_val, env)
+        self.typeof_expression(&node.return_val, env, dl)
     }
 
-    fn typeof_type_expression(&mut self, node: &TypeExpression, env: &mut TypeEnvironment) -> Type {
+    fn typeof_type_expression(
+        &mut self,
+        node: &TypeExpression,
+        env: &mut TypeEnvironment,
+        dl: &mut DiagnosticsList,
+    ) -> Type {
         match node {
             TypeExpression::Int(..) => Type::Int,
             TypeExpression::String(..) => Type::String,
             TypeExpression::Bool(..) => Type::Bool,
             TypeExpression::Unit(..) => Type::Unit,
             TypeExpression::Fn(node) => Type::Fn(FnType {
-                return_type: Box::new(self.typeof_type_expression(&node.return_type, env)),
+                return_type: Box::new(self.typeof_type_expression(&node.return_type, env, dl)),
                 parameters: node
                     .parameters
                     .iter()
-                    .map(|t| self.typeof_type_expression(t, env))
+                    .map(|t| self.typeof_type_expression(t, env, dl))
                     .collect(),
             }),
             TypeExpression::Array(node) => Type::Array(ArrayType {
-                elements: Box::new(self.typeof_type_expression(&node.elements, env)),
+                elements: Box::new(self.typeof_type_expression(&node.elements, env, dl)),
             }),
             TypeExpression::Object(node) => Type::Object(ObjectType {
                 properties: node
@@ -373,32 +424,38 @@ impl TypeChecker {
                     .iter()
                     .map(|p| PropertyType {
                         name: p.name.value.clone(),
-                        value: self.typeof_type_expression(&p.property_type, env),
+                        value: self.typeof_type_expression(&p.property_type, env, dl),
                     })
                     .collect(),
             }),
             TypeExpression::Identifier(node) => match env.bindings.get(&node.name) {
                 Some(t) => t.clone(),
-                None => {
-                    self.add_error_diagnostic(ErrorDiagnostic::UndefinedType(UndefinedTypeError {
+                None => self.add_error_diagnostic(
+                    ErrorDiagnostic::UndefinedType(UndefinedTypeError {
                         loc: node.loc,
                         name: node.name.clone(),
-                    }))
-                }
+                    }),
+                    dl,
+                ),
             },
         }
     }
 
-    fn typeof_let_binding(&mut self, node: &LetBindingNode, env: &mut TypeEnvironment) -> Type {
+    fn typeof_let_binding(
+        &mut self,
+        node: &LetBindingNode,
+        env: &mut TypeEnvironment,
+        dl: &mut DiagnosticsList,
+    ) -> Type {
         let rhs = if let Some(right) = &node.right.as_ref() {
-            self.typeof_expression(right, env)
+            self.typeof_expression(right, env, dl)
         } else {
             Type::Unit
         };
 
         let t = if let Some(type_exp) = &node.binding.typed {
-            let lhs = self.typeof_type_expression(&type_exp, env);
-            self.unify(&lhs, &rhs);
+            let lhs = self.typeof_type_expression(&type_exp, env, dl);
+            self.unify(&lhs, &rhs, dl);
             lhs
         } else {
             rhs
@@ -408,21 +465,31 @@ impl TypeChecker {
         Type::Unit
     }
 
-    fn typeof_object(&mut self, node: &ObjectNode, env: &mut TypeEnvironment) -> Type {
+    fn typeof_object(
+        &mut self,
+        node: &ObjectNode,
+        env: &mut TypeEnvironment,
+        dl: &mut DiagnosticsList,
+    ) -> Type {
         let properties = node
             .properties
             .iter()
             .map(|n| PropertyType {
                 name: n.name.value.clone(),
-                value: self.typeof_expression(&n.value, env),
+                value: self.typeof_expression(&n.value, env, dl),
             })
             .collect::<Vec<_>>();
         Type::Object(ObjectType { properties })
     }
 
-    fn typeof_assignment(&mut self, node: &AssignmentNode, env: &mut TypeEnvironment) -> Type {
+    fn typeof_assignment(
+        &mut self,
+        node: &AssignmentNode,
+        env: &mut TypeEnvironment,
+        dl: &mut DiagnosticsList,
+    ) -> Type {
         let mut lhs = self.typeof_identifier(&node.identifier, env);
-        let rhs = self.typeof_expression(&node.right, env);
+        let rhs = self.typeof_expression(&node.right, env, dl);
         // We do this to make the error appear on the left part of the assignment
         self.current_loc = node.identifier.loc;
 
@@ -431,34 +498,40 @@ impl TypeChecker {
             lhs = rhs.clone();
         };
 
-        let t = self.unify(&lhs, &rhs);
+        let t = self.unify(&lhs, &rhs, dl);
         if t != Type::Never {
             env.bindings.insert(node.identifier.to_string(), t);
         }
         Type::Unit
     }
 
-    fn typeof_if(&mut self, node: &IfNode, env: &mut TypeEnvironment) -> Type {
-        let predicate = self.typeof_expression(&node.predicate, env);
+    fn typeof_if(
+        &mut self,
+        node: &IfNode,
+        env: &mut TypeEnvironment,
+        dl: &mut DiagnosticsList,
+    ) -> Type {
+        let predicate = self.typeof_expression(&node.predicate, env, dl);
         // We do this to make the error appear on the entire predicate
         self.current_loc = node.predicate.loc();
-        self.unify(&Type::Bool, &predicate);
+        self.unify(&Type::Bool, &predicate, dl);
 
-        let consequent = self.typeof_expression(&node.consequent, env);
+        let consequent = self.typeof_expression(&node.consequent, env, dl);
 
         let Some(alternate) = node.alternate.as_ref() else {
             return Type::Unit;
         };
-        let alternate = self.typeof_expression(&alternate, env);
+        let alternate = self.typeof_expression(&alternate, env, dl);
 
         if consequent != alternate {
-            return self.add_error_diagnostic(ErrorDiagnostic::IncompatibleTypes(
-                IncompatibleTypesError {
+            return self.add_error_diagnostic(
+                ErrorDiagnostic::IncompatibleTypes(IncompatibleTypesError {
                     loc: node.loc,
                     alternate,
                     consequent,
-                },
-            ));
+                }),
+                dl,
+            );
         }
         consequent
     }
@@ -470,81 +543,84 @@ impl TypeChecker {
         }
     }
 
-    fn add_error_diagnostic(&mut self, d: ErrorDiagnostic) -> Type {
-        self.diagnostics_list.add(Diagnostic::Error(d));
+    fn add_error_diagnostic(&mut self, d: ErrorDiagnostic, dl: &mut DiagnosticsList) -> Type {
+        dl.add(Diagnostic::Error(d));
         Type::Never
     }
 
-    fn type_error(&mut self, lhs: &Type, rhs: &Type) -> Type {
-        self.add_error_diagnostic(ErrorDiagnostic::UnassignableType(UnassignableTypeError {
-            loc: self.current_loc,
-            lhs: lhs.clone(),
-            rhs: rhs.clone(),
-        }));
+    fn type_error(&mut self, lhs: &Type, rhs: &Type, dl: &mut DiagnosticsList) -> Type {
+        self.add_error_diagnostic(
+            ErrorDiagnostic::UnassignableType(UnassignableTypeError {
+                loc: self.current_loc,
+                lhs: lhs.clone(),
+                rhs: rhs.clone(),
+            }),
+            dl,
+        );
         Type::Never
     }
 
-    fn unify(&mut self, lhs: &Type, rhs: &Type) -> Type {
+    fn unify(&mut self, lhs: &Type, rhs: &Type, dl: &mut DiagnosticsList) -> Type {
         if *rhs == Type::Any || *lhs == Type::Any {
             return Type::Any;
         }
 
         match &lhs {
-            Type::Never => self.type_error(lhs, rhs),
+            Type::Never => self.type_error(lhs, rhs, dl),
 
             Type::Int => match &rhs {
                 Type::Int => Type::Int,
-                _ => self.type_error(&lhs, rhs),
+                _ => self.type_error(&lhs, rhs, dl),
             },
             Type::Bool => match &rhs {
                 Type::Bool => Type::Bool,
-                _ => self.type_error(lhs, rhs),
+                _ => self.type_error(lhs, rhs, dl),
             },
             Type::String => match &rhs {
                 Type::String => Type::String,
-                _ => self.type_error(lhs, rhs),
+                _ => self.type_error(lhs, rhs, dl),
             },
             Type::Unit => match &rhs {
                 Type::Unit => Type::Unit,
-                _ => self.type_error(lhs, rhs),
+                _ => self.type_error(lhs, rhs, dl),
             },
             Type::Fn(a) => match &rhs {
                 Type::Fn(b) => {
                     for (a, b) in a.parameters.iter().zip(b.parameters.iter()) {
-                        if self.unify(a, b) == Type::Never {
-                            return self.type_error(lhs, rhs);
+                        if self.unify(a, b, dl) == Type::Never {
+                            return self.type_error(lhs, rhs, dl);
                         }
                     }
 
-                    if self.unify(&a.return_type, &b.return_type) == Type::Never {
-                        return self.type_error(lhs, rhs);
+                    if self.unify(&a.return_type, &b.return_type, dl) == Type::Never {
+                        return self.type_error(lhs, rhs, dl);
                     }
 
                     lhs.clone()
                 }
-                _ => self.type_error(lhs, rhs),
+                _ => self.type_error(lhs, rhs, dl),
             },
             Type::Object(a) => match &rhs {
                 Type::Object(b) => {
                     for PropertyType { name, value } in &a.properties {
                         let b_prop = b.properties.iter().find(|p| p.name == *name);
                         let Some(b_prop) = b_prop else {
-                            return self.type_error(lhs, rhs);
+                            return self.type_error(lhs, rhs, dl);
                         };
 
-                        if Type::Never == self.unify(value, &b_prop.value) {
-                            return self.type_error(lhs, rhs);
+                        if Type::Never == self.unify(value, &b_prop.value, dl) {
+                            return self.type_error(lhs, rhs, dl);
                         };
                     }
 
                     lhs.clone()
                 }
 
-                _ => self.type_error(lhs, rhs),
+                _ => self.type_error(lhs, rhs, dl),
             },
             Type::Array(a) => match &rhs {
-                Type::Array(b) => self.unify(&a.elements, &b.elements),
-                _ => self.type_error(lhs, rhs),
+                Type::Array(b) => self.unify(&a.elements, &b.elements, dl),
+                _ => self.type_error(lhs, rhs, dl),
             },
             _ => Type::Never,
         }
@@ -571,9 +647,8 @@ a = true
         let mut env = TypeEnvironment {
             bindings: HashMap::new(),
         };
-
-        let t = ts.typeof_expression(&ast, &mut env);
-        println!("{:?}", ts.diagnostics_list);
-        println!("{:?}", t);
+        let mut dl = DiagnosticsList::new();
+        ts.typeof_expression(&ast, &mut env, &mut dl);
+        assert!(!dl.has_errors());
     }
 }

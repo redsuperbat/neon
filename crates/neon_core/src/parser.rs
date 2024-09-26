@@ -1,6 +1,7 @@
 use std::collections::VecDeque;
 
 use crate::{
+    diagnostic::{Diagnostic, ErrorDiagnostic, InvalidSyntaxError, ToDiagnostic},
     lexer::{Token, TokenKind},
     location::{Location, Pos, WithLocation},
 };
@@ -338,6 +339,15 @@ impl WithLocation for Expression {
 pub struct SyntaxError {
     pub kind: SyntaxErrorKind,
     pub loc: Location,
+}
+
+impl ToDiagnostic for SyntaxError {
+    fn to_diagnostic(&self) -> Diagnostic {
+        Diagnostic::Error(ErrorDiagnostic::InvalidSyntax(InvalidSyntaxError {
+            loc: self.loc,
+            message: self.kind.to_string(),
+        }))
+    }
 }
 
 impl SyntaxError {

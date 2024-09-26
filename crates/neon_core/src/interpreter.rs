@@ -194,25 +194,23 @@ impl RuntimeError {
     }
 }
 
-pub trait Builtin {
+pub trait ForeignFunctionInterface {
     fn exec(&self, values: Vec<Value>) -> Result<Value, RuntimeError>;
 }
 
 pub struct Interpreter {
-    builtins: HashMap<BuiltinExpressionKind, Box<dyn Builtin>>,
+    builtins: HashMap<BuiltinExpressionKind, Box<dyn ForeignFunctionInterface>>,
 }
 
 #[derive(Debug, Clone)]
 pub struct EvaluationContext {
     pub bindings: HashMap<String, Value>,
-    pub call_stack: Vec<String>,
 }
 
 impl EvaluationContext {
     pub fn new() -> EvaluationContext {
         EvaluationContext {
             bindings: HashMap::new(),
-            call_stack: vec![],
         }
     }
 }
@@ -244,9 +242,9 @@ impl Interpreter {
             Expression::ForLoop(node) => self.evaluate_for_loop(node, ctx),
             Expression::PropertyAccess(node) => self.evaluate_property_access(node, ctx),
             Expression::Object(node) => self.evaluate_object(node, ctx),
-            Expression::Builtin(node) => self.evaluate_builtin(node, ctx),
             Expression::Assignment(node) => self.evaluate_assignment(node, ctx),
 
+            Expression::Builtin(node) => self.evaluate_builtin(node, ctx),
             Expression::String(node) => Ok(Value::String(node.value.clone())),
             Expression::Bool(node) => Ok(Value::Bool(node.value)),
             Expression::Empty(..) => Ok(Value::Unit),
@@ -605,13 +603,10 @@ impl Interpreter {
         block: &BlockNode,
         ctx: &mut EvaluationContext,
     ) -> Result<Value, RuntimeError> {
-        let BlockNode {
-            body, return_val, ..
-        } = block;
-        for exp in body {
+        for exp in &block.body {
             self.evaluate_expression(exp, ctx)?;
         }
-        self.evaluate_expression(return_val, ctx)
+        self.evaluate_expression(&block.return_val, ctx)
     }
 
     fn evaluate_fn(&self, f: &FnNode, ctx: &mut EvaluationContext) -> Result<Value, RuntimeError> {
@@ -630,41 +625,29 @@ impl Interpreter {
         } = invocation;
         let value = self.evaluate_expression(callee, ctx)?;
 
-        if let Value::Builtin(builtin) = value {
-            return self.evaluate_builtin(&builtin, ctx);
-        };
-
-        let Value::Fn(function) = value else {
+        let Value::Fn(FnNode {
+            parameters, body, ..
+        }) = value
+        else {
             return Err(RuntimeError::illegal_invocation(&callee.loc()));
         };
-
-        let FnNode {
-            identifier: name,
-            parameters,
-            body,
-            ..
-        } = function;
 
         let value_args = arguments
             .iter()
             .map(|a| self.evaluate_expression(a, ctx))
             .collect::<Result<Vec<Value>, RuntimeError>>()?;
 
-        let mut func_ctx = ctx.clone();
-        func_ctx.call_stack.push(name.name);
+        let mut ctx = ctx.clone();
 
         parameters
             .iter()
             .zip(value_args.iter())
             .for_each(|(param, argument)| {
-                func_ctx
-                    .bindings
+                ctx.bindings
                     .insert(param.identifier.name.clone(), argument.clone());
             });
 
-        let result = self.evaluate_expression(&body, &mut func_ctx);
-        func_ctx.call_stack.pop();
-        result
+        self.evaluate_expression(&body, &mut ctx)
     }
 
     fn evaluate_identifier(

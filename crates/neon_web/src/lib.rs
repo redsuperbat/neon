@@ -2,13 +2,11 @@ mod semantic_analyzer;
 
 use js_sys::Array;
 use neon_core::{
-    diagnostic::Diagnostic,
-    interpreter::{Builtin, EvaluationContext, Interpreter, RuntimeError, Value},
+    compiler::Compiler,
+    diagnostic::{Diagnostic, DiagnosticsList},
+    interpreter::{ForeignFunctionInterface, RuntimeError, Value},
     lexer::Lexer,
     location::{Location, Pos},
-    parser::{Expression, Parser},
-    symbol_table::SymbolTable,
-    type_checker::{TypeChecker, TypeEnvironment},
 };
 use semantic_analyzer::{SemanticAnalyzer, SemanticToken};
 use wasm_bindgen::prelude::*;
@@ -55,51 +53,14 @@ pub fn tokenize(src: &str) -> Array {
         .collect()
 }
 
-fn compile_program(src: &str) -> Result<Expression, CompilationDiagnostics> {
-    let tokens = Lexer::new(src).collect::<Vec<_>>();
-    let ast = Parser::new(tokens)
-        .parse_program()
-        .map_err(|e| CompilationDiagnostics {
-            errors: vec![CompilationDiagnostic {
-                loc: e.loc.into(),
-                message: e.kind.to_string(),
-            }],
-        })?;
-
-    let mut symbol_table = SymbolTable::new();
-    symbol_table.visit_expression(&ast);
-
-    let mut ts = TypeChecker::new();
-    let mut env = TypeEnvironment::new();
-    ts.typeof_expression(&ast, &mut env);
-
-    // Handle diagnostics
-    let dl = symbol_table
-        .diagnostics_list
-        .merge(&mut ts.diagnostics_list);
-
-    if dl.has_errors() {
-        return Err(CompilationDiagnostics {
-            errors: dl
-                .diagnostics
-                .iter()
-                .map(|d| match d {
-                    Diagnostic::Error(e) => e,
-                })
-                .map(|d| CompilationDiagnostic {
-                    message: d.to_string(),
-                    loc: d.loc().into(),
-                })
-                .collect::<Vec<_>>(),
-        });
-    } else {
-        Ok(ast)
-    }
-}
-
 #[wasm_bindgen]
 pub fn compile(src: &str) -> Result<(), CompilationDiagnostics> {
-    compile_program(src)?;
+    let mut compiler = Compiler::new();
+    compiler.register_libraries();
+    let dl = compiler.check(src);
+    if dl.has_errors() {
+        return Err(dl.into());
+    }
     Ok(())
 }
 
@@ -142,8 +103,26 @@ pub struct CompilationDiagnostics {
     pub errors: Vec<CompilationDiagnostic>,
 }
 
+impl From<DiagnosticsList> for CompilationDiagnostics {
+    fn from(dl: DiagnosticsList) -> Self {
+        CompilationDiagnostics {
+            errors: dl
+                .diagnostics
+                .iter()
+                .map(|d| match d {
+                    Diagnostic::Error(e) => e,
+                })
+                .map(|d| CompilationDiagnostic {
+                    message: d.to_string(),
+                    loc: d.loc().into(),
+                })
+                .collect::<Vec<_>>(),
+        }
+    }
+}
+
 struct Print {}
-impl Builtin for Print {
+impl ForeignFunctionInterface for Print {
     fn exec(&self, values: Vec<Value>) -> Result<Value, RuntimeError> {
         let str = values
             .iter()
@@ -157,21 +136,18 @@ impl Builtin for Print {
 
 #[wasm_bindgen]
 pub fn interpret_src(src: &str) -> Result<ProgramOk, CompilationDiagnostics> {
-    let ast = compile_program(src)?;
+    let mut compiler = Compiler::new();
+    compiler.register_libraries();
 
-    let mut ctx = EvaluationContext::new();
-
-    let interpreter = Interpreter::new();
-
-    interpreter
-        .evaluate_expression(&ast, &mut ctx)
+    compiler
+        .run(src)
         .map(|r| ProgramOk {
             result: r.to_string(),
         })
         .map_err(|e| CompilationDiagnostics {
             errors: vec![CompilationDiagnostic {
-                loc: e.loc.into(),
-                message: e.kind.to_string(),
+                message: e,
+                loc: Location::beginning().into(),
             }],
         })
 }

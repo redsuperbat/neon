@@ -66,6 +66,12 @@ pub struct NotIterableError {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct InvalidSyntaxError {
+    pub loc: Location,
+    pub message: String,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum ErrorDiagnostic {
     UnassignableType(UnassignableTypeError),
     NotIterable(NotIterableError),
@@ -77,6 +83,7 @@ pub enum ErrorDiagnostic {
     InsufficientOverlapment(InsufficientOverlapmentError),
     PropertyDoesNotExist(PropertyDoesNotExistError),
     InvalidIndexAccess(InvalidIndexAccessError),
+    InvalidSyntax(InvalidSyntaxError),
 }
 
 impl ToString for ErrorDiagnostic {
@@ -96,9 +103,14 @@ impl ToString for ErrorDiagnostic {
             ErrorDiagnostic::InvalidIndexAccess(e) => format!("Expression of type `{}` can't be used to index type `{}`.", e.index_type, e.indexee_type),
             ErrorDiagnostic::InsufficientArguments(e) => format!("Expected `{}` arguments got `{}`.", e.expected, e.got),
             ErrorDiagnostic::UndefinedType(e) => format!("Type `{}` is not defined in current scope.", e.name),
-            ErrorDiagnostic::NotIterable(e) => format!("Type `{}` is not iterable.", e.non_iterable)
+            ErrorDiagnostic::NotIterable(e) => format!("Type `{}` is not iterable.", e.non_iterable),
+            ErrorDiagnostic::InvalidSyntax(e) => e.message.clone(),
         }
     }
+}
+
+pub trait ToDiagnostic {
+    fn to_diagnostic(&self) -> Diagnostic;
 }
 
 impl ErrorDiagnostic {
@@ -114,6 +126,7 @@ impl ErrorDiagnostic {
             ErrorDiagnostic::InsufficientArguments(e) => e.loc,
             ErrorDiagnostic::UndefinedType(e) => e.loc,
             ErrorDiagnostic::NotIterable(e) => e.loc,
+            ErrorDiagnostic::InvalidSyntax(e) => e.loc,
         }
     }
 }
@@ -138,6 +151,16 @@ pub struct DiagnosticsList {
     pub diagnostics: Vec<Diagnostic>,
 }
 
+impl ToString for DiagnosticsList {
+    fn to_string(&self) -> String {
+        self.diagnostics
+            .iter()
+            .map(|d| d.to_string())
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+}
+
 impl DiagnosticsList {
     pub fn new() -> DiagnosticsList {
         DiagnosticsList {
@@ -149,7 +172,7 @@ impl DiagnosticsList {
         if self.diagnostics.iter().any(|d| *d == diagnostic) {
             return;
         }
-        self.diagnostics.push(diagnostic)
+        self.diagnostics.push(diagnostic);
     }
 
     pub fn has_errors(&self) -> bool {
