@@ -9,6 +9,7 @@ use crate::{
         ArrayNode, AssignmentNode, BinaryOp, BinaryOperationNode, BlockNode, BuiltinExpressionKind,
         BuiltinNode, Expression, FnNode, ForLoopNode, ForLoopTarget, IdentifierNode, IfNode,
         IndexAccessNode, IntNode, InvocationNode, LetBindingNode, ObjectNode, PropertyAccessNode,
+        UseNode,
     },
 };
 
@@ -19,11 +20,8 @@ impl Object {
     fn single_line_readable(&self) -> String {
         let mut result = String::from("{ ");
 
-        let mut first = true;
-        for (key, value) in self.0.iter() {
-            if first {
-                first = false;
-            } else {
+        for (i, (key, value)) in self.0.iter().enumerate() {
+            if i != 0 {
                 result += ", "
             }
 
@@ -43,14 +41,10 @@ impl Object {
         let mut result = String::from("{\n");
         let indentation = " ".repeat(indent);
 
-        let mut first = true;
-        for (key, value) in self.0.iter() {
-            if first {
-                first = false;
-            } else {
+        for (i, (key, value)) in self.0.iter().enumerate() {
+            if i != 0 {
                 result += ",\n"
             }
-
             let value_str = match value {
                 Value::Array(arr) => arr.to_readable(indent + 1),
                 Value::Object(obj) => obj.to_readable(indent + 1),
@@ -243,12 +237,21 @@ impl Interpreter {
             Expression::PropertyAccess(node) => self.evaluate_property_access(node, ctx),
             Expression::Object(node) => self.evaluate_object(node, ctx),
             Expression::Assignment(node) => self.evaluate_assignment(node, ctx),
+            Expression::Use(node) => self.evaluate_use(node, ctx),
 
             Expression::Builtin(node) => self.evaluate_builtin(node, ctx),
             Expression::String(node) => Ok(Value::String(node.value.clone())),
             Expression::Bool(node) => Ok(Value::Bool(node.value)),
             Expression::Empty(..) => Ok(Value::Unit),
         }
+    }
+
+    fn evaluate_use(
+        &self,
+        node: &UseNode,
+        ctx: &mut EvaluationContext,
+    ) -> Result<Value, RuntimeError> {
+        todo!()
     }
 
     fn evaluate_assignment(

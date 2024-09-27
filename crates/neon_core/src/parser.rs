@@ -281,6 +281,12 @@ pub struct AssignmentNode {
 }
 
 #[derive(Debug, Clone)]
+pub struct UseNode {
+    pub loc: Location,
+    pub identifier: IdentifierNode,
+}
+
+#[derive(Debug, Clone)]
 pub enum Expression {
     Array(ArrayNode),
     Assignment(AssignmentNode),
@@ -301,6 +307,7 @@ pub enum Expression {
     Object(ObjectNode),
     PropertyAccess(PropertyAccessNode),
     String(StringNode),
+    Use(UseNode),
 }
 
 impl Expression {
@@ -312,25 +319,27 @@ impl Expression {
 impl WithLocation for Expression {
     fn loc(&self) -> Location {
         match self {
-            Expression::Array(a) => a.loc,
-            Expression::Binary(b) => b.loc,
-            Expression::Block(e) => e.loc,
-            Expression::Bool(e) => e.loc,
-            Expression::Builtin(e) => e.loc,
-            Expression::Else(e) => e.loc,
-            Expression::Fn(e) => e.loc,
-            Expression::ForLoop(e) => e.loc,
-            Expression::Identifier(e) => e.loc,
-            Expression::If(e) => e.loc,
-            Expression::IndexAccess(e) => e.loc,
-            Expression::Int(e) => e.loc,
-            Expression::Invocation(e) => e.loc,
-            Expression::LetBinding(e) => e.loc,
-            Expression::Object(e) => e.loc,
-            Expression::PropertyAccess(e) => e.loc,
-            Expression::String(e) => e.loc,
+            Expression::Array(n) => n.loc,
+            Expression::Binary(n) => n.loc,
+            Expression::Block(n) => n.loc,
+            Expression::Bool(n) => n.loc,
+            Expression::Builtin(n) => n.loc,
+            Expression::Else(n) => n.loc,
+            Expression::Fn(n) => n.loc,
+            Expression::ForLoop(n) => n.loc,
+            Expression::Identifier(n) => n.loc,
+            Expression::If(n) => n.loc,
+            Expression::IndexAccess(n) => n.loc,
+            Expression::Int(n) => n.loc,
+            Expression::Invocation(n) => n.loc,
+            Expression::LetBinding(n) => n.loc,
+            Expression::Object(n) => n.loc,
+            Expression::PropertyAccess(n) => n.loc,
+            Expression::String(n) => n.loc,
+            Expression::Assignment(n) => n.loc,
+            Expression::Use(n) => n.loc,
+
             Expression::Empty(loc) => *loc,
-            Expression::Assignment(e) => e.loc,
         }
     }
 }
@@ -534,7 +543,7 @@ impl Parser {
         }
     }
 
-    pub fn parse_expression(&mut self) -> Result<Expression, SyntaxError> {
+    fn parse_expression(&mut self) -> Result<Expression, SyntaxError> {
         let expression = self.parse_accessor_expression()?;
 
         let Some(next) = self.peek() else {
@@ -829,6 +838,7 @@ impl Parser {
             TokenKind::LetKeyword => self.parse_let(),
             TokenKind::Symbol => self.parse_identifier(),
             TokenKind::ForKeyword => self.parse_for_loop(),
+            TokenKind::UseKeyword => self.parse_use(),
             _ => SyntaxError::unexpected_token(
                 vec![
                     TokenKind::FnKeyword,
@@ -845,6 +855,16 @@ impl Parser {
                 next,
             ),
         }
+    }
+
+    fn parse_use(&mut self) -> Result<Expression, SyntaxError> {
+        let Token { start, .. } = self.assert_next(TokenKind::UseKeyword)?;
+        let identifier = self.parse_identifier_node()?;
+
+        Ok(Expression::Use(UseNode {
+            loc: Location::new(start, identifier.loc.end),
+            identifier,
+        }))
     }
 
     fn parse_for_loop(&mut self) -> Result<Expression, SyntaxError> {

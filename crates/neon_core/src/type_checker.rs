@@ -24,6 +24,46 @@ pub struct ObjectType {
     properties: Vec<PropertyType>,
 }
 
+impl ObjectType {
+    fn single_line_readable(&self) -> String {
+        let mut result = String::from("{ ");
+
+        for (i, PropertyType { name, value }) in self.properties.iter().enumerate() {
+            if i != 0 {
+                result += ", "
+            }
+            result += &format!("{name}: {}", format!("{}", value));
+        }
+        result += " }";
+        result
+    }
+
+    fn multi_line_readable(&self, indent: usize) -> String {
+        let mut result = String::from("{\n");
+        let indentation = " ".repeat(indent);
+
+        for (i, PropertyType { name, value }) in self.properties.iter().enumerate() {
+            if i != 0 {
+                result += ",\n"
+            }
+            result += &format!("{}{name}: {}", indentation, format!("{}", value));
+        }
+        let indentation = " ".repeat(indent - 2);
+        result += &format!("\n{indentation}}}");
+        result
+    }
+
+    pub fn to_readable(&self, indent: usize) -> String {
+        if self.properties.len() == 0 {
+            return "{}".to_string();
+        }
+        if self.properties.len() < 3 {
+            return self.single_line_readable();
+        }
+        return self.multi_line_readable(indent);
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct ArrayType {
     elements: Box<Type>,
@@ -73,24 +113,11 @@ impl Display for Type {
                     format!("({parameters}) -> {}", return_type)
                 }
                 Type::Array(t) => format!("{}[]", t.elements),
-                Type::Object(ObjectType { properties }) => {
-                    let mut result = String::from("{\n");
-                    let indentation = " ".repeat(depth);
-
-                    for (i, PropertyType { name, value }) in properties.iter().enumerate() {
-                        if i != 0 {
-                            result += ",\n"
-                        }
-                        result += &format!("{}{name}: {}", indentation, fmt_type(depth + 1, value));
-                    }
-
-                    result += &format!("\n{indentation}}}");
-                    result
-                }
+                Type::Object(obj) => obj.to_readable(depth),
             }
         }
 
-        write!(f, "{}", fmt_type(0, self))
+        write!(f, "{}", fmt_type(2, self))
     }
 }
 
@@ -142,6 +169,7 @@ impl TypeChecker {
             Expression::PropertyAccess(node) => self.typeof_property_access(node, env, dl),
             Expression::IndexAccess(node) => self.typeof_index_access(node, env, dl),
             Expression::Builtin(node) => self.typeof_builtin(node, env),
+            Expression::Use(node) => self.typeof_identifier(&node.identifier, env),
 
             Expression::Bool(..) => Type::Bool,
             Expression::Empty(..) => Type::Unit,

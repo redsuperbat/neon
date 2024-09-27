@@ -33,7 +33,7 @@ impl Compiler {
         let tokens = Lexer::new(src).collect();
         let mut diagnostics = DiagnosticsList::new();
         match Parser::new(tokens)
-            .parse_expression()
+            .parse_program()
             .map_err(|e| e.to_diagnostic())
         {
             Ok(ast) => Ok(ast),
@@ -44,8 +44,18 @@ impl Compiler {
         }
     }
 
-    pub fn register_libraries(&mut self) -> DiagnosticsList {
-        self.check(FMT)
+    pub fn register_libraries(&mut self) {
+        let ast = match self.parse_source(FMT) {
+            Ok(ast) => ast,
+            Err(_dl) => return (),
+        };
+        let mut dl = DiagnosticsList::new();
+        self.symbol_table.visit_expression(&ast, &mut dl);
+        self.type_checker
+            .typeof_expression(&ast, &mut self.type_env, &mut dl);
+        let _ = self
+            .interpreter
+            .evaluate_expression(&ast, &mut self.eval_ctx);
     }
 
     pub fn compile_lua(&self, src: &str) -> Result<String, DiagnosticsList> {

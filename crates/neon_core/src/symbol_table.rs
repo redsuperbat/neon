@@ -67,6 +67,7 @@ impl SymbolTable {
             Expression::PropertyAccess(node) => self.visit_expression(&node.object, dl),
             Expression::Assignment(node) => self.visit_assignment(node, dl),
 
+            Expression::Use(..) => (),
             Expression::Int(..) => (),
             Expression::Bool(..) => (),
             Expression::String(..) => (),
@@ -86,9 +87,11 @@ impl SymbolTable {
     }
 
     fn visit_object(&mut self, object: &ObjectNode, dl: &mut DiagnosticsList) {
+        self.enter_scope(&vec![]);
         for property in &object.properties {
             self.visit_expression(property.value.as_ref(), dl);
         }
+        self.exit_scope();
     }
 
     fn visit_for_loop(&mut self, for_loop: &ForLoopNode, dl: &mut DiagnosticsList) {
@@ -235,7 +238,7 @@ mod tests {
     fn visit_ok() {
         let code = String::from("let a = 3; fn t(){ 3 + 4 }; t();");
         let tokens = Lexer::new(code).collect::<Vec<_>>();
-        let ast = Parser::new(tokens).parse_expression().expect("Should work");
+        let ast = Parser::new(tokens).parse_program().expect("Should work");
         let scope = Scope::global();
         let mut st = SymbolTable::new(scope);
         let mut dl = DiagnosticsList::new();

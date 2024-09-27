@@ -45,7 +45,8 @@ fn print(str: &str) -> () {
 fn repl() {
     let handle = io::stdin().lock();
     let mut compiler = Compiler::new();
-    let _ = compiler.register_libraries();
+    compiler.register_libraries();
+
     print("> ");
     for line in handle.lines() {
         let line = line.expect("Failed to read line");
@@ -62,7 +63,7 @@ fn repl() {
 fn file(path: &str) {
     let src = fs::read_to_string(path).expect("File not found");
     let mut compiler = Compiler::new();
-    let _ = compiler.register_libraries();
+    compiler.register_libraries();
     match compiler.run(&src) {
         Ok(v) => println!("{}", v),
         Err(e) => println!("{}", e),
@@ -72,7 +73,7 @@ fn file(path: &str) {
 fn compile_to_lua(path: &str) -> Result<String, ()> {
     let src = fs::read_to_string(path).expect("File not found");
     let mut compiler = Compiler::new();
-    let _ = compiler.register_libraries();
+    compiler.register_libraries();
     match compiler.compile_lua(&src) {
         Ok(v) => Ok(v),
         Err(dl) => {
