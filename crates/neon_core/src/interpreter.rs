@@ -192,9 +192,7 @@ pub trait ForeignFunctionInterface {
     fn exec(&self, values: Vec<Value>) -> Result<Value, RuntimeError>;
 }
 
-pub struct Interpreter {
-    builtins: HashMap<BuiltinExpressionKind, Box<dyn ForeignFunctionInterface>>,
-}
+pub struct Interpreter {}
 
 #[derive(Debug, Clone)]
 pub struct EvaluationContext {
@@ -210,10 +208,8 @@ impl EvaluationContext {
 }
 
 impl Interpreter {
-    pub fn new() -> Interpreter {
-        Interpreter {
-            builtins: HashMap::new(),
-        }
+    pub fn new() -> Self {
+        Self {}
     }
 
     pub fn evaluate_expression(

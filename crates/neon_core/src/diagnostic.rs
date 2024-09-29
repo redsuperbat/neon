@@ -175,6 +175,10 @@ impl DiagnosticsList {
         self.diagnostics.push(diagnostic);
     }
 
+    pub fn add_error(&mut self, error: ErrorDiagnostic) {
+        self.add(Diagnostic::Error(error));
+    }
+
     pub fn has_errors(&self) -> bool {
         !self.diagnostics.is_empty()
     }
