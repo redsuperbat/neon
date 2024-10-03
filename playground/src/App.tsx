@@ -9,21 +9,22 @@ import init, {
   CompilationDiagnostics,
   compile,
   interpret_src,
-  JsPos,
-  JsToken,
+  type JsPos,
+  type JsToken,
   tokenize,
 } from "neon-web";
 import {
-  createResource,
-  createSignal,
   For,
   Match,
-  onCleanup,
-  onMount,
   Show,
   Switch,
+  createResource,
+  createSignal,
+  onCleanup,
+  onMount,
 } from "solid-js";
 import array from "./assets/examples/arrays.neon?raw";
+import fib from "./assets/examples/fib.neon?raw";
 import fizzbuzz from "./assets/examples/fizz-buzz.neon?raw";
 import helloWorld from "./assets/examples/hello-world.neon?raw";
 import higherOrderFunctions from "./assets/examples/higher-order-functions.neon?raw";
@@ -59,6 +60,10 @@ const examples: { label: string; value: string }[] = [
     value: higherOrderFunctions,
   },
   {
+    label: "Fibbonachi",
+    value: fib,
+  },
+  {
     label: "Fizz Buzz",
     value: fizzbuzz,
   },
@@ -88,13 +93,13 @@ const rangeFromLocation = ({
 
 type Output =
   | {
-      type: "error";
-      message: string;
-    }
+    type: "error";
+    message: string;
+  }
   | {
-      type: "ok";
-      message: string;
-    };
+    type: "ok";
+    message: string;
+  };
 
 function ExecutionPage() {
   const [output, setOutput] = createSignal<Output>();

@@ -4,28 +4,30 @@ use crate::{
     lexer::Lexer,
     lua_compiler::LuaCompiler,
     parser::{Expression, Parser},
-    std::fmt::FMT,
+    std::{fmt::FMT, io::IO},
     symbol_table::{Scope, SymbolTable},
     type_checker::{TypeChecker, TypeEnvironment},
 };
+
 pub struct Compiler {
-    type_checker: TypeChecker,
     lua_compiler: LuaCompiler,
     interpreter: Interpreter,
-    symbol_table: SymbolTable,
+
+    // Mutatates during parsing and evaluating
     type_env: TypeEnvironment,
+    scope: Scope,
     eval_ctx: EvaluationContext,
 }
 
 impl Compiler {
     pub fn new() -> Self {
         Self {
-            type_checker: TypeChecker::new(),
             interpreter: Interpreter::new(),
-            symbol_table: SymbolTable::new(Scope::global()),
+            lua_compiler: LuaCompiler::new(),
+
+            scope: Scope::global(),
             type_env: TypeEnvironment::new(),
             eval_ctx: EvaluationContext::new(),
-            lua_compiler: LuaCompiler::new(),
         }
     }
 
@@ -44,18 +46,22 @@ impl Compiler {
         }
     }
 
-    pub fn register_libraries(&mut self) {
-        let ast = match self.parse_source(FMT) {
+    fn register_library(&mut self, lib: &str) {
+        let ast = match self.parse_source(lib) {
             Ok(ast) => ast,
             Err(_dl) => return (),
         };
         let mut dl = DiagnosticsList::new();
-        self.symbol_table.visit_expression(&ast, &mut dl);
-        self.type_checker
-            .typeof_expression(&ast, &mut self.type_env, &mut dl);
+        TypeChecker::new(&mut dl).typeof_expression(&ast, &mut self.type_env);
+        SymbolTable::new(&mut dl).visit_expression(&ast, &mut self.scope);
         let _ = self
             .interpreter
             .evaluate_expression(&ast, &mut self.eval_ctx);
+    }
+
+    pub fn register_libraries(&mut self) {
+        self.register_library(FMT);
+        self.register_library(IO);
     }
 
     pub fn compile_lua(&self, src: &str) -> Result<String, DiagnosticsList> {
@@ -69,21 +75,16 @@ impl Compiler {
             Err(dl) => return dl,
         };
         let mut dl = DiagnosticsList::new();
-        self.symbol_table.visit_expression(&ast, &mut dl);
-        self.type_checker
-            .typeof_expression(&ast, &mut self.type_env, &mut dl);
-        let _ = self
-            .interpreter
-            .evaluate_expression(&ast, &mut self.eval_ctx);
+        TypeChecker::new(&mut dl).typeof_expression(&ast, &mut self.type_env);
+        SymbolTable::new(&mut dl).visit_expression(&ast, &mut self.scope);
         dl
     }
 
     pub fn run(&mut self, src: &str) -> Result<Value, String> {
         let ast = self.parse_source(src).map_err(|l| l.to_string())?;
         let mut dl = DiagnosticsList::new();
-        self.symbol_table.visit_expression(&ast, &mut dl);
-        self.type_checker
-            .typeof_expression(&ast, &mut self.type_env, &mut dl);
+        TypeChecker::new(&mut dl).typeof_expression(&ast, &mut self.type_env);
+        SymbolTable::new(&mut dl).visit_expression(&ast, &mut self.scope);
 
         if dl.has_errors() {
             return Err(dl.to_string());

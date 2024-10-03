@@ -6,10 +6,9 @@ use std::{
 use crate::{
     location::{Location, WithLocation},
     parser::{
-        ArrayNode, AssignmentNode, BinaryOp, BinaryOperationNode, BlockNode, BuiltinExpressionKind,
-        BuiltinNode, Expression, FnNode, ForLoopNode, ForLoopTarget, IdentifierNode, IfNode,
-        IndexAccessNode, IntNode, InvocationNode, LetBindingNode, ObjectNode, PropertyAccessNode,
-        UseNode,
+        ArrayNode, AssignmentNode, BinaryOp, BinaryOperationNode, BlockNode, BuiltinNode,
+        Expression, FnNode, ForLoopNode, ForLoopTarget, IdentifierNode, IfNode, IndexAccessNode,
+        IntNode, InvocationNode, LetBindingNode, ObjectNode, PropertyAccessNode, UseNode,
     },
 };
 
@@ -244,8 +243,8 @@ impl Interpreter {
 
     fn evaluate_use(
         &self,
-        node: &UseNode,
-        ctx: &mut EvaluationContext,
+        _node: &UseNode,
+        _ctx: &mut EvaluationContext,
     ) -> Result<Value, RuntimeError> {
         todo!()
     }
@@ -447,18 +446,10 @@ impl Interpreter {
 
     fn evaluate_builtin(
         &self,
-        node: &BuiltinNode,
-        ctx: &mut EvaluationContext,
+        _node: &BuiltinNode,
+        _ctx: &mut EvaluationContext,
     ) -> Result<Value, RuntimeError> {
-        let BuiltinNode {
-            arguments, kind, ..
-        } = node;
-        let values = arguments
-            .iter()
-            .map(|a| self.evaluate_expression(a, ctx))
-            .collect::<Result<Vec<Value>, RuntimeError>>()?;
-        let builtin = self.builtins.get(kind).expect("Internal neon error");
-        builtin.exec(values)
+        todo!();
     }
 
     fn evaluate_binary_subtract(
