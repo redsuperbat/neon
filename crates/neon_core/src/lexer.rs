@@ -52,6 +52,7 @@ pub enum TokenKind {
     ImportKeyword,
     FromKeyword,
     ReturnKeyword,
+    EnumKeyword,
 
     Bang,   // !
     Equals, // =
@@ -114,6 +115,7 @@ impl ToString for TokenKind {
             TokenKind::ImportKeyword => "import",
             TokenKind::FromKeyword => "from",
             TokenKind::ReturnKeyword => "return",
+            TokenKind::EnumKeyword => "enum",
 
             TokenKind::OpenAngleBracket => "<",
             TokenKind::ClosedAngleBracket => ">",
@@ -341,6 +343,7 @@ impl Lexer {
             "import" => TokenKind::ImportKeyword,
             "from" => TokenKind::FromKeyword,
             "return" => TokenKind::ReturnKeyword,
+            "enum" => TokenKind::EnumKeyword,
 
             _ => TokenKind::Symbol,
         };
