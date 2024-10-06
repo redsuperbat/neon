@@ -1,89 +1,83 @@
 /**
- * ⚡️ Welcome to *Neon*! ⚡️
- * 
- * Ready to light up the digital horizon with your code? Neon brings simplicity, 
- * speed, and style to the future of programming. Let's get glowing with a quick 
- * tour of what makes Neon shine. 🔮
+ * Welcome to Neon!
  *
- * First up, let's flash that classic *"Hello, World!"* with Neon's signature brilliance:
+ * Neon brings simplicity, speed, and efficiency to programming. This quick introduction 
+ * will guide you through some of Neon's core features and functionality.
+ *
+ * First, let's begin with a basic "Hello, World!" program in Neon:
  */
 
-print("💡 Neon Awakens")  // ⚡ Plug in and power up!
+print("💡 Neon Awakens")  // Output a simple message to the console.
 
-/// Now, let's declare a function—Neon-style. It's as easy as flipping a switch. ⚙️
+/// Now, let's declare a function using Neon's concise syntax.
 
 fn ignite(): string {
-  "⚡ Neon is alive"  // No `return` needed—just pure energy.
+  "⚡ Neon is alive"  // Function returns a string automatically, no explicit return required.
 }
 
 /**
- * Boom! The function `ignite` just returns a string without any extra fluff. 
- * Now, let's store that spark in a variable. 💾
+ * The function `ignite` returns a string value. 
+ * Next, we'll assign that value to a variable.
  */
 
-let signal = ignite()  // ⚡ The neon signal is locked in.
+let signal = ignite()  // Store the result of `ignite` in a variable.
 
-/// Control flow? Of course. Neon handles `if` expressions with futuristic ease:
+/// Let's demonstrate control flow with an `if` expression:
 
 let response = if signal == "⚡ Neon is alive" {
-  "💬 Status: ONLINE"  // 🌐 All systems go.
+  "💬 Status: ONLINE"  // Positive case: Status set to ONLINE.
 } else {
-  "Status: OFFLINE 🚨"
+  "Status: OFFLINE 🚨"  // Negative case: Status set to OFFLINE.
 }
 
 /**
- * 💡 Remember, `if` in Neon always returns a value, so you can directly use it 
- * in expressions, loops, wherever you need! 
+ * In Neon, `if` statements return a value, making them usable 
+ * within expressions, loops, or assignments.
  */
 
-let final_signal = ignite() + " | " + response  // Combine the power signals for max output. 🚀
+let final_signal = ignite() + " | " + response  // Concatenate multiple string values.
 
 /**
- * Let's hit the next gear—looping through arrays. 
- * Imagine these are energy pulses in the grid. 💥
+ * Next, we'll use a `for` loop to iterate over an array of values.
  */
 
 for pulse in ["🔋1", "🔋2", "🔋3"] {
-  print("Pulse level:", pulse)  // Pulse level 1, 2, 3, flowing through the system.
+  print("Pulse level:", pulse)  // Print each value from the array.
 }
 
 /**
- * Neon supports objects too! Let's create a futuristic avatar to keep track of our system:
+ * Neon also supports objects. Below, we create an object with properties and methods:
  */
 
 let cyber_entity = {
   name: "Cybernaut X",
-  age: 2049,  // 🚀 Future-born.
-  ignite, // We can use shorthand syntax for adding properties to objects
+  age: 2049,  // Define attributes of the object.
+  ignite,  // Use shorthand to reference an existing function.
   location: "Neo Tokyo, Sector 7",
   upgrades: ["🦾 Bionic Arm", "🧠 Neural Link"],
   status: fn check_status(): string {
-    "💡: is fully operational."
+    "💡: is fully operational."  // Define a method that returns a string.
   }
 }
 
-/// Accessing the avatar's properties? It's as smooth as slicing through the digital ether:
+/// Accessing object properties is straightforward in Neon:
 
-print("Entity's status:", cyber_entity.status())  // 💡 Cybernaut X is fully operational.
+print("Entity's status:", cyber_entity.status())  // Call the object's method to check status.
 
 /**
- * And of course, since Neon scripts are full expressions, 
- * we can make our avatar's status the final output of the script. ⚡
+ * Finally, we will return the avatar's status as the script's final output.
  */
 
-cyber_entity.status()  // The final evaluation—the system's ready to go live. 🔥
+cyber_entity.status()  // Evaluates to a string indicating the system's status.
 
 /**
- * 🛠 What's the output? 
- * **"💡 Cybernaut X is fully operational."** — Naturally. 🚀
+ * Expected output:
+ * "💡 Cybernaut X is fully operational."
  *
- * This glowing symphony of code is built with Rust at its core, but you're 
- * seeing it run effortlessly in WebAssembly, right here in your browser. 🔌 
- * It's all custom-built—the lexer, parser, interpreter, and semantic analyzer 
- * combine to give you the smoothest experience.
+ * Neon is built with Rust at its foundation, seamlessly integrated with WebAssembly 
+ * for efficient execution in the browser. The entire system—from the lexer, parser, 
+ * to the interpreter—is custom-built for a smooth and streamlined developer experience.
  *
- * Dive deeper into Neon's wonders—explore the examples, remix the code, and 
- * let your imagination light up the future. 🪐
- * 
- * Thanks for charging up with Neon. We're just getting started! ⚡
+ * Explore Neon's features further by experimenting with more examples and code variations. 
+ * Thank you for exploring Neon!
  */
