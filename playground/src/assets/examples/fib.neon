@@ -6,4 +6,5 @@ fn fib(n: int): int {
   }
 }
 
-fib(30)
+fib(25)
+
