@@ -14,13 +14,16 @@ use crate::{
 };
 
 #[derive(Debug, Clone)]
-pub struct Object(pub HashMap<String, Value>);
+pub struct Object {
+    pub properties: HashMap<String, Value>,
+    pub name: String,
+}
 
 impl Object {
     fn single_line_readable(&self) -> String {
-        let mut result = String::from("{ ");
+        let mut result = String::from(self.name.clone() + "{ ");
 
-        for (i, (key, value)) in self.0.iter().enumerate() {
+        for (i, (key, value)) in self.properties.iter().enumerate() {
             if i != 0 {
                 result += ", "
             }
@@ -38,10 +41,10 @@ impl Object {
     }
 
     fn multi_line_readable(&self, indent: usize) -> String {
-        let mut result = String::from("{\n");
+        let mut result = String::from(self.name.clone() + " {\n");
         let indentation = " ".repeat(indent);
 
-        for (i, (key, value)) in self.0.iter().enumerate() {
+        for (i, (key, value)) in self.properties.iter().enumerate() {
             if i != 0 {
                 result += ",\n"
             }
@@ -59,10 +62,10 @@ impl Object {
     }
 
     pub fn to_readable(&self, indent: usize) -> String {
-        if self.0.len() == 0 {
-            return "{}".to_string();
+        if self.properties.len() == 0 {
+            return (self.name.clone() + " {}").to_string();
         }
-        if self.0.len() < 3 {
+        if self.properties.len() < 3 {
             return self.single_line_readable();
         }
         return self.multi_line_readable(indent);
@@ -278,7 +281,7 @@ impl Interpreter {
             });
         };
 
-        match obj.0.get(&node.identifier.name) {
+        match obj.properties.get(&node.identifier.name) {
             Some(v) => Ok(v.clone()),
             None => Ok(Value::Unit),
         }
@@ -296,7 +299,10 @@ impl Interpreter {
             map.insert(p.name.value.clone(), value);
         }
 
-        Ok(Value::Object(Object(map)))
+        Ok(Value::Object(Object {
+            properties: map,
+            name: obj.identifier.name.clone(),
+        }))
     }
 
     fn evaluate_for_loop(
@@ -331,7 +337,7 @@ impl Interpreter {
                         }
                     }
                     Value::Object(obj) => {
-                        for (_, value) in obj.0 {
+                        for (_, value) in obj.properties {
                             loop_ctx.bindings.insert(name.clone(), value);
                             self.evaluate_expression(&body, &mut loop_ctx)?;
                         }
@@ -364,7 +370,7 @@ impl Interpreter {
                     }
                 }
                 Value::Object(obj) => {
-                    for (key, value) in obj.0 {
+                    for (key, value) in obj.properties {
                         loop_ctx.bindings.insert(first.clone(), Value::String(key));
                         loop_ctx.bindings.insert(second.clone(), value.clone());
                         self.evaluate_expression(&body, &mut loop_ctx)?;
