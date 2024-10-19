@@ -1,18 +1,21 @@
 use crate::{
     diagnostic::{
         DiagnosticsList, ErrorDiagnostic, ExpressionNotInvocableError, IncompatibleTypesError,
-        InsufficientArgumentsError, InvalidIndexAccessError, NotIterableError,
-        PropertyDoesNotExistError, UnassignableTypeError, UndefinedTypeError,
+        InsufficientArgumentsError, InvalidIndexAccessError, MissingPropertyError,
+        NotIterableError, SuperfluousPropertyError, UnassignableTypeError, UndefinedTypeError,
     },
     location::{Location, WithLocation},
     parser::{
         ArrayNode, AssignmentNode, BinaryOp, BinaryOperationNode, BlockNode, BuiltinNode, ElseNode,
         Expression, FnNode, ForLoopNode, ForLoopTarget, IdentifierNode, IfNode, IndexAccessNode,
-        InvocationNode, LetBindingNode, ObjectInstantiationNode, PropertyAccessNode,
-        TypeExpression,
+        InvocationNode, LetBindingNode, PropertyAccessNode, StructDefinitionNode,
+        StructInstantiationNode, TypeExpression,
     },
 };
-use std::{collections::HashMap, fmt::Display};
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::Display,
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct PropertyType {
@@ -21,12 +24,12 @@ pub struct PropertyType {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct ObjectType {
+pub struct StructType {
     name: String,
     properties: Vec<PropertyType>,
 }
 
-impl ObjectType {
+impl StructType {
     fn single_line_readable(&self) -> String {
         let mut result = String::from("{ ");
 
@@ -82,7 +85,7 @@ pub enum Type {
     Never,
     Int,
     Bool,
-    Object(ObjectType),
+    Struct(StructType),
     Array(ArrayType),
     Fn(FnType),
 
@@ -115,7 +118,7 @@ impl Display for Type {
                     format!("({parameters}) -> {}", return_type)
                 }
                 Type::Array(t) => format!("{}[]", t.elements),
-                Type::Object(obj) => obj.to_readable(depth),
+                Type::Struct(obj) => obj.to_readable(depth),
             }
         }
 
@@ -162,7 +165,6 @@ impl TypeChecker<'_> {
             Expression::Identifier(node) => self.typeof_identifier(node, env),
             Expression::If(node) => self.typeof_if(node, env),
             Expression::LetBinding(node) => self.typeof_let_binding(node, env),
-            Expression::ObjectInstantiation(node) => self.typeof_object(node, env),
             Expression::Binary(node) => self.typeof_binary(node, env),
             Expression::Invocation(node) => self.typeof_invocation(node, env),
             Expression::Else(node) => self.typeof_else(node, env),
@@ -173,13 +175,72 @@ impl TypeChecker<'_> {
             Expression::IndexAccess(node) => self.typeof_index_access(node, env),
             Expression::Builtin(node) => self.typeof_builtin(node, env),
             Expression::Use(node) => self.typeof_identifier(&node.identifier, env),
-            Expression::StructDefinitionNode(node) => todo!(),
+            Expression::StructDefinitionNode(node) => self.typeof_struct_definition(node, env),
+            Expression::StructInstantiation(node) => self.typeof_struct_instantiation(node, env),
 
             Expression::Bool(..) => Type::Bool,
             Expression::Empty(..) => Type::Unit,
             Expression::Int(..) => Type::Int,
             Expression::String(..) => Type::String,
         }
+    }
+
+    fn typeof_struct_instantiation(
+        &mut self,
+        node: &StructInstantiationNode,
+        env: &mut TypeEnvironment,
+    ) -> Type {
+        let defined_type = env.bindings.get(&node.identifier.name);
+
+        // Symbol table should have produced a diagnostic already of we branch in the else clause
+        // here
+        let Some(Type::Struct(defined_type)) = defined_type else {
+            return Type::Unit;
+        };
+
+        let return_type = defined_type.clone();
+
+        for p in &node.properties {
+            let lhs = return_type
+                .properties
+                .iter()
+                .find(|t| t.name == p.name.value);
+
+            let Some(lhs) = lhs else {
+                self.add_error_diagnostic(ErrorDiagnostic::SuperfluousProperty(
+                    SuperfluousPropertyError {
+                        loc: p.loc,
+                        key: p.name.value.clone(),
+                        access_type: Type::Struct(return_type.clone()),
+                    },
+                ));
+                continue;
+            };
+
+            let rhs = self.typeof_expression(&p.value, env);
+
+            self.unify(&lhs.value, &rhs);
+        }
+
+        let property_names = node
+            .properties
+            .iter()
+            .map(|p| p.name.value.clone())
+            .collect::<HashSet<_>>();
+
+        for missing_prop in return_type
+            .properties
+            .iter()
+            .filter(|t| !property_names.contains(&t.name))
+        {
+            self.add_error_diagnostic(ErrorDiagnostic::MissingProperty(MissingPropertyError {
+                loc: node.loc,
+                key: missing_prop.name.clone(),
+                access_type: Type::Struct(return_type.clone()),
+            }));
+        }
+
+        Type::Struct(return_type)
     }
 
     fn typeof_builtin(&mut self, _node: &BuiltinNode, _env: &mut TypeEnvironment) -> Type {
@@ -209,21 +270,21 @@ impl TypeChecker<'_> {
         env: &mut TypeEnvironment,
     ) -> Type {
         let access_type = self.typeof_expression(&node.object, env);
-        let error = PropertyDoesNotExistError {
+        let error = MissingPropertyError {
             access_type,
             loc: node.identifier.loc,
             key: node.identifier.name.clone(),
         };
 
-        let Type::Object(ObjectType { properties, .. }) = self.typeof_expression(&node.object, env)
+        let Type::Struct(StructType { properties, .. }) = self.typeof_expression(&node.object, env)
         else {
-            return self.add_error_diagnostic(ErrorDiagnostic::PropertyDoesNotExist(error));
+            return self.add_error_diagnostic(ErrorDiagnostic::MissingProperty(error));
         };
 
         let prop_type = properties.iter().find(|p| p.name == node.identifier.name);
 
         let Some(prop_type) = prop_type else {
-            return self.add_error_diagnostic(ErrorDiagnostic::PropertyDoesNotExist(error));
+            return self.add_error_diagnostic(ErrorDiagnostic::MissingProperty(error));
         };
 
         prop_type.value.clone()
@@ -257,7 +318,7 @@ impl TypeChecker<'_> {
         let typeof_iterable = self.typeof_expression(&node.iterable, env);
 
         match typeof_iterable {
-            Type::Object(..) => match &node.targets {
+            Type::Struct(..) => match &node.targets {
                 ForLoopTarget::Single(node) => {
                     // TODO: when union type is implemented use here
                     env.bindings.insert(node.name.clone(), Type::Any);
@@ -428,20 +489,26 @@ impl TypeChecker<'_> {
         Type::Unit
     }
 
-    fn typeof_object(&mut self, node: &ObjectInstantiationNode, env: &mut TypeEnvironment) -> Type {
+    fn typeof_struct_definition(
+        &mut self,
+        node: &StructDefinitionNode,
+        env: &mut TypeEnvironment,
+    ) -> Type {
         let properties = node
             .properties
             .iter()
             .map(|n| PropertyType {
                 name: n.name.value.clone(),
-                value: self.typeof_expression(&n.value, env),
+                value: self.typeof_type_expression(&n.type_expr, env),
             })
             .collect::<Vec<_>>();
 
-        Type::Object(ObjectType {
+        let t = Type::Struct(StructType {
             properties,
             name: node.identifier.name.clone(),
-        })
+        });
+        env.bindings.insert(node.identifier.name.clone(), t.clone());
+        Type::Unit
     }
 
     fn typeof_assignment(&mut self, node: &AssignmentNode, env: &mut TypeEnvironment) -> Type {
@@ -549,8 +616,12 @@ impl TypeChecker<'_> {
                 }
                 _ => self.type_error(lhs, rhs),
             },
-            Type::Object(a) => match &rhs {
-                Type::Object(b) => {
+            Type::Struct(a) => match &rhs {
+                Type::Struct(b) => {
+                    if a.name != b.name {
+                        return self.type_error(lhs, rhs);
+                    }
+
                     for PropertyType { name, value } in &a.properties {
                         let b_prop = b.properties.iter().find(|p| p.name == *name);
                         let Some(b_prop) = b_prop else {

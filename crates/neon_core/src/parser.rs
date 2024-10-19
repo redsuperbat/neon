@@ -231,7 +231,7 @@ pub struct PropertyNode {
 }
 
 #[derive(Debug, Clone)]
-pub struct ObjectInstantiationNode {
+pub struct StructInstantiationNode {
     pub loc: Location,
     pub identifier: IdentifierNode,
     pub properties: Vec<PropertyNode>,
@@ -319,7 +319,7 @@ pub enum Expression {
     Int(IntNode),
     Invocation(InvocationNode),
     LetBinding(LetBindingNode),
-    ObjectInstantiation(ObjectInstantiationNode),
+    StructInstantiation(StructInstantiationNode),
     PropertyAccess(PropertyAccessNode),
     String(StringNode),
     StructDefinitionNode(StructDefinitionNode),
@@ -349,7 +349,7 @@ impl WithLocation for Expression {
             Expression::Int(n) => n.loc,
             Expression::Invocation(n) => n.loc,
             Expression::LetBinding(n) => n.loc,
-            Expression::ObjectInstantiation(n) => n.loc,
+            Expression::StructInstantiation(n) => n.loc,
             Expression::PropertyAccess(n) => n.loc,
             Expression::String(n) => n.loc,
             Expression::Assignment(n) => n.loc,
@@ -644,7 +644,7 @@ impl Parser {
         }))
     }
 
-    fn parse_object_instantiation_node(&mut self) -> Result<ObjectInstantiationNode, SyntaxError> {
+    fn parse_object_instantiation_node(&mut self) -> Result<StructInstantiationNode, SyntaxError> {
         let identifier = self.parse_identifier_node()?;
         let Token { start, .. } = self.assert_next(TokenKind::OpenCurlyBrace)?;
         let mut properties = vec![];
@@ -681,7 +681,7 @@ impl Parser {
 
         let Token { end, .. } = self.assert_next(TokenKind::ClosedCurlyBrace)?;
 
-        Ok(ObjectInstantiationNode {
+        Ok(StructInstantiationNode {
             identifier,
             loc: Location::new(start, end),
             properties,
@@ -694,7 +694,7 @@ impl Parser {
         // but MyStruct should be parsed as an identifier
         if self.at_offset_is(TokenKind::OpenCurlyBrace, 1) {
             let object_instantiation = self.parse_object_instantiation_node()?;
-            Ok(Expression::ObjectInstantiation(object_instantiation))
+            Ok(Expression::StructInstantiation(object_instantiation))
         } else {
             self.parse_identifier()
         }
@@ -883,6 +883,7 @@ impl Parser {
             }
 
             let name = self.parse_property_name_node()?;
+            self.assert_next(TokenKind::Colon)?;
             let type_expr = self.parse_type_expression()?;
             properties.push(TypedPropertyNode {
                 loc: Location::new(name.loc.start, type_expr.loc().end),

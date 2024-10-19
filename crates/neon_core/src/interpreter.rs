@@ -8,7 +8,7 @@ use crate::{
     parser::{
         ArrayNode, AssignmentNode, BinaryOp, BinaryOperationNode, BlockNode, BuiltinNode,
         Expression, FnNode, ForLoopNode, ForLoopTarget, IdentifierNode, IfNode, IndexAccessNode,
-        IntNode, InvocationNode, LetBindingNode, ObjectInstantiationNode, PropertyAccessNode,
+        IntNode, InvocationNode, LetBindingNode, PropertyAccessNode, StructInstantiationNode,
         UseNode,
     },
 };
@@ -231,7 +231,7 @@ impl Interpreter {
             Expression::IndexAccess(node) => self.evaluate_index_access(node, ctx),
             Expression::ForLoop(node) => self.evaluate_for_loop(node, ctx),
             Expression::PropertyAccess(node) => self.evaluate_property_access(node, ctx),
-            Expression::ObjectInstantiation(node) => self.evaluate_object(node, ctx),
+            Expression::StructInstantiation(node) => self.evaluate_object(node, ctx),
             Expression::Assignment(node) => self.evaluate_assignment(node, ctx),
             Expression::Use(node) => self.evaluate_use(node, ctx),
 
@@ -239,7 +239,7 @@ impl Interpreter {
             Expression::String(node) => Ok(Value::String(node.value.clone())),
             Expression::Bool(node) => Ok(Value::Bool(node.value)),
             Expression::Empty(..) => Ok(Value::Unit),
-            _ => panic!("not implemented {:?}", expression),
+            Expression::StructDefinitionNode(..) => Ok(Value::Unit),
         }
     }
 
@@ -286,7 +286,7 @@ impl Interpreter {
 
     fn evaluate_object(
         &self,
-        obj: &ObjectInstantiationNode,
+        obj: &StructInstantiationNode,
         ctx: &mut EvaluationContext,
     ) -> Result<Value, RuntimeError> {
         let mut map = HashMap::new();

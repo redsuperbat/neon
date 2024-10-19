@@ -1,9 +1,12 @@
 use crate::{
-    diagnostic::{Diagnostic, DiagnosticsList, ErrorDiagnostic, UndefinedReferenceError},
+    diagnostic::{
+        Diagnostic, DiagnosticsList, DuplicateDefinitionError, ErrorDiagnostic,
+        UndefinedReferenceError,
+    },
     parser::{
         ArrayNode, AssignmentNode, BinaryOperationNode, BlockNode, Expression, FnNode, ForLoopNode,
         ForLoopTarget, IdentifierNode, IfNode, IndexAccessNode, InvocationNode, LetBindingNode,
-        ObjectInstantiationNode,
+        StructDefinitionNode, StructInstantiationNode,
     },
 };
 use std::{collections::HashSet, mem};
@@ -42,7 +45,7 @@ impl Scope {
         let current = mem::replace(&mut self.parent, None);
         match current {
             Some(current) => *self = *current,
-            None => panic!("Internal neon error"),
+            None => panic!("Cannot exit root scope"),
         };
     }
 
@@ -63,23 +66,43 @@ impl Scope {
         self.variable_declarations = declarations;
     }
 
-    pub fn has_identifier(&self, identifier: &IdentifierNode) -> bool {
+    pub fn is_struct_declared(&self, identifier: &IdentifierNode) -> bool {
         let id = &identifier.name;
-
-        if self.variable_declarations.contains(id) {
-            return true;
-        }
-
-        if self.function_declarations.contains(id) {
-            return true;
-        }
 
         if self.struct_declarations.contains(id) {
             return true;
         }
 
         if let Some(parent) = &self.parent {
-            return parent.has_identifier(identifier);
+            return parent.is_struct_declared(identifier);
+        }
+
+        false
+    }
+
+    pub fn is_fn_declared(&self, identifier: &IdentifierNode) -> bool {
+        let id = &identifier.name;
+
+        if self.function_declarations.contains(id) {
+            return true;
+        }
+
+        if let Some(parent) = &self.parent {
+            return parent.is_fn_declared(identifier);
+        }
+
+        false
+    }
+
+    pub fn is_variable_declared(&self, identifier: &IdentifierNode) -> bool {
+        let id = &identifier.name;
+
+        if self.variable_declarations.contains(id) {
+            return true;
+        }
+
+        if let Some(parent) = &self.parent {
+            return parent.is_variable_declared(identifier);
         }
 
         false
@@ -107,12 +130,13 @@ impl SymbolTable<'_> {
             Expression::Binary(node) => self.visit_binary(node, s),
             Expression::Array(node) => self.visit_array(node, s),
             Expression::ForLoop(node) => self.visit_for_loop(node, s),
-            Expression::ObjectInstantiation(node) => self.visit_object(node, s),
             Expression::Else(node) => self.visit_expression(&node.consequent, s),
             Expression::IndexAccess(node) => self.visit_index_access(&node, s),
             Expression::PropertyAccess(node) => self.visit_expression(&node.object, s),
             Expression::Assignment(node) => self.visit_assignment(node, s),
-            Expression::StructDefinitionNode(node) => todo!(),
+
+            Expression::StructDefinitionNode(node) => self.visit_struct_definition(node, s),
+            Expression::StructInstantiation(node) => self.visit_struct_instantiation(node, s),
 
             Expression::Use(..) => (),
             Expression::Int(..) => (),
@@ -133,12 +157,25 @@ impl SymbolTable<'_> {
         self.visit_expression(&node.right, s);
     }
 
-    fn visit_object(&mut self, object: &ObjectInstantiationNode, s: &mut Scope) {
-        s.enter(&vec![]);
-        for property in &object.properties {
-            self.visit_expression(property.value.as_ref(), s);
+    fn visit_struct_definition(&mut self, node: &StructDefinitionNode, s: &mut Scope) {
+        if s.is_struct_declared(&node.identifier) {
+            self.dl.add_error(ErrorDiagnostic::DuplicateDefinition(
+                DuplicateDefinitionError {
+                    loc: node.loc,
+                    typeof_duplicate: "struct".to_string(),
+                    name: node.identifier.name.clone(),
+                },
+            ));
+            return;
+        };
+        s.struct_declarations.insert(node.identifier.name.clone());
+    }
+
+    fn visit_struct_instantiation(&mut self, node: &StructInstantiationNode, s: &mut Scope) {
+        if s.is_struct_declared(&node.identifier) {
+            return;
         }
-        s.exit();
+        self.undefined_reference(&node.identifier, "struct");
     }
 
     fn visit_for_loop(&mut self, for_loop: &ForLoopNode, s: &mut Scope) {
@@ -183,13 +220,24 @@ impl SymbolTable<'_> {
         }
     }
 
-    fn visit_fn(&mut self, exp: &FnNode, s: &mut Scope) {
+    fn visit_fn(&mut self, node: &FnNode, s: &mut Scope) {
+        if s.is_fn_declared(&node.identifier) {
+            self.dl.add_error(ErrorDiagnostic::DuplicateDefinition(
+                DuplicateDefinitionError {
+                    typeof_duplicate: "function".to_string(),
+                    loc: node.loc,
+                    name: node.identifier.name.clone(),
+                },
+            ));
+            return;
+        };
+
         let FnNode {
             identifier,
             parameters,
             body,
             ..
-        } = exp;
+        } = node;
 
         s.declare_fn(&identifier.name);
         let identifiers = parameters.iter().map(|t| t.identifier.clone()).collect();
@@ -218,17 +266,26 @@ impl SymbolTable<'_> {
         }
     }
 
-    fn visit_identifier(&mut self, identifier: &IdentifierNode, s: &mut Scope) {
-        if s.has_identifier(&identifier) {
-            return;
-        }
+    fn undefined_reference(&mut self, identifier: &IdentifierNode, reference_type: &str) {
         self.dl
             .add(Diagnostic::Error(ErrorDiagnostic::UndefinedReference(
                 UndefinedReferenceError {
+                    reference_type: reference_type.to_string(),
                     loc: identifier.loc,
                     name: identifier.name.to_string(),
                 },
             )));
+    }
+
+    fn visit_identifier(&mut self, identifier: &IdentifierNode, s: &mut Scope) {
+        if s.is_variable_declared(&identifier) {
+            return;
+        };
+
+        if s.is_fn_declared(&identifier) {
+            return;
+        };
+        self.undefined_reference(identifier, "identifier");
     }
 
     fn visit_let(&mut self, l: &LetBindingNode, s: &mut Scope) {
