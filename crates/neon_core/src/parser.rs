@@ -1,3 +1,4 @@
+use core::panic;
 use std::collections::VecDeque;
 
 use crate::{
@@ -6,9 +7,16 @@ use crate::{
     location::{Location, Pos, WithLocation},
 };
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+enum ParserState {
+    Default,
+    Let,
+}
+
 pub struct Parser {
     tokens: VecDeque<Token>,
     last_location: Location,
+    state: Vec<ParserState>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -50,14 +58,14 @@ pub struct IfNode {
 pub struct TypedIdentifierNode {
     pub loc: Location,
     pub identifier: IdentifierNode,
-    pub typed: Option<TypeExpression>,
+    pub type_expr: Option<TypeExpression>,
 }
 
 #[derive(Debug, Clone)]
 pub struct ParameterNode {
     pub loc: Location,
     pub identifier: IdentifierNode,
-    pub typed: TypeExpression,
+    pub type_expr: TypeExpression,
 }
 
 #[derive(Debug, Clone)]
@@ -232,7 +240,7 @@ pub struct ObjectInstantiationNode {
 #[derive(Debug, Clone)]
 pub struct TypedPropertyNode {
     pub loc: Location,
-    pub name: String,
+    pub name: PropertyNameNode,
     pub type_expr: TypeExpression,
 }
 
@@ -314,6 +322,7 @@ pub enum Expression {
     ObjectInstantiation(ObjectInstantiationNode),
     PropertyAccess(PropertyAccessNode),
     String(StringNode),
+    StructDefinitionNode(StructDefinitionNode),
     Use(UseNode),
 }
 
@@ -345,6 +354,7 @@ impl WithLocation for Expression {
             Expression::String(n) => n.loc,
             Expression::Assignment(n) => n.loc,
             Expression::Use(n) => n.loc,
+            Expression::StructDefinitionNode(n) => n.loc,
 
             Expression::Empty(loc) => *loc,
         }
@@ -381,7 +391,6 @@ impl SyntaxError {
 #[derive(Debug)]
 pub enum SyntaxErrorKind {
     UnexpectedEndOfFile,
-
     UnexpectedToken {
         expected: Vec<TokenKind>,
         found: TokenKind,
@@ -502,6 +511,7 @@ impl Parser {
         Parser {
             tokens: VecDeque::from(tokens),
             last_location: Location::new(Pos::start(), Pos::start()),
+            state: vec![ParserState::Default],
         }
     }
 
@@ -533,6 +543,10 @@ impl Parser {
 
     fn peek(&self) -> Option<&Token> {
         self.peek_at_offset(0)
+    }
+
+    fn assert_peek(&self) -> Result<&Token, SyntaxError> {
+        self.peek().ok_or(self.eof())
     }
 
     fn peek_at_offset(&self, i: usize) -> Option<&Token> {
@@ -676,6 +690,8 @@ impl Parser {
 
     fn parse_object_instantiation_or_identifier(&mut self) -> Result<Expression, SyntaxError> {
         // Look 1 step ahead since the identifier is parsed by the subsequent function calls
+        // Eg, MyStruct {} should be parsed as an object instantiation
+        // but MyStruct should be parsed as an identifier
         if self.at_offset_is(TokenKind::OpenCurlyBrace, 1) {
             let object_instantiation = self.parse_object_instantiation_node()?;
             Ok(Expression::ObjectInstantiation(object_instantiation))
@@ -807,14 +823,28 @@ impl Parser {
     }
 
     fn parse_leaf_expression(&mut self) -> Result<Expression, SyntaxError> {
-        let next = self.peek();
+        let next = self.assert_peek()?;
 
-        let Some(next) = next else {
-            return Err(self.eof());
-        };
+        match self.state.last() {
+            Some(state) => match state {
+                ParserState::Default => match next.kind {
+                    TokenKind::FnKeyword => self.parse_fn(),
+                    TokenKind::StructKeyword => self.parse_struct_definition(),
+                    TokenKind::LetKeyword => self.parse_let(),
+                    TokenKind::UseKeyword => self.parse_use(),
+                    TokenKind::ForKeyword => self.parse_for_loop(),
 
+                    _ => self.parse_stateless_expression(),
+                },
+                ParserState::Let => self.parse_stateless_expression(),
+            },
+            None => panic!("internal neon error"),
+        }
+    }
+
+    fn parse_stateless_expression(&mut self) -> Result<Expression, SyntaxError> {
+        let next = self.assert_peek()?;
         match next.kind {
-            TokenKind::FnKeyword => self.parse_fn(),
             TokenKind::OpenSquareBracket => self.parse_array(),
             TokenKind::OpenCurlyBrace => self.parse_block(),
             TokenKind::FalseKeyword => self.parse_false_keyword(),
@@ -822,27 +852,57 @@ impl Parser {
             TokenKind::IntegerLiteral => self.parse_integer(),
             TokenKind::StringLiteral => self.parse_string(),
             TokenKind::IfKeyword => self.parse_if(),
-            TokenKind::LetKeyword => self.parse_let(),
-            TokenKind::ForKeyword => self.parse_for_loop(),
-            TokenKind::UseKeyword => self.parse_use(),
-
             TokenKind::Symbol => self.parse_object_instantiation_or_identifier(),
+
             _ => SyntaxError::unexpected_token(
                 vec![
-                    TokenKind::FnKeyword,
                     TokenKind::OpenSquareBracket,
-                    TokenKind::ClosedCurlyBrace,
+                    TokenKind::OpenCurlyBrace,
                     TokenKind::FalseKeyword,
                     TokenKind::TrueKeyword,
                     TokenKind::IntegerLiteral,
                     TokenKind::StringLiteral,
                     TokenKind::IfKeyword,
-                    TokenKind::LetKeyword,
                     TokenKind::Symbol,
                 ],
                 next,
             ),
         }
+    }
+
+    fn parse_struct_definition(&mut self) -> Result<Expression, SyntaxError> {
+        let structure = self.assert_next(TokenKind::StructKeyword)?;
+        let identifier = self.parse_identifier_node()?;
+        self.assert_next(TokenKind::OpenCurlyBrace)?;
+        let mut properties = vec![];
+
+        loop {
+            // If the first iteration returns an empty object
+            if self.next_is(TokenKind::ClosedCurlyBrace) {
+                break;
+            }
+
+            let name = self.parse_property_name_node()?;
+            let type_expr = self.parse_type_expression()?;
+            properties.push(TypedPropertyNode {
+                loc: Location::new(name.loc.start, type_expr.loc().end),
+                type_expr,
+                name,
+            });
+
+            if self.next_is(TokenKind::Comma) {
+                self.next()?;
+            } else {
+                break;
+            }
+        }
+        let Token { end, .. } = self.assert_next(TokenKind::ClosedCurlyBrace)?;
+
+        Ok(Expression::StructDefinitionNode(StructDefinitionNode {
+            loc: Location::new(structure.start, end),
+            identifier,
+            properties,
+        }))
     }
 
     fn parse_use(&mut self) -> Result<Expression, SyntaxError> {
@@ -909,7 +969,7 @@ impl Parser {
         Ok(TypedIdentifierNode {
             loc: Location::new((&identifier).loc.start, end),
             identifier,
-            typed,
+            type_expr: typed,
         })
     }
 
@@ -1088,7 +1148,9 @@ impl Parser {
         let mut right = None;
         if self.next_is(TokenKind::Equals) {
             self.assert_next(TokenKind::Equals)?;
+            self.state.push(ParserState::Let);
             right = Some(self.parse_expression()?);
+            self.state.pop();
         };
 
         let end = right.as_ref().map(|r| r.loc().end).unwrap_or(name.loc.end);
@@ -1114,7 +1176,7 @@ impl Parser {
             params.push(ParameterNode {
                 loc: Location::new(identifier.loc.start, typed.loc().end),
                 identifier,
-                typed,
+                type_expr: typed,
             });
 
             if self.next_is(TokenKind::ClosedParen) {

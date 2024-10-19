@@ -35,6 +35,7 @@ impl LuaCompiler {
             Expression::String(string_node) => format!("\"{}\"", string_node.value),
             Expression::Empty(..) => "".to_string(),
             Expression::Use(node) => todo!("{:?}", node),
+            _ => panic!("not implemented {:?}", expression),
         }
     }
 

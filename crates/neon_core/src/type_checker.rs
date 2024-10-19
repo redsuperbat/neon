@@ -22,6 +22,7 @@ pub struct PropertyType {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ObjectType {
+    name: String,
     properties: Vec<PropertyType>,
 }
 
@@ -172,6 +173,7 @@ impl TypeChecker<'_> {
             Expression::IndexAccess(node) => self.typeof_index_access(node, env),
             Expression::Builtin(node) => self.typeof_builtin(node, env),
             Expression::Use(node) => self.typeof_identifier(&node.identifier, env),
+            Expression::StructDefinitionNode(node) => todo!(),
 
             Expression::Bool(..) => Type::Bool,
             Expression::Empty(..) => Type::Unit,
@@ -213,7 +215,7 @@ impl TypeChecker<'_> {
             key: node.identifier.name.clone(),
         };
 
-        let Type::Object(ObjectType { properties }) = self.typeof_expression(&node.object, env)
+        let Type::Object(ObjectType { properties, .. }) = self.typeof_expression(&node.object, env)
         else {
             return self.add_error_diagnostic(ErrorDiagnostic::PropertyDoesNotExist(error));
         };
@@ -298,7 +300,7 @@ impl TypeChecker<'_> {
     fn typeof_fn(&mut self, node: &FnNode, env: &mut TypeEnvironment) -> Type {
         let mut parameters = vec![];
         for param in &node.parameters {
-            let param_type = self.typeof_type_expression(&param.typed, env);
+            let param_type = self.typeof_type_expression(&param.type_expr, env);
             env.bindings
                 .insert(param.identifier.name.clone(), param_type.clone());
             parameters.push(param_type);
@@ -414,7 +416,7 @@ impl TypeChecker<'_> {
             Type::Unit
         };
 
-        let t = if let Some(type_exp) = &node.binding.typed {
+        let t = if let Some(type_exp) = &node.binding.type_expr {
             let lhs = self.typeof_type_expression(&type_exp, env);
             self.unify(&lhs, &rhs);
             lhs
@@ -435,7 +437,11 @@ impl TypeChecker<'_> {
                 value: self.typeof_expression(&n.value, env),
             })
             .collect::<Vec<_>>();
-        Type::Object(ObjectType { properties })
+
+        Type::Object(ObjectType {
+            properties,
+            name: node.identifier.name.clone(),
+        })
     }
 
     fn typeof_assignment(&mut self, node: &AssignmentNode, env: &mut TypeEnvironment) -> Type {

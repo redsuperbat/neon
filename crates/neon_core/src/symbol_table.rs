@@ -11,19 +11,31 @@ use std::{collections::HashSet, mem};
 #[derive(Debug, Clone)]
 pub struct Scope {
     parent: Option<Box<Scope>>,
-    declarations: HashSet<String>,
+    variable_declarations: HashSet<String>,
+    function_declarations: HashSet<String>,
+    struct_declarations: HashSet<String>,
 }
 
 impl Scope {
     pub fn global() -> Scope {
         Scope {
-            declarations: HashSet::new(),
+            variable_declarations: HashSet::new(),
+            function_declarations: HashSet::new(),
+            struct_declarations: HashSet::new(),
             parent: None,
         }
     }
 
-    pub fn declare(&mut self, id: &str) {
-        self.declarations.insert(id.to_string());
+    pub fn declare_variable(&mut self, id: &str) {
+        self.variable_declarations.insert(id.to_string());
+    }
+
+    pub fn declare_struct(&mut self, id: &str) {
+        self.struct_declarations.insert(id.to_string());
+    }
+
+    pub fn declare_fn(&mut self, id: &str) {
+        self.function_declarations.insert(id.to_string());
     }
 
     pub fn exit(&mut self) {
@@ -42,16 +54,27 @@ impl Scope {
 
         let new_parent = Scope {
             parent: self.parent.take(),
-            declarations: std::mem::take(&mut self.declarations),
+            variable_declarations: std::mem::take(&mut self.variable_declarations),
+            function_declarations: std::mem::take(&mut self.function_declarations),
+            struct_declarations: std::mem::take(&mut self.struct_declarations),
         };
 
         self.parent = Some(Box::new(new_parent));
-        self.declarations = declarations;
+        self.variable_declarations = declarations;
     }
 
     pub fn has_identifier(&self, identifier: &IdentifierNode) -> bool {
         let id = &identifier.name;
-        if self.declarations.contains(id) {
+
+        if self.variable_declarations.contains(id) {
+            return true;
+        }
+
+        if self.function_declarations.contains(id) {
+            return true;
+        }
+
+        if self.struct_declarations.contains(id) {
             return true;
         }
 
@@ -89,6 +112,7 @@ impl SymbolTable<'_> {
             Expression::IndexAccess(node) => self.visit_index_access(&node, s),
             Expression::PropertyAccess(node) => self.visit_expression(&node.object, s),
             Expression::Assignment(node) => self.visit_assignment(node, s),
+            Expression::StructDefinitionNode(node) => todo!(),
 
             Expression::Use(..) => (),
             Expression::Int(..) => (),
@@ -167,7 +191,7 @@ impl SymbolTable<'_> {
             ..
         } = exp;
 
-        s.declare(&identifier.name);
+        s.declare_fn(&identifier.name);
         let identifiers = parameters.iter().map(|t| t.identifier.clone()).collect();
         s.enter(&identifiers);
         self.visit_expression(body, s);
@@ -212,7 +236,7 @@ impl SymbolTable<'_> {
         if let Some(right) = right.as_ref() {
             self.visit_expression(right, s);
         };
-        s.declare(&binding.identifier.name);
+        s.declare_variable(&binding.identifier.name);
     }
 
     fn visit_binary(&mut self, bin: &BinaryOperationNode, s: &mut Scope) {

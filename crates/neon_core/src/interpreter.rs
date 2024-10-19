@@ -239,6 +239,7 @@ impl Interpreter {
             Expression::String(node) => Ok(Value::String(node.value.clone())),
             Expression::Bool(node) => Ok(Value::Bool(node.value)),
             Expression::Empty(..) => Ok(Value::Unit),
+            _ => panic!("not implemented {:?}", expression),
         }
     }
 
