@@ -30,62 +30,61 @@ impl Into<Location> for Token {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum TokenKind {
+    AsKeyword,
+    BreakKeyword,
+    ContinueKeyword,
     ElseKeyword,
+    EnumKeyword,
     FalseKeyword,
     FnKeyword,
     ForKeyword,
+    FromKeyword,
     IfKeyword,
+    ImportKeyword,
     InKeyword,
     LetKeyword,
-    TrueKeyword,
     LoopKeyword,
-    WhileKeyword,
-    StructKeyword,
-    SelfKeyword,
-    PubKeyword,
-    TypeKeyword,
     MatchKeyword,
-    BreakKeyword,
-    ContinueKeyword,
-    UseKeyword,
-    AsKeyword,
-    ImportKeyword,
-    FromKeyword,
+    PubKeyword,
     ReturnKeyword,
-    EnumKeyword,
+    SelfKeyword,
+    StructKeyword,
+    TrueKeyword,
+    TypeKeyword,
+    UseKeyword,
+    ValKeyword,
+    VarKeyword,
+    WhileKeyword,
 
-    Bang,   // !
-    Equals, // =
+    IntegerLiteral,
+    StringLiteral,
 
-    Plus,               // +
-    Minus,              // -
-    OpenAngleBracket,   // <
-    ClosedAngleBracket, // >
-
-    Dot, // .
+    Symbol,
 
     Ampersand,           // &
-    DollarSign,          // $
-    Asterix,             // *
+    Asterisk,            // *
+    Bang,                // !
+    ClosedAngleBracket,  // >
     ClosedCurlyBrace,    // }
     ClosedParen,         // )
     ClosedSquareBracket, // ]
+    Colon,               // :
     Comma,               // ,
+    DollarSign,          // $
+    Dot,                 // .
+    Equals,              // =
     ForwardSlash,        // /
+    Minus,               // -
+    Newline,             // \n
+    OpenAngleBracket,    // <
     OpenCurlyBrace,      // {
     OpenParen,           // (
     OpenSquareBracket,   // ]
     Percentage,          // %
     Pipe,                // |
-
-    IntegerLiteral, // 5
-    StringLiteral,  // "hello world" etc.
-
-    Symbol,     // abc
-    Newline,    // \n
-    SemiColon,  // ;
-    Colon,      // :
-    WhiteSpace, // ' '
+    Plus,                // +
+    SemiColon,           // ;
+    WhiteSpace,          // ' '
 
     Unknown(String),
 }
@@ -116,6 +115,8 @@ impl ToString for TokenKind {
             TokenKind::FromKeyword => "from",
             TokenKind::ReturnKeyword => "return",
             TokenKind::EnumKeyword => "enum",
+            TokenKind::VarKeyword => "var",
+            TokenKind::ValKeyword => "val",
 
             TokenKind::OpenAngleBracket => "<",
             TokenKind::ClosedAngleBracket => ">",
@@ -124,7 +125,7 @@ impl ToString for TokenKind {
             TokenKind::Plus => "+",
             TokenKind::Ampersand => "&",
             TokenKind::Pipe => "|",
-            TokenKind::Asterix => "*",
+            TokenKind::Asterisk => "*",
 
             TokenKind::SemiColon => ";",
             TokenKind::Colon => ":",
@@ -189,7 +190,7 @@ impl Lexer {
             '/' => self.single_char(TokenKind::ForwardSlash),
             '+' => self.single_char(TokenKind::Plus),
             '-' => self.single_char(TokenKind::Minus),
-            '*' => self.single_char(TokenKind::Asterix),
+            '*' => self.single_char(TokenKind::Asterisk),
             ']' => self.single_char(TokenKind::ClosedSquareBracket),
             '[' => self.single_char(TokenKind::OpenSquareBracket),
             '.' => self.single_char(TokenKind::Dot),
@@ -344,6 +345,8 @@ impl Lexer {
             "from" => TokenKind::FromKeyword,
             "return" => TokenKind::ReturnKeyword,
             "enum" => TokenKind::EnumKeyword,
+            "var" => TokenKind::VarKeyword,
+            "val" => TokenKind::ValKeyword,
 
             _ => TokenKind::Symbol,
         };
