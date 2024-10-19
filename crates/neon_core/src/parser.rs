@@ -463,10 +463,10 @@ impl SignificantTokenClassifier {
                                 continue;
                             }
 
-                            TokenKind::Asterix => {
+                            TokenKind::Asterisk => {
                                 self.next();
                                 while !self
-                                    .next_pair_is((TokenKind::Asterix, TokenKind::ForwardSlash))
+                                    .next_pair_is((TokenKind::Asterisk, TokenKind::ForwardSlash))
                                 {
                                     match self.next() {
                                         Some(_) => (),

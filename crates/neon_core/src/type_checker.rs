@@ -1,6 +1,6 @@
 use crate::{
     diagnostic::{
-        DiagnosticsList, ErrorDiagnostic, ExpressionNotInvokableError, IncompatibleTypesError,
+        DiagnosticsList, ErrorDiagnostic, ExpressionNotInvocableError, IncompatibleTypesError,
         InsufficientArgumentsError, InvalidIndexAccessError, NotIterableError,
         PropertyDoesNotExistError, UnassignableTypeError, UndefinedTypeError,
     },
@@ -327,8 +327,8 @@ impl TypeChecker<'_> {
         let callee = self.typeof_expression(&node.callee, env);
 
         let Type::Fn(fn_type) = callee else {
-            return self.add_error_diagnostic(ErrorDiagnostic::ExpressionNotInvokable(
-                ExpressionNotInvokableError {
+            return self.add_error_diagnostic(ErrorDiagnostic::ExpressionNotInvocable(
+                ExpressionNotInvocableError {
                     loc: node.callee.loc(),
                     callee_type: callee,
                 },
