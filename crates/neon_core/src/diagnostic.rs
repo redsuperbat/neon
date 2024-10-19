@@ -22,13 +22,13 @@ pub struct IncompatibleTypesError {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct ExpressionNotInvokableError {
+pub struct ExpressionNotInvocableError {
     pub loc: Location,
     pub callee_type: Type,
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct InsufficientOverlapmentError {
+pub struct InsufficientOverlapError {
     pub loc: Location,
 }
 
@@ -77,10 +77,10 @@ pub enum ErrorDiagnostic {
     NotIterable(NotIterableError),
     UndefinedReference(UndefinedReferenceError),
     IncompatibleTypes(IncompatibleTypesError),
-    ExpressionNotInvokable(ExpressionNotInvokableError),
+    ExpressionNotInvocable(ExpressionNotInvocableError),
     InsufficientArguments(InsufficientArgumentsError),
     UndefinedType(UndefinedTypeError),
-    InsufficientOverlapment(InsufficientOverlapmentError),
+    InsufficientOverlap(InsufficientOverlapError),
     PropertyDoesNotExist(PropertyDoesNotExistError),
     InvalidIndexAccess(InvalidIndexAccessError),
     InvalidSyntax(InvalidSyntaxError),
@@ -97,8 +97,8 @@ impl ToString for ErrorDiagnostic {
                 "If expression has incompatible arms, expected `{}` found `{}`.",
                 e.consequent, e.alternate
             ),
-            ErrorDiagnostic::ExpressionNotInvokable(e) => format!("Expression with type `{}` is not invokable.", e.callee_type),
-            ErrorDiagnostic::InsufficientOverlapment(_e) => "Binary operation on types seems to be a mistake since none of them overlap sufficiently with each other.".to_string(),
+            ErrorDiagnostic::ExpressionNotInvocable(e) => format!("Expression with type `{}` is not invocable.", e.callee_type),
+            ErrorDiagnostic::InsufficientOverlap(_e) => "Binary operation on types seems to be a mistake since none of them overlap sufficiently with each other.".to_string(),
             ErrorDiagnostic::PropertyDoesNotExist(e) => format!("Property `{}` does not exist on type `{}`.", e.key, e.access_type),
             ErrorDiagnostic::InvalidIndexAccess(e) => format!("Expression of type `{}` can't be used to index type `{}`.", e.index_type, e.indexee_type),
             ErrorDiagnostic::InsufficientArguments(e) => format!("Expected `{}` arguments got `{}`.", e.expected, e.got),
@@ -119,8 +119,8 @@ impl ErrorDiagnostic {
             ErrorDiagnostic::UnassignableType(e) => e.loc,
             ErrorDiagnostic::UndefinedReference(e) => e.loc,
             ErrorDiagnostic::IncompatibleTypes(e) => e.loc,
-            ErrorDiagnostic::ExpressionNotInvokable(e) => e.loc,
-            ErrorDiagnostic::InsufficientOverlapment(e) => e.loc,
+            ErrorDiagnostic::ExpressionNotInvocable(e) => e.loc,
+            ErrorDiagnostic::InsufficientOverlap(e) => e.loc,
             ErrorDiagnostic::PropertyDoesNotExist(e) => e.loc,
             ErrorDiagnostic::InvalidIndexAccess(e) => e.loc,
             ErrorDiagnostic::InsufficientArguments(e) => e.loc,
@@ -185,6 +185,12 @@ impl DiagnosticsList {
 
     pub fn clear(&mut self) {
         self.diagnostics.clear()
+    }
+
+    pub fn consume(&mut self, list: &DiagnosticsList) {
+        for d in &list.diagnostics {
+            self.add(d.clone());
+        }
     }
 
     pub fn merge(&self, list: &mut DiagnosticsList) -> DiagnosticsList {
