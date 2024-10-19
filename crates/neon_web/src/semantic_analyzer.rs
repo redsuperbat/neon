@@ -180,8 +180,8 @@ impl SemanticAnalyzer {
     fn analyze_forward_slash(&mut self) -> Option<SemanticToken> {
         let Token { start, .. } = self.next()?;
         // For /* comments
-        if self.next_is(TokenKind::Asterix) {
-            while !self.next_pair_is((TokenKind::Asterix, TokenKind::ForwardSlash)) {
+        if self.next_is(TokenKind::Asterisk) {
+            while !self.next_pair_is((TokenKind::Asterisk, TokenKind::ForwardSlash)) {
                 self.next()?;
             }
             self.next()?;

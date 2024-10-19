@@ -13,7 +13,7 @@ print("Third element (using expression in index):", numbers[1 + 1])
  * booleans, and even other arrays.
  */
 
-fn pie_eater(i) {
+fn pie_eater(i: int) {
   print("I want", i, "number of pies")
 }
 
@@ -51,11 +51,11 @@ print("Second element of the first array in nestedArray:", nestedArray[0][1])
  * Let's try an array of functions to see how Neon handles it.
  */
 
-fn greet(name) {
+fn greet(name: string) {
   print("Hello,", name)
 }
 
-fn farewell(name) {
+fn farewell(name: string) {
   print("Goodbye,", name)
 }
 
@@ -74,7 +74,7 @@ farewellFunc("Bob")
  * and immutable variables to iterate through an array.
  */
 
-fn print_array_elements(arr, length, index) {
+fn print_array_elements(arr: string[], length: int, index: int) {
     if index < length {
         print("Element at index", index, ":", arr[index])
         print_array_elements(arr, length, index + 1)
@@ -93,7 +93,7 @@ print_array_elements(numbers2, numbers_length, 0)
  * using recursion without reassignment.
  */
 
-fn sum_array_elements(arr, length, index, total) {
+fn sum_array_elements(arr: int[], length: int, index: int, total: int) {
     if index < length {
       let new_total = total + arr[index]
       sum_array_elements(arr, length, index + 1, new_total)

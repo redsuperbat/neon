@@ -13,7 +13,7 @@ pub struct Compiler {
     lua_compiler: LuaCompiler,
     interpreter: Interpreter,
 
-    // Mutatates during parsing and evaluating
+    // Mutates during parsing and evaluating
     type_env: TypeEnvironment,
     scope: Scope,
     eval_ctx: EvaluationContext,
