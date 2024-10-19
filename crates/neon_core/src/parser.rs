@@ -141,12 +141,6 @@ pub struct ObjectPropertyTypeNode {
 }
 
 #[derive(Debug, Clone)]
-pub struct ObjectTypeNode {
-    pub loc: Location,
-    pub properties: Vec<ObjectPropertyTypeNode>,
-}
-
-#[derive(Debug, Clone)]
 pub struct IdentifierTypeNode {
     pub loc: Location,
     pub name: String,
@@ -171,7 +165,6 @@ pub enum TypeExpression {
     Bool(BoolTypeNode),
     Array(ArrayTypeNode),
     Unit(UnitTypeNode),
-    Object(ObjectTypeNode),
     Fn(FnTypeNode),
     Identifier(IdentifierTypeNode),
 }
@@ -183,7 +176,6 @@ impl WithLocation for TypeExpression {
             TypeExpression::String(t) => t.loc,
             TypeExpression::Bool(t) => t.loc,
             TypeExpression::Array(t) => t.loc,
-            TypeExpression::Object(t) => t.loc,
             TypeExpression::Identifier(t) => t.loc,
             TypeExpression::Unit(t) => t.loc,
             TypeExpression::Fn(t) => t.loc,
@@ -231,9 +223,24 @@ pub struct PropertyNode {
 }
 
 #[derive(Debug, Clone)]
-pub struct ObjectNode {
-    pub properties: Vec<PropertyNode>,
+pub struct ObjectInstantiationNode {
     pub loc: Location,
+    pub identifier: IdentifierNode,
+    pub properties: Vec<PropertyNode>,
+}
+
+#[derive(Debug, Clone)]
+pub struct TypedPropertyNode {
+    pub loc: Location,
+    pub name: String,
+    pub type_expr: TypeExpression,
+}
+
+#[derive(Debug, Clone)]
+pub struct StructDefinitionNode {
+    pub loc: Location,
+    pub identifier: IdentifierNode,
+    pub properties: Vec<TypedPropertyNode>,
 }
 
 #[derive(Debug, Clone)]
@@ -304,7 +311,7 @@ pub enum Expression {
     Int(IntNode),
     Invocation(InvocationNode),
     LetBinding(LetBindingNode),
-    Object(ObjectNode),
+    ObjectInstantiation(ObjectInstantiationNode),
     PropertyAccess(PropertyAccessNode),
     String(StringNode),
     Use(UseNode),
@@ -333,7 +340,7 @@ impl WithLocation for Expression {
             Expression::Int(n) => n.loc,
             Expression::Invocation(n) => n.loc,
             Expression::LetBinding(n) => n.loc,
-            Expression::Object(n) => n.loc,
+            Expression::ObjectInstantiation(n) => n.loc,
             Expression::PropertyAccess(n) => n.loc,
             Expression::String(n) => n.loc,
             Expression::Assignment(n) => n.loc,
@@ -536,11 +543,15 @@ impl Parser {
         Some((self.peek()?, self.peek_at_offset(1)?))
     }
 
-    fn next_is(&self, kind: TokenKind) -> bool {
-        match self.peek() {
+    fn at_offset_is(&self, kind: TokenKind, offset: usize) -> bool {
+        match self.peek_at_offset(offset) {
             Some(token) => token.kind == kind,
             None => false,
         }
+    }
+
+    fn next_is(&self, kind: TokenKind) -> bool {
+        self.at_offset_is(kind, 0)
     }
 
     fn parse_expression(&mut self) -> Result<Expression, SyntaxError> {
@@ -619,6 +630,60 @@ impl Parser {
         }))
     }
 
+    fn parse_object_instantiation_node(&mut self) -> Result<ObjectInstantiationNode, SyntaxError> {
+        let identifier = self.parse_identifier_node()?;
+        let Token { start, .. } = self.assert_next(TokenKind::OpenCurlyBrace)?;
+        let mut properties = vec![];
+
+        loop {
+            // If the first iteration returns an empty object
+            if self.next_is(TokenKind::ClosedCurlyBrace) {
+                break;
+            }
+
+            let name = self.parse_property_name_node()?;
+            let value = if self.next_is(TokenKind::Colon) {
+                self.assert_next(TokenKind::Colon)?;
+                self.parse_expression()?
+            } else {
+                Expression::Identifier(IdentifierNode {
+                    name: name.value.clone(),
+                    loc: name.loc,
+                })
+            };
+
+            properties.push(PropertyNode {
+                loc: Location::new(name.loc.start, value.loc().end),
+                name,
+                value: value.boxed(),
+            });
+
+            if self.next_is(TokenKind::Comma) {
+                self.next()?;
+            } else {
+                break;
+            }
+        }
+
+        let Token { end, .. } = self.assert_next(TokenKind::ClosedCurlyBrace)?;
+
+        Ok(ObjectInstantiationNode {
+            identifier,
+            loc: Location::new(start, end),
+            properties,
+        })
+    }
+
+    fn parse_object_instantiation_or_identifier(&mut self) -> Result<Expression, SyntaxError> {
+        // Look 1 step ahead since the identifier is parsed by the subsequent function calls
+        if self.at_offset_is(TokenKind::OpenCurlyBrace, 1) {
+            let object_instantiation = self.parse_object_instantiation_node()?;
+            Ok(Expression::ObjectInstantiation(object_instantiation))
+        } else {
+            self.parse_identifier()
+        }
+    }
+
     fn parse_identifier(&mut self) -> Result<Expression, SyntaxError> {
         Ok(Expression::Identifier(self.parse_identifier_node()?))
     }
@@ -661,10 +726,7 @@ impl Parser {
             };
             return Ok(exp);
         }
-        if self.next_is(TokenKind::OpenParen) {
-            return self.parse_fn_type_expression();
-        };
-        self.parse_object_type_expression()
+        return self.parse_fn_type_expression();
     }
 
     fn parse_fn_type_expression(&mut self) -> Result<TypeExpression, SyntaxError> {
@@ -685,7 +747,6 @@ impl Parser {
                 break;
             }
         }
-        println!("{:?}", parameters);
 
         self.assert_next(TokenKind::ClosedParen)?;
         self.assert_next(TokenKind::Minus)?;
@@ -696,38 +757,6 @@ impl Parser {
             loc: Location::new(start, return_type.loc().end),
             parameters,
             return_type: Box::new(return_type),
-        }))
-    }
-
-    fn parse_object_type_expression(&mut self) -> Result<TypeExpression, SyntaxError> {
-        let mut properties = vec![];
-        let Token { start, .. } = self.assert_next(TokenKind::OpenCurlyBrace)?;
-
-        loop {
-            // If the first iteration returns an empty object
-            if self.next_is(TokenKind::ClosedCurlyBrace) {
-                break;
-            }
-
-            let name = self.parse_property_name_node()?;
-            let property_type = self.parse_mandatory_type()?;
-            properties.push(ObjectPropertyTypeNode {
-                loc: Location::new(name.loc.start, property_type.loc().end),
-                name,
-                property_type: Box::new(property_type),
-            });
-
-            if self.next_is(TokenKind::Comma) {
-                self.next()?;
-            } else {
-                break;
-            }
-        }
-
-        let Token { end, .. } = self.assert_next(TokenKind::ClosedCurlyBrace)?;
-        Ok(TypeExpression::Object(ObjectTypeNode {
-            loc: Location::new(start, end),
-            properties,
         }))
     }
 
@@ -777,48 +806,6 @@ impl Parser {
         })
     }
 
-    fn parse_object(&mut self) -> Result<Expression, SyntaxError> {
-        let Token { start, .. } = self.assert_next(TokenKind::OpenCurlyBrace)?;
-        let mut properties = vec![];
-
-        loop {
-            // If the first iteration returns an empty object
-            if self.next_is(TokenKind::ClosedCurlyBrace) {
-                break;
-            }
-
-            let name = self.parse_property_name_node()?;
-            let value = if self.next_is(TokenKind::Colon) {
-                self.assert_next(TokenKind::Colon)?;
-                self.parse_expression()?
-            } else {
-                Expression::Identifier(IdentifierNode {
-                    name: name.value.clone(),
-                    loc: name.loc,
-                })
-            };
-
-            properties.push(PropertyNode {
-                loc: Location::new(name.loc.start, value.loc().end),
-                name,
-                value: value.boxed(),
-            });
-
-            if self.next_is(TokenKind::Comma) {
-                self.next()?;
-            } else {
-                break;
-            }
-        }
-
-        let Token { end, .. } = self.assert_next(TokenKind::ClosedCurlyBrace)?;
-
-        Ok(Expression::Object(ObjectNode {
-            loc: Location::new(start, end),
-            properties,
-        }))
-    }
-
     fn parse_leaf_expression(&mut self) -> Result<Expression, SyntaxError> {
         let next = self.peek();
 
@@ -829,16 +816,17 @@ impl Parser {
         match next.kind {
             TokenKind::FnKeyword => self.parse_fn(),
             TokenKind::OpenSquareBracket => self.parse_array(),
-            TokenKind::OpenCurlyBrace => self.parse_object(),
+            TokenKind::OpenCurlyBrace => self.parse_block(),
             TokenKind::FalseKeyword => self.parse_false_keyword(),
             TokenKind::TrueKeyword => self.parse_true_keyword(),
             TokenKind::IntegerLiteral => self.parse_integer(),
             TokenKind::StringLiteral => self.parse_string(),
             TokenKind::IfKeyword => self.parse_if(),
             TokenKind::LetKeyword => self.parse_let(),
-            TokenKind::Symbol => self.parse_identifier(),
             TokenKind::ForKeyword => self.parse_for_loop(),
             TokenKind::UseKeyword => self.parse_use(),
+
+            TokenKind::Symbol => self.parse_object_instantiation_or_identifier(),
             _ => SyntaxError::unexpected_token(
                 vec![
                     TokenKind::FnKeyword,

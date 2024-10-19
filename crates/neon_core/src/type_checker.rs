@@ -8,7 +8,8 @@ use crate::{
     parser::{
         ArrayNode, AssignmentNode, BinaryOp, BinaryOperationNode, BlockNode, BuiltinNode, ElseNode,
         Expression, FnNode, ForLoopNode, ForLoopTarget, IdentifierNode, IfNode, IndexAccessNode,
-        InvocationNode, LetBindingNode, ObjectNode, PropertyAccessNode, TypeExpression,
+        InvocationNode, LetBindingNode, ObjectInstantiationNode, PropertyAccessNode,
+        TypeExpression,
     },
 };
 use std::{collections::HashMap, fmt::Display};
@@ -160,7 +161,7 @@ impl TypeChecker<'_> {
             Expression::Identifier(node) => self.typeof_identifier(node, env),
             Expression::If(node) => self.typeof_if(node, env),
             Expression::LetBinding(node) => self.typeof_let_binding(node, env),
-            Expression::Object(node) => self.typeof_object(node, env),
+            Expression::ObjectInstantiation(node) => self.typeof_object(node, env),
             Expression::Binary(node) => self.typeof_binary(node, env),
             Expression::Invocation(node) => self.typeof_invocation(node, env),
             Expression::Else(node) => self.typeof_else(node, env),
@@ -394,16 +395,6 @@ impl TypeChecker<'_> {
             TypeExpression::Array(node) => Type::Array(ArrayType {
                 elements: Box::new(self.typeof_type_expression(&node.elements, env)),
             }),
-            TypeExpression::Object(node) => Type::Object(ObjectType {
-                properties: node
-                    .properties
-                    .iter()
-                    .map(|p| PropertyType {
-                        name: p.name.value.clone(),
-                        value: self.typeof_type_expression(&p.property_type, env),
-                    })
-                    .collect(),
-            }),
             TypeExpression::Identifier(node) => match env.bindings.get(&node.name) {
                 Some(t) => t.clone(),
                 None => {
@@ -435,7 +426,7 @@ impl TypeChecker<'_> {
         Type::Unit
     }
 
-    fn typeof_object(&mut self, node: &ObjectNode, env: &mut TypeEnvironment) -> Type {
+    fn typeof_object(&mut self, node: &ObjectInstantiationNode, env: &mut TypeEnvironment) -> Type {
         let properties = node
             .properties
             .iter()

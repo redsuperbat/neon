@@ -3,7 +3,7 @@ use crate::{
     parser::{
         ArrayNode, AssignmentNode, BinaryOperationNode, BlockNode, Expression, FnNode, ForLoopNode,
         ForLoopTarget, IdentifierNode, IfNode, IndexAccessNode, InvocationNode, LetBindingNode,
-        ObjectNode,
+        ObjectInstantiationNode,
     },
 };
 use std::{collections::HashSet, mem};
@@ -84,7 +84,7 @@ impl SymbolTable<'_> {
             Expression::Binary(node) => self.visit_binary(node, s),
             Expression::Array(node) => self.visit_array(node, s),
             Expression::ForLoop(node) => self.visit_for_loop(node, s),
-            Expression::Object(node) => self.visit_object(node, s),
+            Expression::ObjectInstantiation(node) => self.visit_object(node, s),
             Expression::Else(node) => self.visit_expression(&node.consequent, s),
             Expression::IndexAccess(node) => self.visit_index_access(&node, s),
             Expression::PropertyAccess(node) => self.visit_expression(&node.object, s),
@@ -109,7 +109,7 @@ impl SymbolTable<'_> {
         self.visit_expression(&node.right, s);
     }
 
-    fn visit_object(&mut self, object: &ObjectNode, s: &mut Scope) {
+    fn visit_object(&mut self, object: &ObjectInstantiationNode, s: &mut Scope) {
         s.enter(&vec![]);
         for property in &object.properties {
             self.visit_expression(property.value.as_ref(), s);

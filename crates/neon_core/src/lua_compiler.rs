@@ -26,7 +26,7 @@ impl LuaCompiler {
 
             Expression::Builtin(node) => todo!("{:?}", node),
             Expression::Else(node) => todo!("{:?}", node),
-            Expression::Object(node) => todo!("{:?}", node),
+            Expression::ObjectInstantiation(node) => todo!("{:?}", node),
             Expression::PropertyAccess(node) => todo!("{:?}", node),
             Expression::IndexAccess(node) => todo!("{:?}", node),
 
