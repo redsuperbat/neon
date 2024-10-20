@@ -1,8 +1,9 @@
 use crate::{
     diagnostic::{
         DiagnosticsList, ErrorDiagnostic, ExpressionNotInvocableError, IncompatibleTypesError,
-        InsufficientArgumentsError, InvalidIndexAccessError, MissingPropertyError,
-        NotIterableError, SuperfluousPropertyError, UnassignableTypeError, UndefinedTypeError,
+        InsufficientArgumentsError, InvalidIndexAccessError, MissingPropertyAccessError,
+        MissingPropertyError, NotIterableError, SuperfluousPropertyError, UnassignableTypeError,
+        UndefinedTypeError,
     },
     location::{Location, WithLocation},
     parser::{
@@ -27,46 +28,6 @@ pub struct PropertyType {
 pub struct StructType {
     name: String,
     properties: Vec<PropertyType>,
-}
-
-impl StructType {
-    fn single_line_readable(&self) -> String {
-        let mut result = String::from("{ ");
-
-        for (i, PropertyType { name, value }) in self.properties.iter().enumerate() {
-            if i != 0 {
-                result += ", "
-            }
-            result += &format!("{name}: {}", format!("{}", value));
-        }
-        result += " }";
-        result
-    }
-
-    fn multi_line_readable(&self, indent: usize) -> String {
-        let mut result = String::from("{\n");
-        let indentation = " ".repeat(indent);
-
-        for (i, PropertyType { name, value }) in self.properties.iter().enumerate() {
-            if i != 0 {
-                result += ",\n"
-            }
-            result += &format!("{}{name}: {}", indentation, format!("{}", value));
-        }
-        let indentation = " ".repeat(indent - 2);
-        result += &format!("\n{indentation}}}");
-        result
-    }
-
-    pub fn to_readable(&self, indent: usize) -> String {
-        if self.properties.len() == 0 {
-            return "{}".to_string();
-        }
-        if self.properties.len() < 3 {
-            return self.single_line_readable();
-        }
-        return self.multi_line_readable(indent);
-    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -96,33 +57,31 @@ pub enum Type {
 
 impl Display for Type {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        fn fmt_type(depth: usize, t: &Type) -> String {
-            match t {
-                Type::String => "string".to_string(),
-                Type::Int => "int".to_string(),
-                Type::Bool => "boolean".to_string(),
-                Type::Unit => "unit".to_string(),
-                Type::Never => "never".to_string(),
-                Type::Any => "any".to_string(),
-                Type::Fn(FnType {
-                    parameters,
-                    return_type,
-                    ..
-                }) => {
-                    let parameters = parameters
-                        .iter()
-                        .map(|t| format!("{}", t))
-                        .collect::<Vec<_>>()
-                        .join(",");
+        let s = match self {
+            Type::String => "string".to_string(),
+            Type::Int => "int".to_string(),
+            Type::Bool => "boolean".to_string(),
+            Type::Unit => "unit".to_string(),
+            Type::Never => "never".to_string(),
+            Type::Any => "any".to_string(),
+            Type::Fn(FnType {
+                parameters,
+                return_type,
+                ..
+            }) => {
+                let parameters = parameters
+                    .iter()
+                    .map(|t| format!("{}", t))
+                    .collect::<Vec<_>>()
+                    .join(",");
 
-                    format!("({parameters}) -> {}", return_type)
-                }
-                Type::Array(t) => format!("{}[]", t.elements),
-                Type::Struct(obj) => obj.to_readable(depth),
+                format!("({parameters}) -> {}", return_type)
             }
-        }
+            Type::Array(t) => format!("{}[]", t.elements),
+            Type::Struct(t) => format!("{} {{..}}", t.name),
+        };
 
-        write!(f, "{}", fmt_type(2, self))
+        write!(f, "{}", s)
     }
 }
 
@@ -234,9 +193,9 @@ impl TypeChecker<'_> {
             .filter(|t| !property_names.contains(&t.name))
         {
             self.add_error_diagnostic(ErrorDiagnostic::MissingProperty(MissingPropertyError {
-                loc: node.loc,
-                key: missing_prop.name.clone(),
-                access_type: Type::Struct(return_type.clone()),
+                loc: node.identifier.loc,
+                property: missing_prop.name.clone(),
+                missing_from: Type::Struct(return_type.clone()),
             }));
         }
 
@@ -270,21 +229,21 @@ impl TypeChecker<'_> {
         env: &mut TypeEnvironment,
     ) -> Type {
         let access_type = self.typeof_expression(&node.object, env);
-        let error = MissingPropertyError {
-            access_type,
+        let error = MissingPropertyAccessError {
+            accessed_on: access_type,
             loc: node.identifier.loc,
-            key: node.identifier.name.clone(),
+            property: node.identifier.name.clone(),
         };
 
         let Type::Struct(StructType { properties, .. }) = self.typeof_expression(&node.object, env)
         else {
-            return self.add_error_diagnostic(ErrorDiagnostic::MissingProperty(error));
+            return self.add_error_diagnostic(ErrorDiagnostic::MissingPropertyAccess(error));
         };
 
         let prop_type = properties.iter().find(|p| p.name == node.identifier.name);
 
         let Some(prop_type) = prop_type else {
-            return self.add_error_diagnostic(ErrorDiagnostic::MissingProperty(error));
+            return self.add_error_diagnostic(ErrorDiagnostic::MissingPropertyAccess(error));
         };
 
         prop_type.value.clone()
@@ -380,7 +339,7 @@ impl TypeChecker<'_> {
         env.bindings
             .insert(node.identifier.name.clone(), fn_type.clone());
 
-        let inferred_return_type = self.typeof_expression(&node.body, env);
+        let inferred_return_type = self.typeof_expression(&node.body.return_val, env);
 
         self.unify(&return_type, &inferred_return_type);
 

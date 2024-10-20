@@ -645,7 +645,7 @@ impl Interpreter {
                     .insert(param.identifier.name.clone(), argument.clone());
             });
 
-        self.evaluate_expression(&body, &mut ctx)
+        self.evaluate_block(&body, &mut ctx)
     }
 
     fn evaluate_identifier(

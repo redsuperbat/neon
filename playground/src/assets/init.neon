@@ -4,12 +4,10 @@
  * Neon brings simplicity, speed, and efficiency to programming. This quick introduction 
  * will guide you through some of Neon's core features and functionality.
  *
- * First, let's begin with a basic "Hello, World!" program in Neon:
  */
 
-print("💡 Neon Awakens")  // Output a simple message to the console.
 
-/// Now, let's declare a function using Neon's concise syntax.
+// Let's declare a function
 
 fn ignite(): string {
   "⚡ Neon is alive"  // Function returns a string automatically, no explicit return required.
@@ -20,9 +18,9 @@ fn ignite(): string {
  * Next, we'll assign that value to a variable.
  */
 
-let signal = ignite()  // Store the result of `ignite` in a variable.
+let signal = ignite()
 
-/// Let's demonstrate control flow with an `if` expression:
+// Let's demonstrate control flow with an `if` expression:
 
 let response = if signal == "⚡ Neon is alive" {
   "💬 Status: ONLINE"  // Positive case: Status set to ONLINE.
@@ -41,28 +39,34 @@ let final_signal = ignite() + " | " + response  // Concatenate multiple string v
  * Next, we'll use a `for` loop to iterate over an array of values.
  */
 
-for pulse in ["🔋1", "🔋2", "🔋3"] {
-  print("Pulse level:", pulse)  // Print each value from the array.
+for pulse in [1, 2, 3] {
+
 }
 
 /**
- * Neon also supports objects. Below, we create an object with properties and methods:
+ * Neon also supports structs. Below, we define a struct with properties:
  */
 
-let cyber_entity = {
-  name: "Cybernaut X",
-  age: 2049,  // Define attributes of the object.
-  ignite,  // Use shorthand to reference an existing function.
-  location: "Neo Tokyo, Sector 7",
-  upgrades: ["🦾 Bionic Arm", "🧠 Neural Link"],
-  status: fn check_status(): string {
-    "💡: is fully operational."  // Define a method that returns a string.
-  }
+struct CyberEntity {
+  name: string,
+  age: int,
+  location: string,
+  upgrades: string[],
+  status: () -> string
 }
 
-/// Accessing object properties is straightforward in Neon:
+/**
+ * Instantiating the struct like so:
+ */
 
-print("Entity's status:", cyber_entity.status())  // Call the object's method to check status.
+let cyber_entity = CyberEntity {
+  name: "Cybernaut X",
+  age: 2049,  // Define attributes of the object.
+  location: "Neo Tokyo, Sector 7",
+  upgrades: ["🦾 Bionic Arm", "🧠 Neural Link"],
+  status: ignite
+}
+
 
 /**
  * Finally, we will return the avatar's status as the script's final output.

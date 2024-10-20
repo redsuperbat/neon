@@ -59,23 +59,23 @@ impl LuaCompiler {
             fn_str += &param.identifier.name;
         }
         fn_str += ")\n";
-        fn_str += &self.compile_expression(&node.body);
+        fn_str += &self.compile_block(&node.body);
         fn_str += "\n";
         fn_str += "end";
         fn_str
     }
 
     fn compile_invocation(&self, node: &InvocationNode) -> String {
-        let mut invo = self.compile_expression(&node.callee);
-        invo += "(";
+        let mut invocation = self.compile_expression(&node.callee);
+        invocation += "(";
         for (i, arg) in node.arguments.iter().enumerate() {
             if i != 0 {
-                invo += ","
+                invocation += ","
             }
-            invo += &self.compile_expression(arg);
+            invocation += &self.compile_expression(arg);
         }
-        invo += ")";
-        invo
+        invocation += ")";
+        invocation
     }
 
     fn compile_let_binding(&self, node: &LetBindingNode) -> String {

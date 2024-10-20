@@ -242,7 +242,7 @@ impl SymbolTable<'_> {
         s.declare_fn(&identifier.name);
         let identifiers = parameters.iter().map(|t| t.identifier.clone()).collect();
         s.enter(&identifiers);
-        self.visit_expression(body, s);
+        self.visit_block(body, s);
         s.exit();
     }
 

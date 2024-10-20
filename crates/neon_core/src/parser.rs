@@ -11,6 +11,7 @@ use crate::{
 enum ParserState {
     Default,
     Let,
+    For,
 }
 
 pub struct Parser {
@@ -73,7 +74,7 @@ pub struct FnNode {
     pub loc: Location,
     pub identifier: IdentifierNode,
     pub parameters: Vec<ParameterNode>,
-    pub body: Box<Expression>,
+    pub body: BlockNode,
     pub return_type: Option<TypeExpression>,
 }
 
@@ -644,7 +645,7 @@ impl Parser {
         }))
     }
 
-    fn parse_object_instantiation_node(&mut self) -> Result<StructInstantiationNode, SyntaxError> {
+    fn parse_struct_instantiation_node(&mut self) -> Result<StructInstantiationNode, SyntaxError> {
         let identifier = self.parse_identifier_node()?;
         let Token { start, .. } = self.assert_next(TokenKind::OpenCurlyBrace)?;
         let mut properties = vec![];
@@ -688,12 +689,12 @@ impl Parser {
         })
     }
 
-    fn parse_object_instantiation_or_identifier(&mut self) -> Result<Expression, SyntaxError> {
+    fn parse_struct_instantiation_or_identifier(&mut self) -> Result<Expression, SyntaxError> {
         // Look 1 step ahead since the identifier is parsed by the subsequent function calls
         // Eg, MyStruct {} should be parsed as an object instantiation
         // but MyStruct should be parsed as an identifier
         if self.at_offset_is(TokenKind::OpenCurlyBrace, 1) {
-            let object_instantiation = self.parse_object_instantiation_node()?;
+            let object_instantiation = self.parse_struct_instantiation_node()?;
             Ok(Expression::StructInstantiation(object_instantiation))
         } else {
             self.parse_identifier()
@@ -836,6 +837,12 @@ impl Parser {
 
                     _ => self.parse_stateless_expression(),
                 },
+                // When parsing for loop iterables we treat all symbols as identifiers
+                ParserState::For => match next.kind {
+                    TokenKind::Symbol => self.parse_identifier(),
+
+                    _ => self.parse_stateless_expression(),
+                },
                 ParserState::Let => self.parse_stateless_expression(),
             },
             None => panic!("internal neon error"),
@@ -852,7 +859,7 @@ impl Parser {
             TokenKind::IntegerLiteral => self.parse_integer(),
             TokenKind::StringLiteral => self.parse_string(),
             TokenKind::IfKeyword => self.parse_if(),
-            TokenKind::Symbol => self.parse_object_instantiation_or_identifier(),
+            TokenKind::Symbol => self.parse_struct_instantiation_or_identifier(),
 
             _ => SyntaxError::unexpected_token(
                 vec![
@@ -921,7 +928,9 @@ impl Parser {
 
         let targets = self.parse_loop_targets()?;
         self.assert_next(TokenKind::InKeyword)?;
+        self.state.push(ParserState::For);
         let iterable = self.parse_expression()?.boxed();
+        self.state.pop();
         let body = self.parse_block()?.boxed();
 
         Ok(Expression::ForLoop(ForLoopNode {
@@ -1030,16 +1039,19 @@ impl Parser {
         Ok((body, return_val))
     }
 
-    fn parse_block(&mut self) -> Result<Expression, SyntaxError> {
+    fn parse_block_node(&mut self) -> Result<BlockNode, SyntaxError> {
         let Token { start, .. } = self.assert_next(TokenKind::OpenCurlyBrace)?;
         let (body, return_val) = self.parse_block_body()?;
         let Token { end, .. } = self.assert_next(TokenKind::ClosedCurlyBrace)?;
-
-        Ok(Expression::Block(BlockNode {
+        Ok(BlockNode {
             loc: Location::new(start, end),
             return_val: return_val.boxed(),
             body,
-        }))
+        })
+    }
+
+    fn parse_block(&mut self) -> Result<Expression, SyntaxError> {
+        Ok(Expression::Block(self.parse_block_node()?))
     }
 
     pub fn parse_program(&mut self) -> Result<Expression, SyntaxError> {
@@ -1197,14 +1209,14 @@ impl Parser {
         let parameters = self.parse_parameters()?;
         let return_type = self.parse_optional_type();
 
-        let block = self.parse_block()?;
+        let block = self.parse_block_node()?;
 
         Ok(Expression::Fn(FnNode {
             return_type,
-            loc: Location::new(start, block.loc().end),
+            loc: Location::new(start, block.loc.end),
             identifier: name,
             parameters,
-            body: block.boxed(),
+            body: block,
         }))
     }
 }

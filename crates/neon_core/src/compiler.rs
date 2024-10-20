@@ -4,7 +4,7 @@ use crate::{
     lexer::Lexer,
     lua_compiler::LuaCompiler,
     parser::{Expression, Parser},
-    std::{fmt::FMT, io::IO},
+    std::io::IO,
     symbol_table::{Scope, SymbolTable},
     type_checker::{TypeChecker, TypeEnvironment},
 };
@@ -60,7 +60,6 @@ impl Compiler {
     }
 
     pub fn register_libraries(&mut self) {
-        self.register_library(FMT);
         self.register_library(IO);
     }
 

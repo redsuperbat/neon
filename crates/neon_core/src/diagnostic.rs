@@ -36,8 +36,15 @@ pub struct InsufficientOverlapError {
 #[derive(Debug, Clone, PartialEq)]
 pub struct MissingPropertyError {
     pub loc: Location,
-    pub access_type: Type,
-    pub key: String,
+    pub missing_from: Type,
+    pub property: String,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct MissingPropertyAccessError {
+    pub loc: Location,
+    pub accessed_on: Type,
+    pub property: String,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -87,6 +94,13 @@ pub struct DuplicateDefinitionError {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct MismatchedTypeError {
+    pub loc: Location,
+    pub found: Type,
+    pub expected: Type,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum ErrorDiagnostic {
     UnassignableType(UnassignableTypeError),
     NotIterable(NotIterableError),
@@ -97,6 +111,8 @@ pub enum ErrorDiagnostic {
     UndefinedType(UndefinedTypeError),
     InsufficientOverlap(InsufficientOverlapError),
     MissingProperty(MissingPropertyError),
+    MissingPropertyAccess(MissingPropertyAccessError),
+    MismatchedType(MismatchedTypeError),
     DuplicateDefinition(DuplicateDefinitionError),
     SuperfluousProperty(SuperfluousPropertyError),
     InvalidIndexAccess(InvalidIndexAccessError),
@@ -107,23 +123,25 @@ impl ToString for ErrorDiagnostic {
     fn to_string(&self) -> String {
         match self {
             ErrorDiagnostic::UnassignableType(e) => {
-                format!("Type `{}` is not assignable to type `{}`.", e.rhs, e.lhs)
+                format!("Type '{}' is not assignable to type '{}'.", e.rhs, e.lhs)
             }
-            ErrorDiagnostic::UndefinedReference(e) => format!("Undefined `{}` reference `{}`.", e.reference_type, e.name),
+            ErrorDiagnostic::UndefinedReference(e) => format!("Undefined {} reference '{}'.", e.reference_type, e.name),
             ErrorDiagnostic::IncompatibleTypes(e) => format!(
-                "If expression has incompatible arms, expected `{}` found `{}`.",
+                "If expression has incompatible arms, expected type '{}' found '{}'.",
                 e.consequent, e.alternate
             ),
-            ErrorDiagnostic::ExpressionNotInvocable(e) => format!("Expression with type `{}` is not invocable.", e.callee_type),
+            ErrorDiagnostic::ExpressionNotInvocable(e) => format!("Expected function found '{}'", e.callee_type),
             ErrorDiagnostic::InsufficientOverlap(_e) => "Binary operation on types seems to be a mistake since none of them overlap sufficiently with each other.".to_string(),
-            ErrorDiagnostic::MissingProperty(e) => format!("Property `{}` does not exist on type `{}`.", e.key, e.access_type),
-            ErrorDiagnostic::SuperfluousProperty(e) =>  format!("Type `{}` does not define property `{}`.", e.access_type, e.key),
-            ErrorDiagnostic::InvalidIndexAccess(e) => format!("Expression of type `{}` can't be used to index type `{}`.", e.index_type, e.indexee_type),
-            ErrorDiagnostic::InsufficientArguments(e) => format!("Expected `{}` arguments got `{}`.", e.expected, e.got),
-            ErrorDiagnostic::UndefinedType(e) => format!("Type `{}` is not defined in current scope.", e.name),
-            ErrorDiagnostic::NotIterable(e) => format!("Type `{}` is not iterable.", e.non_iterable),
+            ErrorDiagnostic::MissingProperty(e) => format!("Property '{}' is missing, but required in type '{}'", e.property, e.missing_from),
+            ErrorDiagnostic::SuperfluousProperty(e) =>  format!("Struct may only specify known properties, and '{}' does not exist in type '{}'", e.key, e.access_type),
+            ErrorDiagnostic::InvalidIndexAccess(e) => format!("Expression of type '{}' can't be used to index type '{}'.", e.index_type, e.indexee_type),
+            ErrorDiagnostic::InsufficientArguments(e) => format!("Expected '{}' arguments got '{}'.", e.expected, e.got),
+            ErrorDiagnostic::UndefinedType(e) => format!("Type '{}' is not defined in current scope.", e.name),
+            ErrorDiagnostic::NotIterable(e) => format!("Type '{}' is not iterable.", e.non_iterable),
             ErrorDiagnostic::InvalidSyntax(e) => e.message.clone(),
-            ErrorDiagnostic::DuplicateDefinition(e) => format!("`{}` `{}` defined multiple times in current scope.", e.typeof_duplicate, e.name),
+            ErrorDiagnostic::DuplicateDefinition(e) => format!("'{}' '{}' defined multiple times in current scope.", e.typeof_duplicate, e.name),
+            ErrorDiagnostic::MissingPropertyAccess(e) => format!("Property '{}' does not exist on type '{}'", e.property, e.accessed_on),
+            ErrorDiagnostic::MismatchedType(e) => format!("Mismatched types, expected '{}', found '{}'", e.expected, e.found),
         }
     }
 }
@@ -148,6 +166,8 @@ impl ErrorDiagnostic {
             ErrorDiagnostic::InvalidSyntax(e) => e.loc,
             ErrorDiagnostic::SuperfluousProperty(e) => e.loc,
             ErrorDiagnostic::DuplicateDefinition(e) => e.loc,
+            ErrorDiagnostic::MissingPropertyAccess(e) => e.loc,
+            ErrorDiagnostic::MismatchedType(e) => e.loc,
         }
     }
 }
