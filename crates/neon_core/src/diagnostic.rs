@@ -142,6 +142,7 @@ impl ToString for DiagnosticsList {
         self.diagnostics
             .iter()
             .map(|d| d.to_string())
+            .inspect(|d| println!("{:?}", d))
             .collect::<Vec<_>>()
             .join("\n")
     }

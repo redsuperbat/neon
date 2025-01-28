@@ -7,7 +7,6 @@ use crate::{
         InvocationNode, LetBindingNode, PropertyAccessNode, StructDefinitionNode,
         StructInstantiationNode, TypeExpression,
     },
-    unifier::Unifier,
 };
 use std::{
     collections::{HashMap, HashSet},
@@ -97,7 +96,6 @@ impl TypeEnvironment {
 pub struct TypeChecker<'a> {
     current_loc: Location,
     dl: &'a mut DiagnosticsList,
-    unifier: Unifier,
 }
 
 impl TypeChecker<'_> {
@@ -105,7 +103,6 @@ impl TypeChecker<'_> {
         TypeChecker {
             current_loc: Location::beginning(),
             dl,
-            unifier: Unifier::new(),
         }
     }
 
@@ -175,7 +172,7 @@ impl TypeChecker<'_> {
 
             let rhs = self.typeof_expression(&p.value, env);
 
-            if self.unifier.unify(&lhs.value, &rhs) == Type::Never {
+            if self.unify(&lhs.value, &rhs) == Type::Never {
                 self.dl.add_error(
                     DiagnosticKind::MismatchedTypes {
                         expected: lhs.value.clone(),
@@ -358,7 +355,7 @@ impl TypeChecker<'_> {
     }
 
     fn check_type_match(&mut self, lhs: &Type, rhs: &Type, loc: impl Into<Location>) -> Type {
-        let t = self.unifier.unify(lhs, rhs);
+        let t = self.unify(lhs, rhs);
         if t == Type::Never {
             self.dl.add_error(
                 DiagnosticKind::MismatchedTypes {
@@ -528,7 +525,7 @@ impl TypeChecker<'_> {
         };
         let alternate = self.typeof_expression(&alternate, env);
 
-        let result = self.unifier.unify(&consequent, &alternate);
+        let result = self.unify(&consequent, &alternate);
         if result == Type::Never {
             return self.error(
                 DiagnosticKind::IncompatibleTypes {
@@ -545,6 +542,54 @@ impl TypeChecker<'_> {
         match env.bindings.get(&node.name) {
             Some(t) => t.clone(),
             None => Type::Never,
+        }
+    }
+
+    fn unify(&mut self, lhs: &Type, rhs: &Type) -> Type {
+        if *rhs == Type::Any || *lhs == Type::Any {
+            return Type::Any;
+        }
+
+        match &lhs {
+            Type::Never => self.type_error(lhs, rhs),
+
+            Type::Int => match &rhs {
+                Type::Int => Type::Int,
+                _ => self.type_error(&lhs, rhs),
+            },
+            Type::Bool => match &rhs {
+                Type::Bool => Type::Bool,
+                _ => self.type_error(lhs, rhs),
+            },
+            Type::String => match &rhs {
+                Type::String => Type::String,
+                _ => self.type_error(lhs, rhs),
+            },
+            Type::Unit => match &rhs {
+                Type::Unit => Type::Unit,
+                _ => self.type_error(lhs, rhs),
+            },
+            Type::Fn(a) => match &rhs {
+                Type::Fn(b) => {
+                    for (a, b) in a.parameters.iter().zip(b.parameters.iter()) {
+                        if self.unify(a, b) == Type::Never {
+                            return self.type_error(lhs, rhs);
+                        }
+                    }
+
+                    if self.unify(&a.return_type, &b.return_type) == Type::Never {
+                        return self.type_error(lhs, rhs);
+                    }
+
+                    lhs.clone()
+                }
+                _ => self.type_error(lhs, rhs),
+            },
+            Type::Array(a) => match &rhs {
+                Type::Array(b) => self.unify(&a.elements, &b.elements),
+                _ => self.type_error(lhs, rhs),
+            },
+            _ => Type::Never,
         }
     }
 

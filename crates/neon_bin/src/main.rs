@@ -77,7 +77,9 @@ fn compile_to_lua(path: &str) -> Result<String, ()> {
     match compiler.compile_lua(&src) {
         Ok(v) => Ok(v),
         Err(dl) => {
-            dl.diagnostics.iter().for_each(|d| println!("{}", d));
+            dl.diagnostics
+                .iter()
+                .for_each(|d| println!("{}", d.to_string()));
             Err(())
         }
     }

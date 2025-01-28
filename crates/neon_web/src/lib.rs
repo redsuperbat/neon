@@ -3,7 +3,7 @@ mod semantic_analyzer;
 use js_sys::Array;
 use neon_core::{
     compiler::Compiler,
-    diagnostic::{Diagnostic, DiagnosticsList},
+    diagnostic::DiagnosticsList,
     interpreter::{ForeignFunctionInterface, RuntimeError, Value},
     lexer::Lexer,
     location::{Location, Pos},
@@ -109,12 +109,9 @@ impl From<DiagnosticsList> for CompilationDiagnostics {
             errors: dl
                 .diagnostics
                 .iter()
-                .map(|d| match d {
-                    Diagnostic::Error(e) => e,
-                })
                 .map(|d| CompilationDiagnostic {
                     message: d.to_string(),
-                    loc: d.loc().into(),
+                    loc: d.loc.into(),
                 })
                 .collect::<Vec<_>>(),
         }

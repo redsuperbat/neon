@@ -9,4 +9,3 @@ pub mod symbol_table;
 pub mod type_checker;
 
 mod std;
-mod unifier;
