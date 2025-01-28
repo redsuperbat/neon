@@ -235,7 +235,7 @@ pub struct PropertyNode {
 pub struct StructInstantiationNode {
     pub loc: Location,
     pub identifier: IdentifierNode,
-    pub properties: Vec<PropertyNode>,
+    pub arguments: Vec<PropertyNode>,
 }
 
 #[derive(Debug, Clone)]
@@ -688,7 +688,7 @@ impl Parser {
         Ok(StructInstantiationNode {
             identifier,
             loc: Location::new(start, end),
-            properties,
+            arguments: properties,
         })
     }
 

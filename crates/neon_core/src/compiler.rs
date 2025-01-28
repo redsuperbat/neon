@@ -7,6 +7,7 @@ use crate::{
     std::io::IO,
     symbol_table::{Scope, SymbolTable},
     type_checker::{TypeChecker, TypeEnvironment},
+    visitor::Visitor,
 };
 
 pub struct Compiler {
@@ -53,7 +54,9 @@ impl Compiler {
         };
         let mut dl = DiagnosticsList::new();
         TypeChecker::new(&mut dl).typeof_expression(&ast, &mut self.type_env);
-        SymbolTable::new(&mut dl).visit_expression(&ast, &mut self.scope);
+        SymbolTable::new(&mut dl, &mut self.scope)
+            .scanner()
+            .scan_expression(&ast);
         let _ = self
             .interpreter
             .evaluate_expression(&ast, &mut self.eval_ctx);
@@ -75,7 +78,9 @@ impl Compiler {
         };
         let mut dl = DiagnosticsList::new();
         TypeChecker::new(&mut dl).typeof_expression(&ast, &mut self.type_env);
-        SymbolTable::new(&mut dl).visit_expression(&ast, &mut self.scope);
+        SymbolTable::new(&mut dl, &mut self.scope)
+            .scanner()
+            .scan_expression(&ast);
         dl
     }
 
@@ -83,7 +88,9 @@ impl Compiler {
         let ast = self.parse_source(src).map_err(|l| l.to_string())?;
         let mut dl = DiagnosticsList::new();
         TypeChecker::new(&mut dl).typeof_expression(&ast, &mut self.type_env);
-        SymbolTable::new(&mut dl).visit_expression(&ast, &mut self.scope);
+        SymbolTable::new(&mut dl, &mut self.scope)
+            .scanner()
+            .scan_expression(&ast);
 
         if dl.has_errors() {
             return Err(dl.to_string());

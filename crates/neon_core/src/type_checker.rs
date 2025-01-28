@@ -153,7 +153,7 @@ impl TypeChecker<'_> {
 
         let return_type = defined_type.clone();
 
-        for p in &node.properties {
+        for p in &node.arguments {
             let lhs = return_type
                 .properties
                 .iter()
@@ -184,7 +184,7 @@ impl TypeChecker<'_> {
         }
 
         let property_names = node
-            .properties
+            .arguments
             .iter()
             .map(|p| p.name.value.clone())
             .collect::<HashSet<_>>();

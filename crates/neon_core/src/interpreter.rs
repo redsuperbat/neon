@@ -294,7 +294,7 @@ impl Interpreter {
     ) -> Result<Value, RuntimeError> {
         let mut map = HashMap::new();
 
-        for p in &obj.properties {
+        for p in &obj.arguments {
             let value = self.evaluate_expression(p.value.as_ref(), ctx)?;
             map.insert(p.name.value.clone(), value);
         }
