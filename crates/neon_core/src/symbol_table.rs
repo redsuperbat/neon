@@ -1,8 +1,5 @@
 use crate::{
-    diagnostic::{
-        Diagnostic, DiagnosticsList, DuplicateDefinitionError, ErrorDiagnostic,
-        UndefinedReferenceError,
-    },
+    diagnostic::{Diagnostic, DiagnosticKind, DiagnosticLevel, DiagnosticsList},
     parser::{
         ArrayNode, AssignmentNode, BinaryOperationNode, BlockNode, Expression, FnNode, ForLoopNode,
         ForLoopTarget, IdentifierNode, IfNode, IndexAccessNode, InvocationNode, LetBindingNode,
@@ -86,7 +83,6 @@ impl Scope {
         if self.function_declarations.contains(id) {
             return true;
         }
-
         if let Some(parent) = &self.parent {
             return parent.is_fn_declared(identifier);
         }
@@ -159,13 +155,14 @@ impl SymbolTable<'_> {
 
     fn visit_struct_definition(&mut self, node: &StructDefinitionNode, s: &mut Scope) {
         if s.is_struct_declared(&node.identifier) {
-            self.dl.add_error(ErrorDiagnostic::DuplicateDefinition(
-                DuplicateDefinitionError {
-                    loc: node.loc,
-                    typeof_duplicate: "struct".to_string(),
+            self.dl.add(Diagnostic {
+                kind: DiagnosticKind::DuplicateDefinition {
                     name: node.identifier.name.clone(),
+                    typeof_duplicate: "struct".to_string(),
                 },
-            ));
+                level: DiagnosticLevel::Error,
+                loc: node.loc,
+            });
             return;
         };
         s.struct_declarations.insert(node.identifier.name.clone());
@@ -222,13 +219,14 @@ impl SymbolTable<'_> {
 
     fn visit_fn(&mut self, node: &FnNode, s: &mut Scope) {
         if s.is_fn_declared(&node.identifier) {
-            self.dl.add_error(ErrorDiagnostic::DuplicateDefinition(
-                DuplicateDefinitionError {
+            self.dl.add(Diagnostic {
+                level: DiagnosticLevel::Error,
+                kind: DiagnosticKind::DuplicateDefinition {
                     typeof_duplicate: "function".to_string(),
-                    loc: node.loc,
                     name: node.identifier.name.clone(),
                 },
-            ));
+                loc: node.loc,
+            });
             return;
         };
 
@@ -267,14 +265,14 @@ impl SymbolTable<'_> {
     }
 
     fn undefined_reference(&mut self, identifier: &IdentifierNode, reference_type: &str) {
-        self.dl
-            .add(Diagnostic::Error(ErrorDiagnostic::UndefinedReference(
-                UndefinedReferenceError {
-                    reference_type: reference_type.to_string(),
-                    loc: identifier.loc,
-                    name: identifier.name.to_string(),
-                },
-            )));
+        self.dl.add(Diagnostic {
+            level: DiagnosticLevel::Error,
+            kind: DiagnosticKind::UndefinedReference {
+                reference_type: reference_type.to_string(),
+                name: identifier.name.to_string(),
+            },
+            loc: identifier.loc,
+        });
     }
 
     fn visit_identifier(&mut self, identifier: &IdentifierNode, s: &mut Scope) {

@@ -1,190 +1,135 @@
 use crate::{location::Location, type_checker::Type};
-use std::fmt::Display;
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct UnassignableTypeError {
+pub enum DiagnosticKind {
+    UnassignableType {
+        lhs: Type,
+        rhs: Type,
+    },
+    UndefinedReference {
+        reference_type: String,
+        name: String,
+    },
+    IncompatibleTypes {
+        consequent: Type,
+        alternate: Type,
+    },
+    ExpressionNotInvocable {
+        callee_type: Type,
+    },
+    InsufficientOverlap,
+    MissingProperty {
+        missing_from: Type,
+        property: String,
+    },
+    MissingPropertyAccess {
+        accessed_on: Type,
+        property: String,
+    },
+    SuperfluousProperty {
+        access_type: Type,
+        key: String,
+    },
+    InvalidIndexAccess {
+        indexee_type: Type,
+    },
+    InsufficientArguments {
+        expected: usize,
+        got: usize,
+    },
+    UndefinedType {
+        name: String,
+    },
+    NotIterable {
+        non_iterable: Type,
+    },
+    InvalidSyntax {
+        message: String,
+    },
+    DuplicateDefinition {
+        name: String,
+        typeof_duplicate: String,
+    },
+    MismatchedTypes {
+        found: Type,
+        expected: Type,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum DiagnosticLevel {
+    Error,
+    Warning,
+    Info,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Diagnostic {
     pub loc: Location,
-    pub lhs: Type,
-    pub rhs: Type,
+    pub kind: DiagnosticKind,
+    pub level: DiagnosticLevel,
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct UndefinedReferenceError {
-    pub loc: Location,
-    pub reference_type: String,
-    pub name: String,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct IncompatibleTypesError {
-    pub loc: Location,
-    pub consequent: Type,
-    pub alternate: Type,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct ExpressionNotInvocableError {
-    pub loc: Location,
-    pub callee_type: Type,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct InsufficientOverlapError {
-    pub loc: Location,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct MissingPropertyError {
-    pub loc: Location,
-    pub missing_from: Type,
-    pub property: String,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct MissingPropertyAccessError {
-    pub loc: Location,
-    pub accessed_on: Type,
-    pub property: String,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct SuperfluousPropertyError {
-    pub loc: Location,
-    pub access_type: Type,
-    pub key: String,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct InvalidIndexAccessError {
-    pub loc: Location,
-    pub index_type: Type,
-    pub indexee_type: Type,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct InsufficientArgumentsError {
-    pub loc: Location,
-    pub expected: usize,
-    pub got: usize,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct UndefinedTypeError {
-    pub loc: Location,
-    pub name: String,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct NotIterableError {
-    pub loc: Location,
-    pub non_iterable: Type,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct InvalidSyntaxError {
-    pub loc: Location,
-    pub message: String,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct DuplicateDefinitionError {
-    pub loc: Location,
-    pub name: String,
-    pub typeof_duplicate: String,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct MismatchedTypeError {
-    pub loc: Location,
-    pub found: Type,
-    pub expected: Type,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum ErrorDiagnostic {
-    UnassignableType(UnassignableTypeError),
-    NotIterable(NotIterableError),
-    UndefinedReference(UndefinedReferenceError),
-    IncompatibleTypes(IncompatibleTypesError),
-    ExpressionNotInvocable(ExpressionNotInvocableError),
-    InsufficientArguments(InsufficientArgumentsError),
-    UndefinedType(UndefinedTypeError),
-    InsufficientOverlap(InsufficientOverlapError),
-    MissingProperty(MissingPropertyError),
-    MissingPropertyAccess(MissingPropertyAccessError),
-    MismatchedType(MismatchedTypeError),
-    DuplicateDefinition(DuplicateDefinitionError),
-    SuperfluousProperty(SuperfluousPropertyError),
-    InvalidIndexAccess(InvalidIndexAccessError),
-    InvalidSyntax(InvalidSyntaxError),
-}
-
-impl ToString for ErrorDiagnostic {
+impl ToString for Diagnostic {
     fn to_string(&self) -> String {
-        match self {
-            ErrorDiagnostic::UnassignableType(e) => {
-                format!("Type '{}' is not assignable to type '{}'.", e.rhs, e.lhs)
+        let level_prefix = match self.level {
+            DiagnosticLevel::Error => "ERROR",
+            DiagnosticLevel::Warning => "WARNING",
+            DiagnosticLevel::Info => "INFO",
+        };
+
+        let message = match &self.kind {
+            DiagnosticKind::UnassignableType { lhs, rhs } => {
+                format!("Type '{}' is not assignable to type '{}'.", rhs, lhs)
             }
-            ErrorDiagnostic::UndefinedReference(e) => format!("Undefined {} reference '{}'.", e.reference_type, e.name),
-            ErrorDiagnostic::IncompatibleTypes(e) => format!(
-                "If expression has incompatible arms, expected type '{}' found '{}'.",
-                e.consequent, e.alternate
-            ),
-            ErrorDiagnostic::ExpressionNotInvocable(e) => format!("Expected function found '{}'", e.callee_type),
-            ErrorDiagnostic::InsufficientOverlap(_e) => "Binary operation on types seems to be a mistake since none of them overlap sufficiently with each other.".to_string(),
-            ErrorDiagnostic::MissingProperty(e) => format!("Property '{}' is missing, but required in type '{}'", e.property, e.missing_from),
-            ErrorDiagnostic::SuperfluousProperty(e) =>  format!("Struct may only specify known properties, and '{}' does not exist in type '{}'", e.key, e.access_type),
-            ErrorDiagnostic::InvalidIndexAccess(e) => format!("Expression of type '{}' can't be used to index type '{}'.", e.index_type, e.indexee_type),
-            ErrorDiagnostic::InsufficientArguments(e) => format!("Expected '{}' arguments got '{}'.", e.expected, e.got),
-            ErrorDiagnostic::UndefinedType(e) => format!("Type '{}' is not defined in current scope.", e.name),
-            ErrorDiagnostic::NotIterable(e) => format!("Type '{}' is not iterable.", e.non_iterable),
-            ErrorDiagnostic::InvalidSyntax(e) => e.message.clone(),
-            ErrorDiagnostic::DuplicateDefinition(e) => format!("'{}' '{}' defined multiple times in current scope.", e.typeof_duplicate, e.name),
-            ErrorDiagnostic::MissingPropertyAccess(e) => format!("Property '{}' does not exist on type '{}'", e.property, e.accessed_on),
-            ErrorDiagnostic::MismatchedType(e) => format!("Mismatched types, expected '{}', found '{}'", e.expected, e.found),
-        }
+            DiagnosticKind::UndefinedReference { reference_type, name } => {
+                format!("Undefined {} reference '{}'.", reference_type, name)
+            }
+            DiagnosticKind::IncompatibleTypes { consequent, alternate } => {
+                format!("If expression has incompatible arms, expected type '{}' found '{}'.", consequent, alternate)
+            }
+            DiagnosticKind::ExpressionNotInvocable { callee_type } => {
+                format!("Expected function found '{}'", callee_type)
+            }
+            DiagnosticKind::InsufficientOverlap => {
+                "Binary operation on types seems to be a mistake since none of them overlap sufficiently with each other.".to_string()
+            }
+            DiagnosticKind::MissingProperty { missing_from, property } => {
+                format!("Property '{}' is missing, but required in type '{}'", property, missing_from)
+            }
+            DiagnosticKind::SuperfluousProperty { access_type, key } => {
+                format!("Struct may only specify known properties, and '{}' does not exist in type '{}'", key, access_type)
+            }
+            DiagnosticKind::InvalidIndexAccess { indexee_type } => {
+                format!("Cannot index into a value of type '{}'", indexee_type)
+            }
+            DiagnosticKind::InsufficientArguments { expected, got } => {
+                format!("Expected '{}' arguments got '{}'.", expected, got)
+            }
+            DiagnosticKind::UndefinedType { name } => {
+                format!("Type '{}' is not defined in current scope.", name)
+            }
+            DiagnosticKind::NotIterable { non_iterable } => {
+                format!("Type '{}' is not iterable.", non_iterable)
+            }
+            DiagnosticKind::InvalidSyntax { message } => message.clone(),
+            DiagnosticKind::DuplicateDefinition { name, typeof_duplicate } => {
+                format!("'{}' '{}' defined multiple times in current scope.", typeof_duplicate, name)
+            }
+            DiagnosticKind::MismatchedTypes { found, expected } => {
+                format!("Mismatched types, expected '{}', found '{}'", expected, found)
+            }
+            DiagnosticKind::MissingPropertyAccess { accessed_on, property } => {
+                format!("Property '{}' does not exist in type '{}'.", property, accessed_on)
+            }
+        };
+
+        format!("{}: {}", level_prefix, message)
     }
 }
 
 pub trait ToDiagnostic {
     fn to_diagnostic(&self) -> Diagnostic;
-}
-
-impl ErrorDiagnostic {
-    pub fn loc(&self) -> Location {
-        match self {
-            ErrorDiagnostic::UnassignableType(e) => e.loc,
-            ErrorDiagnostic::UndefinedReference(e) => e.loc,
-            ErrorDiagnostic::IncompatibleTypes(e) => e.loc,
-            ErrorDiagnostic::ExpressionNotInvocable(e) => e.loc,
-            ErrorDiagnostic::InsufficientOverlap(e) => e.loc,
-            ErrorDiagnostic::MissingProperty(e) => e.loc,
-            ErrorDiagnostic::InvalidIndexAccess(e) => e.loc,
-            ErrorDiagnostic::InsufficientArguments(e) => e.loc,
-            ErrorDiagnostic::UndefinedType(e) => e.loc,
-            ErrorDiagnostic::NotIterable(e) => e.loc,
-            ErrorDiagnostic::InvalidSyntax(e) => e.loc,
-            ErrorDiagnostic::SuperfluousProperty(e) => e.loc,
-            ErrorDiagnostic::DuplicateDefinition(e) => e.loc,
-            ErrorDiagnostic::MissingPropertyAccess(e) => e.loc,
-            ErrorDiagnostic::MismatchedType(e) => e.loc,
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum Diagnostic {
-    Error(ErrorDiagnostic),
-}
-
-impl Display for Diagnostic {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Diagnostic::Error(error_diagnostic) => {
-                write!(f, "ERROR: {}", error_diagnostic.to_string())
-            }
-        }
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -210,18 +155,29 @@ impl DiagnosticsList {
     }
 
     pub fn add(&mut self, diagnostic: Diagnostic) {
-        if self.diagnostics.iter().any(|d| *d == diagnostic) {
+        let are_equal = self
+            .diagnostics
+            .iter()
+            .any(|d| d.loc == diagnostic.loc && d.to_string() == diagnostic.to_string());
+
+        if !are_equal {
             return;
         }
         self.diagnostics.push(diagnostic);
     }
 
-    pub fn add_error(&mut self, error: ErrorDiagnostic) {
-        self.add(Diagnostic::Error(error));
+    pub fn add_error(&mut self, diagnostic: DiagnosticKind, loc: Location) {
+        self.add(Diagnostic {
+            level: DiagnosticLevel::Error,
+            loc,
+            kind: diagnostic,
+        })
     }
 
     pub fn has_errors(&self) -> bool {
-        !self.diagnostics.is_empty()
+        self.diagnostics
+            .iter()
+            .any(|d| d.level == DiagnosticLevel::Error)
     }
 
     pub fn clear(&mut self) {
@@ -235,8 +191,12 @@ impl DiagnosticsList {
     }
 
     pub fn merge(&self, list: &mut DiagnosticsList) -> DiagnosticsList {
-        let mut diagnostics = self.diagnostics.clone();
-        diagnostics.append(&mut list.diagnostics);
-        DiagnosticsList { diagnostics }
+        let mut diagnostics = DiagnosticsList {
+            diagnostics: self.diagnostics.clone(),
+        };
+        for d in &list.diagnostics {
+            diagnostics.add(d.clone());
+        }
+        return diagnostics;
     }
 }

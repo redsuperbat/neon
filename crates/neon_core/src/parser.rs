@@ -2,7 +2,7 @@ use core::panic;
 use std::collections::VecDeque;
 
 use crate::{
-    diagnostic::{Diagnostic, ErrorDiagnostic, InvalidSyntaxError, ToDiagnostic},
+    diagnostic::{Diagnostic, DiagnosticKind, DiagnosticLevel, ToDiagnostic},
     lexer::{Token, TokenKind},
     location::{Location, Pos, WithLocation},
 };
@@ -370,10 +370,13 @@ pub struct SyntaxError {
 
 impl ToDiagnostic for SyntaxError {
     fn to_diagnostic(&self) -> Diagnostic {
-        Diagnostic::Error(ErrorDiagnostic::InvalidSyntax(InvalidSyntaxError {
+        Diagnostic {
             loc: self.loc,
-            message: self.kind.to_string(),
-        }))
+            level: DiagnosticLevel::Error,
+            kind: DiagnosticKind::InvalidSyntax {
+                message: self.kind.to_string(),
+            },
+        }
     }
 }
 
@@ -802,10 +805,11 @@ impl Parser {
                 }
                 TokenKind::OpenSquareBracket => {
                     self.assert_next(TokenKind::OpenSquareBracket)?;
+                    let index = self.parse_expression()?.boxed();
                     let exp = Expression::IndexAccess(IndexAccessNode {
-                        loc: expression.loc(),
+                        loc: Location::new(expression.loc().start, index.loc().end),
                         indexee: expression.boxed(),
-                        index: self.parse_expression()?.boxed(),
+                        index,
                     });
                     self.assert_next(TokenKind::ClosedSquareBracket)?;
                     exp

@@ -1,10 +1,5 @@
 use crate::{
-    diagnostic::{
-        DiagnosticsList, ErrorDiagnostic, ExpressionNotInvocableError, IncompatibleTypesError,
-        InsufficientArgumentsError, InvalidIndexAccessError, MissingPropertyAccessError,
-        MissingPropertyError, NotIterableError, SuperfluousPropertyError, UnassignableTypeError,
-        UndefinedTypeError,
-    },
+    diagnostic::{DiagnosticKind, DiagnosticsList},
     location::{Location, WithLocation},
     parser::{
         ArrayNode, AssignmentNode, BinaryOp, BinaryOperationNode, BlockNode, BuiltinNode, ElseNode,
@@ -12,6 +7,7 @@ use crate::{
         InvocationNode, LetBindingNode, PropertyAccessNode, StructDefinitionNode,
         StructInstantiationNode, TypeExpression,
     },
+    unifier::Unifier,
 };
 use std::{
     collections::{HashMap, HashSet},
@@ -20,25 +16,25 @@ use std::{
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct PropertyType {
-    name: String,
-    value: Type,
+    pub name: String,
+    pub value: Type,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct StructType {
-    name: String,
-    properties: Vec<PropertyType>,
+    pub name: String,
+    pub properties: Vec<PropertyType>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ArrayType {
-    elements: Box<Type>,
+    pub elements: Box<Type>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct FnType {
-    parameters: Vec<Type>,
-    return_type: Box<Type>,
+    pub parameters: Vec<Type>,
+    pub return_type: Box<Type>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -85,6 +81,7 @@ impl Display for Type {
     }
 }
 
+#[derive(Clone)]
 pub struct TypeEnvironment {
     pub bindings: HashMap<String, Type>,
 }
@@ -97,11 +94,10 @@ impl TypeEnvironment {
     }
 }
 
-impl TypeEnvironment {}
-
 pub struct TypeChecker<'a> {
     current_loc: Location,
     dl: &'a mut DiagnosticsList,
+    unifier: Unifier,
 }
 
 impl TypeChecker<'_> {
@@ -109,6 +105,7 @@ impl TypeChecker<'_> {
         TypeChecker {
             current_loc: Location::beginning(),
             dl,
+            unifier: Unifier::new(),
         }
     }
 
@@ -166,19 +163,27 @@ impl TypeChecker<'_> {
                 .find(|t| t.name == p.name.value);
 
             let Some(lhs) = lhs else {
-                self.add_error_diagnostic(ErrorDiagnostic::SuperfluousProperty(
-                    SuperfluousPropertyError {
-                        loc: p.loc,
+                self.error(
+                    DiagnosticKind::SuperfluousProperty {
                         key: p.name.value.clone(),
                         access_type: Type::Struct(return_type.clone()),
                     },
-                ));
+                    p.loc,
+                );
                 continue;
             };
 
             let rhs = self.typeof_expression(&p.value, env);
 
-            self.unify(&lhs.value, &rhs);
+            if self.unifier.unify(&lhs.value, &rhs) == Type::Never {
+                self.dl.add_error(
+                    DiagnosticKind::MismatchedTypes {
+                        expected: lhs.value.clone(),
+                        found: rhs,
+                    },
+                    p.loc,
+                );
+            };
         }
 
         let property_names = node
@@ -192,11 +197,13 @@ impl TypeChecker<'_> {
             .iter()
             .filter(|t| !property_names.contains(&t.name))
         {
-            self.add_error_diagnostic(ErrorDiagnostic::MissingProperty(MissingPropertyError {
-                loc: node.identifier.loc,
-                property: missing_prop.name.clone(),
-                missing_from: Type::Struct(return_type.clone()),
-            }));
+            self.error(
+                DiagnosticKind::MissingProperty {
+                    property: missing_prop.name.clone(),
+                    missing_from: Type::Struct(return_type.clone()),
+                },
+                node.identifier.loc,
+            );
         }
 
         Type::Struct(return_type)
@@ -208,16 +215,15 @@ impl TypeChecker<'_> {
 
     fn typeof_index_access(&mut self, node: &IndexAccessNode, env: &mut TypeEnvironment) -> Type {
         let typeof_index = self.typeof_expression(&node.index, env);
-        self.unify(&Type::Int, &typeof_index);
+        self.check_type_match(&Type::Int, &typeof_index, node.index.loc());
         let typeof_indexee = self.typeof_expression(&node.indexee, env);
         let Type::Array(array_type) = typeof_indexee else {
-            return self.add_error_diagnostic(ErrorDiagnostic::InvalidIndexAccess(
-                InvalidIndexAccessError {
-                    loc: node.index.loc(),
+            return self.error(
+                DiagnosticKind::InvalidIndexAccess {
                     indexee_type: typeof_indexee,
-                    index_type: typeof_index,
                 },
-            ));
+                node.loc,
+            );
         };
 
         *array_type.elements
@@ -229,21 +235,27 @@ impl TypeChecker<'_> {
         env: &mut TypeEnvironment,
     ) -> Type {
         let access_type = self.typeof_expression(&node.object, env);
-        let error = MissingPropertyAccessError {
-            accessed_on: access_type,
-            loc: node.identifier.loc,
-            property: node.identifier.name.clone(),
-        };
-
         let Type::Struct(StructType { properties, .. }) = self.typeof_expression(&node.object, env)
         else {
-            return self.add_error_diagnostic(ErrorDiagnostic::MissingPropertyAccess(error));
+            return self.error(
+                DiagnosticKind::MissingPropertyAccess {
+                    accessed_on: access_type,
+                    property: node.identifier.name.clone(),
+                },
+                node.identifier.loc,
+            );
         };
 
         let prop_type = properties.iter().find(|p| p.name == node.identifier.name);
 
         let Some(prop_type) = prop_type else {
-            return self.add_error_diagnostic(ErrorDiagnostic::MissingPropertyAccess(error));
+            return self.error(
+                DiagnosticKind::MissingPropertyAccess {
+                    accessed_on: access_type,
+                    property: node.identifier.name.clone(),
+                },
+                node.identifier.loc,
+            );
         };
 
         prop_type.value.clone()
@@ -276,6 +288,7 @@ impl TypeChecker<'_> {
     fn typeof_for_loop(&mut self, node: &ForLoopNode, env: &mut TypeEnvironment) -> Type {
         let typeof_iterable = self.typeof_expression(&node.iterable, env);
 
+        let mut env = env.clone();
         match typeof_iterable {
             Type::Struct(..) => match &node.targets {
                 ForLoopTarget::Single(node) => {
@@ -306,14 +319,16 @@ impl TypeChecker<'_> {
                 }
             },
             _ => {
-                return self.add_error_diagnostic(ErrorDiagnostic::NotIterable(NotIterableError {
-                    loc: node.iterable.loc(),
-                    non_iterable: typeof_iterable,
-                }))
+                return self.error(
+                    DiagnosticKind::NotIterable {
+                        non_iterable: typeof_iterable,
+                    },
+                    node.iterable.loc(),
+                )
             }
         }
 
-        self.typeof_expression(&node.body, env);
+        self.typeof_expression(&node.body, &mut env);
         Type::Unit
     }
 
@@ -336,41 +351,51 @@ impl TypeChecker<'_> {
             return_type: Box::new(return_type.clone()),
         });
 
-        env.bindings
-            .insert(node.identifier.name.clone(), fn_type.clone());
+        let mut env = env.clone();
+        env.bindings.insert(node.identifier.name.clone(), fn_type);
+        let inferred_return_type = self.typeof_expression(&node.body.return_val, &mut env);
+        Type::Unit
+    }
 
-        let inferred_return_type = self.typeof_expression(&node.body.return_val, env);
-
-        self.unify(&return_type, &inferred_return_type);
-
-        fn_type
+    fn check_type_match(&mut self, lhs: &Type, rhs: &Type, loc: impl Into<Location>) -> Type {
+        let t = self.unifier.unify(lhs, rhs);
+        if t == Type::Never {
+            self.dl.add_error(
+                DiagnosticKind::MismatchedTypes {
+                    expected: lhs.clone(),
+                    found: rhs.clone(),
+                },
+                loc.into(),
+            );
+        };
+        t
     }
 
     fn typeof_invocation(&mut self, node: &InvocationNode, env: &mut TypeEnvironment) -> Type {
         let callee = self.typeof_expression(&node.callee, env);
 
         let Type::Fn(fn_type) = callee else {
-            return self.add_error_diagnostic(ErrorDiagnostic::ExpressionNotInvocable(
-                ExpressionNotInvocableError {
-                    loc: node.callee.loc(),
+            return self.error(
+                DiagnosticKind::ExpressionNotInvocable {
                     callee_type: callee,
                 },
-            ));
+                node.callee.loc(),
+            );
         };
 
         for (i, param) in fn_type.parameters.iter().enumerate() {
             let arg = node.arguments.get(i);
             let Some(arg) = arg else {
-                return self.add_error_diagnostic(ErrorDiagnostic::InsufficientArguments(
-                    InsufficientArgumentsError {
-                        loc: node.loc,
+                return self.error(
+                    DiagnosticKind::InsufficientArguments {
                         expected: fn_type.parameters.len(),
                         got: node.arguments.len(),
                     },
-                ));
+                    node.loc,
+                );
             };
             let arg_type = self.typeof_expression(arg, env);
-            self.unify(param, &arg_type);
+            self.check_type_match(param, &arg_type, arg.loc());
         }
         *fn_type.return_type
     }
@@ -378,8 +403,7 @@ impl TypeChecker<'_> {
     fn typeof_binary(&mut self, node: &BinaryOperationNode, env: &mut TypeEnvironment) -> Type {
         let lhs = self.typeof_expression(&node.left, env);
         let rhs = self.typeof_expression(&node.right, env);
-        self.current_loc = node.left.loc();
-        let unification = self.unify(&lhs, &rhs);
+        let unification = self.check_type_match(&lhs, &rhs, node.left.loc());
 
         match node.operation {
             BinaryOp::Mod | BinaryOp::Add | BinaryOp::Sub => unification,
@@ -419,12 +443,12 @@ impl TypeChecker<'_> {
             }),
             TypeExpression::Identifier(node) => match env.bindings.get(&node.name) {
                 Some(t) => t.clone(),
-                None => {
-                    self.add_error_diagnostic(ErrorDiagnostic::UndefinedType(UndefinedTypeError {
-                        loc: node.loc,
+                None => self.error(
+                    DiagnosticKind::UndefinedType {
                         name: node.name.clone(),
-                    }))
-                }
+                    },
+                    node.loc,
+                ),
             },
         }
     }
@@ -438,7 +462,12 @@ impl TypeChecker<'_> {
 
         let t = if let Some(type_exp) = &node.binding.type_expr {
             let lhs = self.typeof_type_expression(&type_exp, env);
-            self.unify(&lhs, &rhs);
+            let loc = node
+                .right
+                .clone()
+                .map(|r| r.loc())
+                .unwrap_or(type_exp.loc());
+            self.check_type_match(&lhs, &rhs, loc);
             lhs
         } else {
             rhs
@@ -462,26 +491,26 @@ impl TypeChecker<'_> {
             })
             .collect::<Vec<_>>();
 
-        let t = Type::Struct(StructType {
-            properties,
-            name: node.identifier.name.clone(),
-        });
-        env.bindings.insert(node.identifier.name.clone(), t.clone());
+        env.bindings.insert(
+            node.identifier.name.clone(),
+            Type::Struct(StructType {
+                properties,
+                name: node.identifier.name.clone(),
+            }),
+        );
         Type::Unit
     }
 
     fn typeof_assignment(&mut self, node: &AssignmentNode, env: &mut TypeEnvironment) -> Type {
         let mut lhs = self.typeof_identifier(&node.identifier, env);
         let rhs = self.typeof_expression(&node.right, env);
-        // We do this to make the error appear on the left part of the assignment
-        self.current_loc = node.identifier.loc;
 
         // If the lhs is unit we give it the type of the rhs
         if lhs == Type::Unit {
             lhs = rhs.clone();
         };
 
-        let t = self.unify(&lhs, &rhs);
+        let t = self.check_type_match(&lhs, &rhs, node.identifier.loc);
         if t != Type::Never {
             env.bindings.insert(node.identifier.to_string(), t);
         }
@@ -490,9 +519,7 @@ impl TypeChecker<'_> {
 
     fn typeof_if(&mut self, node: &IfNode, env: &mut TypeEnvironment) -> Type {
         let predicate = self.typeof_expression(&node.predicate, env);
-        // We do this to make the error appear on the entire predicate
-        self.current_loc = node.predicate.loc();
-        self.unify(&Type::Bool, &predicate);
+        self.check_type_match(&Type::Bool, &predicate, node.predicate.loc());
 
         let consequent = self.typeof_expression(&node.consequent, env);
 
@@ -501,14 +528,15 @@ impl TypeChecker<'_> {
         };
         let alternate = self.typeof_expression(&alternate, env);
 
-        if consequent != alternate {
-            return self.add_error_diagnostic(ErrorDiagnostic::IncompatibleTypes(
-                IncompatibleTypesError {
-                    loc: node.loc,
+        let result = self.unifier.unify(&consequent, &alternate);
+        if result == Type::Never {
+            return self.error(
+                DiagnosticKind::IncompatibleTypes {
                     alternate,
                     consequent,
                 },
-            ));
+                node.loc,
+            );
         }
         consequent
     }
@@ -520,89 +548,20 @@ impl TypeChecker<'_> {
         }
     }
 
-    fn add_error_diagnostic(&mut self, d: ErrorDiagnostic) -> Type {
-        self.dl.add_error(d);
+    fn error(&mut self, d: DiagnosticKind, loc: Location) -> Type {
+        self.dl.add_error(d, loc);
         Type::Never
     }
 
     fn type_error(&mut self, lhs: &Type, rhs: &Type) -> Type {
-        self.dl
-            .add_error(ErrorDiagnostic::UnassignableType(UnassignableTypeError {
-                loc: self.current_loc,
+        self.dl.add_error(
+            DiagnosticKind::UnassignableType {
                 lhs: lhs.clone(),
                 rhs: rhs.clone(),
-            }));
+            },
+            self.current_loc,
+        );
         Type::Never
-    }
-
-    fn unify(&mut self, lhs: &Type, rhs: &Type) -> Type {
-        if *rhs == Type::Any || *lhs == Type::Any {
-            return Type::Any;
-        }
-
-        match &lhs {
-            Type::Never => self.type_error(lhs, rhs),
-
-            Type::Int => match &rhs {
-                Type::Int => Type::Int,
-                _ => self.type_error(&lhs, rhs),
-            },
-            Type::Bool => match &rhs {
-                Type::Bool => Type::Bool,
-                _ => self.type_error(lhs, rhs),
-            },
-            Type::String => match &rhs {
-                Type::String => Type::String,
-                _ => self.type_error(lhs, rhs),
-            },
-            Type::Unit => match &rhs {
-                Type::Unit => Type::Unit,
-                _ => self.type_error(lhs, rhs),
-            },
-            Type::Fn(a) => match &rhs {
-                Type::Fn(b) => {
-                    for (a, b) in a.parameters.iter().zip(b.parameters.iter()) {
-                        if self.unify(a, b) == Type::Never {
-                            return self.type_error(lhs, rhs);
-                        }
-                    }
-
-                    if self.unify(&a.return_type, &b.return_type) == Type::Never {
-                        return self.type_error(lhs, rhs);
-                    }
-
-                    lhs.clone()
-                }
-                _ => self.type_error(lhs, rhs),
-            },
-            Type::Struct(a) => match &rhs {
-                Type::Struct(b) => {
-                    if a.name != b.name {
-                        return self.type_error(lhs, rhs);
-                    }
-
-                    for PropertyType { name, value } in &a.properties {
-                        let b_prop = b.properties.iter().find(|p| p.name == *name);
-                        let Some(b_prop) = b_prop else {
-                            return self.type_error(lhs, rhs);
-                        };
-
-                        if Type::Never == self.unify(value, &b_prop.value) {
-                            return self.type_error(lhs, rhs);
-                        };
-                    }
-
-                    lhs.clone()
-                }
-
-                _ => self.type_error(lhs, rhs),
-            },
-            Type::Array(a) => match &rhs {
-                Type::Array(b) => self.unify(&a.elements, &b.elements),
-                _ => self.type_error(lhs, rhs),
-            },
-            _ => Type::Never,
-        }
     }
 }
 
