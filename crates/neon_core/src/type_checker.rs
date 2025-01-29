@@ -259,17 +259,16 @@ impl TypeChecker<'_> {
     }
 
     fn typeof_array(&mut self, node: &ArrayNode, env: &mut TypeEnvironment) -> Type {
-        if node.elements.is_empty() {
+        let Some(first_element) = node.elements.get(0) else {
             // If array is empty it can be assignable to any type
             return Type::Any;
-        }
+        };
 
-        let t = self.typeof_expression(&node.elements[0], env);
+        let t = self.typeof_expression(&first_element, env);
         for element in node.elements.iter().skip(1) {
             let inner_t = self.typeof_expression(element, env);
-            self.current_loc = node.elements[0].loc();
-            if t != inner_t {
-                self.type_error(&t, &inner_t);
+            if self.unify(&t, &inner_t) == Type::Never {
+                self.type_error(&t, &inner_t, element.loc());
             }
         }
 
@@ -289,7 +288,6 @@ impl TypeChecker<'_> {
         match typeof_iterable {
             Type::Struct(..) => match &node.targets {
                 ForLoopTarget::Single(node) => {
-                    // TODO: when union type is implemented use here
                     env.bindings.insert(node.name.clone(), Type::Any);
                 }
                 ForLoopTarget::Tuple(a, b) => {
@@ -348,12 +346,14 @@ impl TypeChecker<'_> {
             return_type: Box::new(return_type.clone()),
         });
 
-        let mut env = env.clone();
         env.bindings
             .insert(node.identifier.name.clone(), fn_type.clone());
+
+        let mut env = env.clone();
+
         let inferred_return_type = self.typeof_expression(&node.body.return_val, &mut env);
         if self.unify(&inferred_return_type, &return_type) == Type::Never {
-            return self.type_error(&inferred_return_type, &return_type);
+            return self.type_error(&inferred_return_type, &return_type, node.identifier.loc);
         }
         fn_type
     }
@@ -543,6 +543,7 @@ impl TypeChecker<'_> {
     }
 
     fn typeof_identifier(&mut self, node: &IdentifierNode, env: &mut TypeEnvironment) -> Type {
+        println!("binding: {}, {:?}", node.name, env.bindings);
         match env.bindings.get(&node.name) {
             Some(t) => t.clone(),
             None => Type::Never,
@@ -554,45 +555,24 @@ impl TypeChecker<'_> {
             return Type::Any;
         }
 
-        match &lhs {
-            Type::Never => self.type_error(lhs, rhs),
-
-            Type::Int => match &rhs {
-                Type::Int => Type::Int,
-                _ => self.type_error(&lhs, rhs),
-            },
-            Type::Bool => match &rhs {
-                Type::Bool => Type::Bool,
-                _ => self.type_error(lhs, rhs),
-            },
-            Type::String => match &rhs {
-                Type::String => Type::String,
-                _ => self.type_error(lhs, rhs),
-            },
-            Type::Unit => match &rhs {
-                Type::Unit => Type::Unit,
-                _ => self.type_error(lhs, rhs),
-            },
-            Type::Fn(a) => match &rhs {
-                Type::Fn(b) => {
-                    for (a, b) in a.parameters.iter().zip(b.parameters.iter()) {
-                        if self.unify(a, b) == Type::Never {
-                            return self.type_error(lhs, rhs);
-                        }
+        match (&lhs, &rhs) {
+            (Type::Never, _) => Type::Never,
+            (Type::Int, Type::Int) => Type::Int,
+            (Type::String, Type::String) => Type::String,
+            (Type::Bool, Type::Bool) => Type::Bool,
+            (Type::Unit, Type::Unit) => Type::Unit,
+            (Type::Fn(a), Type::Fn(b)) => {
+                for (a, b) in a.parameters.iter().zip(b.parameters.iter()) {
+                    if self.unify(a, b) == Type::Never {
+                        return Type::Never;
                     }
-
-                    if self.unify(&a.return_type, &b.return_type) == Type::Never {
-                        return self.type_error(lhs, rhs);
-                    }
-
-                    lhs.clone()
                 }
-                _ => self.type_error(lhs, rhs),
-            },
-            Type::Array(a) => match &rhs {
-                Type::Array(b) => self.unify(&a.elements, &b.elements),
-                _ => self.type_error(lhs, rhs),
-            },
+                if self.unify(&a.return_type, &b.return_type) == Type::Never {
+                    return Type::Never;
+                }
+                lhs.clone()
+            }
+            (Type::Array(a), Type::Array(b)) => self.unify(&a.elements, &b.elements),
             _ => Type::Never,
         }
     }
@@ -602,13 +582,13 @@ impl TypeChecker<'_> {
         Type::Never
     }
 
-    fn type_error(&mut self, lhs: &Type, rhs: &Type) -> Type {
+    fn type_error(&mut self, lhs: &Type, rhs: &Type, loc: Location) -> Type {
         self.dl.add_error(
             DiagnosticKind::UnassignableType {
                 lhs: lhs.clone(),
                 rhs: rhs.clone(),
             },
-            self.current_loc,
+            loc,
         );
         Type::Never
     }
