@@ -275,13 +275,13 @@ impl Interpreter {
             return Err(RuntimeError {
                 loc: node.loc,
                 kind: RuntimeErrorKind::InvalidPropertyAccess {
-                    name: node.identifier.name.to_string(),
+                    name: node.property.value.clone(),
                     value,
                 },
             });
         };
 
-        match obj.properties.get(&node.identifier.name) {
+        match obj.properties.get(&node.property.value) {
             Some(v) => Ok(v.clone()),
             None => Ok(Value::Unit),
         }

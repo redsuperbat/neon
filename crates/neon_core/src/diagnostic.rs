@@ -142,7 +142,6 @@ impl ToString for DiagnosticsList {
         self.diagnostics
             .iter()
             .map(|d| d.to_string())
-            .inspect(|d| println!("{:?}", d))
             .collect::<Vec<_>>()
             .join("\n")
     }
@@ -161,7 +160,7 @@ impl DiagnosticsList {
             .iter()
             .any(|d| d.loc == diagnostic.loc && d.to_string() == diagnostic.to_string());
 
-        if !are_equal {
+        if are_equal {
             return;
         }
         self.diagnostics.push(diagnostic);

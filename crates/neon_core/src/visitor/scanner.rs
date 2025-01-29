@@ -65,6 +65,7 @@ impl<'a, V: Visitor + ?Sized> Scanner<'a, V> {
         for statement in &n.body {
             self.scan_expression(statement);
         }
+        self.scan_expression(&n.return_val);
         self.visitor.leave_block(n);
     }
 
@@ -86,6 +87,9 @@ impl<'a, V: Visitor + ?Sized> Scanner<'a, V> {
             self.scan_parameter(param);
         }
         self.scan_block(&n.body);
+        if let Some(return_type) = &n.return_type {
+            self.visitor.visit_type_expression(return_type);
+        }
         self.visitor.leave_fn(n);
     }
 
@@ -153,13 +157,13 @@ impl<'a, V: Visitor + ?Sized> Scanner<'a, V> {
     fn scan_property_access(&mut self, n: &PropertyAccessNode) {
         self.visitor.enter_property_access(n);
         self.scan_expression(&n.object);
-        self.visitor.visit_identifier(&n.identifier);
+        self.visitor.visit_property_name(&n.property);
         self.visitor.leave_property_access(n);
     }
 
     fn scan_struct_definition(&mut self, n: &StructDefinitionNode) {
         self.visitor.enter_struct_definition(n);
-        self.visitor.visit_identifier(&n.identifier);
+        self.visitor.visit_struct_name(&n.name);
         for property in &n.properties {
             self.visitor.visit_type_expression(&property.type_expr);
         }

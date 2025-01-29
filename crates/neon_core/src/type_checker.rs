@@ -237,21 +237,21 @@ impl TypeChecker<'_> {
             return self.error(
                 DiagnosticKind::MissingPropertyAccess {
                     accessed_on: access_type,
-                    property: node.identifier.name.clone(),
+                    property: node.property.value.clone(),
                 },
-                node.identifier.loc,
+                node.property.loc,
             );
         };
 
-        let prop_type = properties.iter().find(|p| p.name == node.identifier.name);
+        let prop_type = properties.iter().find(|p| p.name == node.property.value);
 
         let Some(prop_type) = prop_type else {
             return self.error(
                 DiagnosticKind::MissingPropertyAccess {
                     accessed_on: access_type,
-                    property: node.identifier.name.clone(),
+                    property: node.property.value.clone(),
                 },
-                node.identifier.loc,
+                node.property.loc,
             );
         };
 
@@ -349,9 +349,13 @@ impl TypeChecker<'_> {
         });
 
         let mut env = env.clone();
-        env.bindings.insert(node.identifier.name.clone(), fn_type);
+        env.bindings
+            .insert(node.identifier.name.clone(), fn_type.clone());
         let inferred_return_type = self.typeof_expression(&node.body.return_val, &mut env);
-        Type::Unit
+        if self.unify(&inferred_return_type, &return_type) == Type::Never {
+            return self.type_error(&inferred_return_type, &return_type);
+        }
+        fn_type
     }
 
     fn check_type_match(&mut self, lhs: &Type, rhs: &Type, loc: impl Into<Location>) -> Type {
@@ -489,10 +493,10 @@ impl TypeChecker<'_> {
             .collect::<Vec<_>>();
 
         env.bindings.insert(
-            node.identifier.name.clone(),
+            node.name.value.clone(),
             Type::Struct(StructType {
                 properties,
-                name: node.identifier.name.clone(),
+                name: node.name.value.clone(),
             }),
         );
         Type::Unit

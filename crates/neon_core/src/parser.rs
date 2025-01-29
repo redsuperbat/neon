@@ -246,9 +246,15 @@ pub struct TypedPropertyNode {
 }
 
 #[derive(Debug, Clone)]
+pub struct StructNameNode {
+    pub loc: Location,
+    pub value: String,
+}
+
+#[derive(Debug, Clone)]
 pub struct StructDefinitionNode {
     pub loc: Location,
-    pub identifier: IdentifierNode,
+    pub name: StructNameNode,
     pub properties: Vec<TypedPropertyNode>,
 }
 
@@ -256,7 +262,7 @@ pub struct StructDefinitionNode {
 pub struct PropertyAccessNode {
     pub loc: Location,
     pub object: Box<Expression>,
-    pub identifier: IdentifierNode,
+    pub property: PropertyNameNode,
 }
 
 #[derive(Debug, Clone)]
@@ -796,10 +802,10 @@ impl Parser {
                 }),
                 TokenKind::Dot => {
                     let Token { start, .. } = self.assert_next(TokenKind::Dot)?;
-                    let property_name = self.parse_identifier_node()?;
+                    let property = self.parse_property_name_node()?;
                     Expression::PropertyAccess(PropertyAccessNode {
-                        loc: Location::new(start, property_name.loc.end),
-                        identifier: property_name,
+                        loc: Location::new(start, property.loc.end),
+                        property,
                         object: expression.boxed(),
                     })
                 }
@@ -912,7 +918,10 @@ impl Parser {
 
         Ok(Expression::StructDefinitionNode(StructDefinitionNode {
             loc: Location::new(structure.start, end),
-            identifier,
+            name: StructNameNode {
+                loc: identifier.loc,
+                value: identifier.name,
+            },
             properties,
         }))
     }

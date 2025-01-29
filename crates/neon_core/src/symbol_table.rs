@@ -63,15 +63,13 @@ impl Scope {
         self.variable_declarations = declarations;
     }
 
-    pub fn is_struct_declared(&self, identifier: &IdentifierNode) -> bool {
-        let id = &identifier.name;
-
-        if self.struct_declarations.contains(id) {
+    pub fn is_struct_declared(&self, name: &str) -> bool {
+        if self.struct_declarations.contains(name) {
             return true;
         }
 
         if let Some(parent) = &self.parent {
-            return parent.is_struct_declared(identifier);
+            return parent.is_struct_declared(name);
         }
 
         false
@@ -113,10 +111,10 @@ pub struct SymbolTable<'a> {
 
 impl Visitor for SymbolTable<'_> {
     fn enter_struct_definition(&mut self, node: &StructDefinitionNode) {
-        if self.scope.is_struct_declared(&node.identifier) {
+        if self.scope.is_struct_declared(&node.name.value) {
             self.dl.add(Diagnostic {
                 kind: DiagnosticKind::DuplicateDefinition {
-                    name: node.identifier.name.clone(),
+                    name: node.name.value.clone(),
                     typeof_duplicate: "struct".to_string(),
                 },
                 level: DiagnosticLevel::Error,
@@ -124,13 +122,14 @@ impl Visitor for SymbolTable<'_> {
             });
             return;
         };
+
         self.scope
             .struct_declarations
-            .insert(node.identifier.name.clone());
+            .insert(node.name.value.clone());
     }
 
     fn enter_struct_instantiation(&mut self, node: &StructInstantiationNode) {
-        if self.scope.is_struct_declared(&node.identifier) {
+        if self.scope.is_struct_declared(&node.identifier.name) {
             return;
         }
         self.undefined_reference(&node.identifier, "struct");
@@ -143,7 +142,9 @@ impl Visitor for SymbolTable<'_> {
                 self.scope.enter(&vec![first.clone(), second.clone()])
             }
         };
+    }
 
+    fn leave_for_loop(&mut self, _for_loop: &ForLoopNode) {
         self.scope.exit();
     }
 
@@ -165,10 +166,12 @@ impl Visitor for SymbolTable<'_> {
             parameters,
             ..
         } = node;
-
         self.scope.declare_fn(&identifier.name);
-        let identifiers = parameters.iter().map(|t| t.identifier.clone()).collect();
+        let identifiers = parameters.iter().map(|p| p.identifier.to_owned()).collect();
         self.scope.enter(&identifiers);
+    }
+
+    fn leave_fn(&mut self, _function: &FnNode) {
         self.scope.exit();
     }
 
@@ -180,6 +183,11 @@ impl Visitor for SymbolTable<'_> {
         if self.scope.is_fn_declared(&identifier) {
             return;
         };
+
+        if self.scope.is_struct_declared(&identifier.name) {
+            return;
+        }
+
         self.undefined_reference(identifier, "identifier");
     }
 

@@ -1,14 +1,6 @@
 use scanner::Scanner;
 
-use crate::parser::{
-    ArrayNode, ArrayTypeNode, AssignmentNode, BinaryOperationNode, BlockNode, BoolNode,
-    BoolTypeNode, BuiltinNode, ElseNode, Expression, FnNode, FnTypeNode, ForLoopNode,
-    IdentifierNode, IdentifierTypeNode, IfNode, IndexAccessNode, IntNode, IntTypeNode,
-    InvocationNode, LetBindingNode, ObjectPropertyTypeNode, ParameterNode, PropertyAccessNode,
-    PropertyNameNode, PropertyNode, StringNode, StringTypeNode, StructDefinitionNode,
-    StructInstantiationNode, TypeExpression, TypedIdentifierNode, TypedPropertyNode, UnitTypeNode,
-    UseNode,
-};
+use crate::parser::*;
 
 pub trait Visitor {
     fn enter_expression(&mut self, _expression: &Expression) {}
@@ -73,6 +65,7 @@ pub trait Visitor {
     fn visit_type_expression(&mut self, _type_expr: &TypeExpression) {}
     fn visit_identifier(&mut self, _identifier: &IdentifierNode) {}
     fn visit_property_name(&mut self, _property_name: &PropertyNameNode) {}
+    fn visit_struct_name(&mut self, _struct_name: &StructNameNode) {}
     fn visit_property(&mut self, _property: &PropertyNode) {}
     fn visit_typed_property(&mut self, _typed_property: &TypedPropertyNode) {}
     fn visit_bool(&mut self, _bool_node: &BoolNode) {}
