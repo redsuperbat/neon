@@ -81,5 +81,5 @@ pub trait Visitor {
     }
 }
 
-pub mod paralell_visitor;
+pub mod parallel_visitor;
 pub mod scanner;

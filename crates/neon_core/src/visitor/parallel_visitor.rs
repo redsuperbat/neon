@@ -1,11 +1,11 @@
 use super::Visitor;
 use crate::parser::*;
 
-pub struct ParalellVisitor {
+pub struct ParallelVisitor {
     visitors: Vec<Box<dyn Visitor>>,
 }
 
-impl Visitor for ParalellVisitor {
+impl Visitor for ParallelVisitor {
     fn enter_expression(&mut self, n: &Expression) {
         for visitor in &mut self.visitors {
             visitor.enter_expression(n);
