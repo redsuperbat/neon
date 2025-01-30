@@ -699,3 +699,60 @@ impl Interpreter {
         Ok(result)
     }
 }
+
+#[cfg(test)]
+mod test {
+    use crate::{lexer::Lexer, parser::Parser};
+
+    use super::{EvaluationContext, Interpreter};
+
+    #[test]
+    fn interpret() {
+        let code = "
+/**
+ * Neon supports arrays that can store various types of data.
+ * Let's start with a basic array containing integers.
+ */
+
+let numbers = [3, 4, 5]
+
+/**
+ * Arrays can contain any type of data, including functions,
+ * booleans, and even other arrays.
+ */
+
+fn pie_eater(i: int): int {
+  i
+}
+
+let func_array = [
+  pie_eater,
+  pie_eater,
+  pie_eater,
+]
+
+let first = func_array[1]
+let second = func_array[3]
+
+first(second(1)) 
+
+/**
+ * Arrays can also be nested, meaning you can have arrays inside arrays.
+ */
+
+let nestedArray = [
+  [1, 2, 3],
+  [4, 5, 6],
+]
+
+nestedArray
+";
+
+        let tokens = Lexer::new(code).collect::<Vec<_>>();
+        let ast = Parser::new(tokens).parse_program().expect("Should work");
+        let interpreter = Interpreter::new();
+        let mut ctx = EvaluationContext::new();
+        let errs = interpreter.evaluate_expression(&ast, &mut ctx);
+        println!("{:?}", errs);
+    }
+}

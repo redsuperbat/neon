@@ -239,8 +239,12 @@ function ExecutionPage() {
       });
     } catch (e) {
       if (!(e instanceof CompilationDiagnostics)) return;
-      const decorations = diagnosticsToDecorations(e);
-      runtimeDecorations?.append(decorations);
+      setOutput({
+        type: "error",
+        message: e.errors
+          .map((e) => `${e.loc.start.line}:${e.loc.start.col} ${e.message}`)
+          .join("\n"),
+      });
     }
   }
 

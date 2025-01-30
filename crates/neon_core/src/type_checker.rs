@@ -324,28 +324,30 @@ impl TypeChecker<'_> {
 
     fn typeof_fn(&mut self, node: &FnNode, env: &mut TypeEnvironment) -> Type {
         let mut parameters = vec![];
-        let mut env = env.clone();
         for param in &node.parameters {
-            let param_type = self.typeof_type_expression(&param.type_expr, &mut env);
-            env.bindings
-                .insert(param.identifier.name.clone(), param_type.clone());
-            parameters.push(param_type);
+            let param_type = self.typeof_type_expression(&param.type_expr, env);
+            parameters.push((&param.identifier.name, param_type));
         }
 
         let return_type = match &node.return_type {
-            Some(t) => self.typeof_type_expression(&t, &mut env),
+            Some(t) => self.typeof_type_expression(&t, env),
             None => Type::Unit,
         };
 
         let fn_type = Type::Fn(FnType {
-            parameters,
+            parameters: parameters.iter().map(|(_, t)| t.clone()).collect(),
             return_type: Box::new(return_type.clone()),
         });
 
         env.bindings
             .insert(node.identifier.name.clone(), fn_type.clone());
 
-        let inferred_return_type = self.typeof_block(&node.body, &mut env);
+        let mut inner_env = env.clone();
+        parameters.iter().for_each(|(name, t)| {
+            inner_env.bindings.insert(name.to_string(), t.clone());
+        });
+
+        let inferred_return_type = self.typeof_block(&node.body, &mut inner_env);
 
         if self.unify(&inferred_return_type, &return_type) == Type::Never {
             return self.error(

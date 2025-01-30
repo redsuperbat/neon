@@ -4,35 +4,26 @@
  */
 
 let numbers = [3, 4, 5]
-print("Array:", numbers)
-print("First element:", numbers[0])
-print("Third element (using expression in index):", numbers[1 + 1])
 
 /**
- * Arrays can contain any type of data, including functions, 
+ * Arrays can contain any type of data, including functions,
  * booleans, and even other arrays.
  */
 
-fn pie_eater(i: int) {
-  print("I want", i, "number of pies")
+fn pie_eater(i: int): int {
+  i
 }
 
-/* Creating an array with mixed types */
-let mixedArray = [
-  numbers,
+let func_array = [
   pie_eater,
-  true,
-  3 + 4
+  pie_eater,
+  pie_eater,
 ]
 
-print("Mixed Array:", mixedArray)
+let first = func_array[1]
+let second = func_array[2]
 
-/* Accessing elements from the mixed array */
-let func = mixedArray[1]
-let pies = mixedArray[3]
-
-/* Calls the function with the result of the expression */
-func(pies) 
+first(second(1)) 
 
 /**
  * Arrays can also be nested, meaning you can have arrays inside arrays.
@@ -40,31 +31,7 @@ func(pies)
 
 let nestedArray = [
   [1, 2, 3],
-  ["apple", "banana", "cherry"],
-  [true, false, true]
+  [4, 5, 6],
 ]
 
-print("Nested Array:", nestedArray)
-print("Second element of the first array in nestedArray:", nestedArray[0][1])
-
-/**
- * Let's try an array of functions to see how Neon handles it.
- */
-
-fn greet(name: string) {
-  print("Hello,", name)
-}
-
-fn farewell(name: string) {
-  print("Goodbye,", name)
-}
-
-let functionsArray = [greet, farewell]
-print("Functions Array:", functionsArray)
-
-let greetFunc = functionsArray[0]
-let farewellFunc = functionsArray[1]
-
-greetFunc("Alice")
-farewellFunc("Bob")
-
+nestedArray

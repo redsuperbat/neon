@@ -10,19 +10,16 @@ let age: int = 3
  * declarations
  */
 
-let human = { name: "Dave", age: 32 }
-print(human)
+let name = "Harry"
 
 /**
  * Neon does not coerce types therefore it's a compilation error if you try to add
  * an int and a string try to fixing this 👇 so the type error goes away.
  */
 let six = 3 + "3"
-print(six)
 
 /**
  * The same goes for other data types
  */
 let truth = true == "false"
-print(truth)
 

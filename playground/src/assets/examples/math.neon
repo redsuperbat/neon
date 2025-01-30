@@ -14,7 +14,7 @@ fn multiply(a: int, b: int): int {
   }
 }
 
-fn divide(dividend: int, divisor: int) {
+fn divide(dividend: int, divisor: int): int {
   fn helper(dividend: int, divisor: int, quotient: int): int {
     if minus(dividend, divisor) < 0 {
       quotient

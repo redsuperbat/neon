@@ -3,6 +3,6 @@
  *  in this case they are called an iife (immediately invoked function expression)
  */
 
-fn hello_world() {
-  print("iffies are cool 🚀")
+fn hello_world(): string {
+  "iifies are cool 🚀"
 }()

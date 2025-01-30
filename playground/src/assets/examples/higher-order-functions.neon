@@ -1,17 +1,16 @@
-/* Helper function to repeat a function call */
-fn repeat(fn_to_repeat: (int) -> unit, n: int) {
+// Helper function to repeat a function call
+fn repeat(fn_to_repeat: (int) -> unit, n: int): string {
   fn helper(i: int) {
     if i < n + 1 {
       fn_to_repeat(i)
       helper(i + 1)
-    } 
+    }
   }
   helper(1)
+  "Done 🌸"
 }
 
-fn greet(person: string, person_nr: int) {
-  print("Hello,", person + "!", person_nr)
-}
+fn greet(person: string, person_nr: int) {}
 
 fn repeatable(iteration: int) {
   greet("Dave", iteration)
