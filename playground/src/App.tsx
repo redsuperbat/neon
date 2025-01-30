@@ -35,7 +35,7 @@ import typeErrors from "./assets/examples/type-errors.neon?raw";
 import initScript from "./assets/init.neon?raw";
 
 function LoadingPage() {
-  return <div aria-busy="true"></div>;
+  return <div aria-busy="true" />;
 }
 
 function ErrorPage({ error }: { error: string }) {
@@ -93,13 +93,13 @@ const rangeFromLocation = ({
 
 type Output =
   | {
-    type: "error";
-    message: string;
-  }
+      type: "error";
+      message: string;
+    }
   | {
-    type: "ok";
-    message: string;
-  };
+      type: "ok";
+      message: string;
+    };
 
 function ExecutionPage() {
   const [output, setOutput] = createSignal<Output>();
@@ -254,7 +254,7 @@ function ExecutionPage() {
           "margin-bottom": "10px",
         }}
         ref={monacoEl}
-      ></div>
+      />
 
       <div
         style={{
@@ -287,6 +287,7 @@ function ExecutionPage() {
           </Show>
         </div>
         <button
+          type="button"
           style={{ height: "60px" }}
           disabled={disabled()}
           onclick={() => exec()}
