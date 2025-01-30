@@ -1,12 +1,7 @@
 use crate::{
     diagnostic::{DiagnosticKind, DiagnosticsList},
     location::{Location, WithLocation},
-    parser::{
-        ArrayNode, AssignmentNode, BinaryOp, BinaryOperationNode, BlockNode, BuiltinNode, ElseNode,
-        Expression, FnNode, ForLoopNode, ForLoopTarget, IdentifierNode, IfNode, IndexAccessNode,
-        InvocationNode, LetBindingNode, PropertyAccessNode, StructDefinitionNode,
-        StructInstantiationNode, TypeExpression,
-    },
+    parser::*,
 };
 use std::{
     collections::{HashMap, HashSet},
@@ -329,15 +324,16 @@ impl TypeChecker<'_> {
 
     fn typeof_fn(&mut self, node: &FnNode, env: &mut TypeEnvironment) -> Type {
         let mut parameters = vec![];
+        let mut env = env.clone();
         for param in &node.parameters {
-            let param_type = self.typeof_type_expression(&param.type_expr, env);
+            let param_type = self.typeof_type_expression(&param.type_expr, &mut env);
             env.bindings
                 .insert(param.identifier.name.clone(), param_type.clone());
             parameters.push(param_type);
         }
 
         let return_type = match &node.return_type {
-            Some(t) => self.typeof_type_expression(&t, env),
+            Some(t) => self.typeof_type_expression(&t, &mut env),
             None => Type::Unit,
         };
 
@@ -349,11 +345,16 @@ impl TypeChecker<'_> {
         env.bindings
             .insert(node.identifier.name.clone(), fn_type.clone());
 
-        let mut env = env.clone();
+        let inferred_return_type = self.typeof_block(&node.body, &mut env);
 
-        let inferred_return_type = self.typeof_expression(&node.body.return_val, &mut env);
         if self.unify(&inferred_return_type, &return_type) == Type::Never {
-            return self.type_error(&inferred_return_type, &return_type, node.identifier.loc);
+            return self.error(
+                DiagnosticKind::InvalidFnReturnType {
+                    expected: return_type.clone(),
+                    found: inferred_return_type.clone(),
+                },
+                node.identifier.loc,
+            );
         }
         fn_type
     }
@@ -376,6 +377,9 @@ impl TypeChecker<'_> {
         let callee = self.typeof_expression(&node.callee, env);
 
         let Type::Fn(fn_type) = callee else {
+            println!("bindings: {:?}", env.bindings);
+            println!("callee: {:?}", node.callee);
+            println!("typeof_callee: {:?}", callee);
             return self.error(
                 DiagnosticKind::ExpressionNotInvocable {
                     callee_type: callee,
@@ -404,7 +408,7 @@ impl TypeChecker<'_> {
     fn typeof_binary(&mut self, node: &BinaryOperationNode, env: &mut TypeEnvironment) -> Type {
         let lhs = self.typeof_expression(&node.left, env);
         let rhs = self.typeof_expression(&node.right, env);
-        let unification = self.check_type_match(&lhs, &rhs, node.left.loc());
+        let unification = self.check_type_match(&lhs, &rhs, node.right.loc());
 
         match node.operation {
             BinaryOp::Mod | BinaryOp::Add | BinaryOp::Sub => unification,
@@ -543,7 +547,6 @@ impl TypeChecker<'_> {
     }
 
     fn typeof_identifier(&mut self, node: &IdentifierNode, env: &mut TypeEnvironment) -> Type {
-        println!("binding: {}, {:?}", node.name, env.bindings);
         match env.bindings.get(&node.name) {
             Some(t) => t.clone(),
             None => Type::Never,
@@ -604,8 +607,15 @@ mod tests {
     fn typeof_ok() {
         let code = String::from(
             "
-let a = 3 
-a = true
+fn repeat(fn_to_repeat: (int) -> unit, n: int) {
+  fn helper(i: int) {
+    if i < n + 1 {
+      fn_to_repeat(i)
+      helper(i + 1)
+    }
+  }
+  helper(1)
+}
 ",
         );
         let tokens = Lexer::new(code).collect::<Vec<_>>();
@@ -615,7 +625,11 @@ a = true
         let mut env = TypeEnvironment {
             bindings: HashMap::new(),
         };
+
         ts.typeof_expression(&ast, &mut env);
+        for d in dl.diagnostics.iter() {
+            println!("{}", d.to_string());
+        }
         assert!(!dl.has_errors());
     }
 }

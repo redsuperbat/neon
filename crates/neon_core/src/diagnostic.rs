@@ -22,6 +22,10 @@ pub enum DiagnosticKind {
         missing_from: Type,
         property: String,
     },
+    InvalidFnReturnType {
+        expected: Type,
+        found: Type,
+    },
     MissingPropertyAccess {
         accessed_on: Type,
         property: String,
@@ -121,6 +125,9 @@ impl ToString for Diagnostic {
             }
             DiagnosticKind::MissingPropertyAccess { accessed_on, property } => {
                 format!("Property '{}' does not exist in type '{}'.", property, accessed_on)
+            }
+            DiagnosticKind::InvalidFnReturnType { expected, found } => {
+                format!("Invalid return type, expected '{}', found '{}'", expected, found)
             }
         };
 
