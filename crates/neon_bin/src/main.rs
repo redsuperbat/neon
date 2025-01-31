@@ -1,10 +1,7 @@
 use clap::{Parser as ClapParser, Subcommand, ValueEnum};
 use neon_core::compiler::Compiler;
-use rustyline::{error::ReadlineError, DefaultEditor, Editor};
-use std::{
-    fs,
-    io::{self, Write},
-};
+use rustyline::{error::ReadlineError, DefaultEditor};
+use std::fs;
 
 /// Neon CLI
 #[derive(ClapParser, Debug)]
@@ -35,11 +32,6 @@ enum Commands {
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Debug)]
 enum CompilationTarget {
     Lua,
-}
-
-fn print(str: &str) -> () {
-    print!("{str}");
-    io::stdout().flush().expect("Failed to flush to stdout");
 }
 
 fn repl() {
@@ -86,17 +78,15 @@ fn file(path: &str) {
     };
 }
 
-fn compile_to_lua(path: &str) -> Result<String, ()> {
+fn compile_to_lua(path: &str) -> Option<String> {
     let src = fs::read_to_string(path).expect("File not found");
     let mut compiler = Compiler::new();
     compiler.register_libraries();
     match compiler.compile_lua(&src) {
-        Ok(v) => Ok(v),
+        Ok(v) => Some(v),
         Err(dl) => {
-            dl.diagnostics
-                .iter()
-                .for_each(|d| println!("{}", d.to_string()));
-            Err(())
+            println!("{}", dl.to_string());
+            None
         }
     }
 }
@@ -115,7 +105,7 @@ fn main() {
                     let result = match target {
                         CompilationTarget::Lua => compile_to_lua(&path),
                     };
-                    let Ok(result) = result else {
+                    let Some(result) = result else {
                         return;
                     };
                     fs::write(filepath, result).expect("Should be able to write");
