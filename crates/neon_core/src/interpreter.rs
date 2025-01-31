@@ -5,12 +5,7 @@ use std::{
 
 use crate::{
     location::{Location, WithLocation},
-    parser::{
-        ArrayNode, AssignmentNode, BinaryOp, BinaryOperationNode, BlockNode, BuiltinNode,
-        Expression, FnNode, ForLoopNode, ForLoopTarget, IdentifierNode, IfNode, IndexAccessNode,
-        IntNode, InvocationNode, LetBindingNode, PropertyAccessNode, StructInstantiationNode,
-        UseNode,
-    },
+    parser::*,
 };
 
 #[derive(Debug, Clone)]
@@ -238,6 +233,7 @@ impl Interpreter {
             Expression::Assignment(node) => self.evaluate_assignment(node, ctx),
             Expression::Use(node) => self.evaluate_use(node, ctx),
 
+            Expression::UnitBlock(node) => self.evaluate_unit_block(node, ctx),
             Expression::Builtin(node) => self.evaluate_builtin(node, ctx),
             Expression::String(node) => Ok(Value::String(node.value.clone())),
             Expression::Bool(node) => Ok(Value::Bool(node.value)),
@@ -313,7 +309,7 @@ impl Interpreter {
         let ForLoopNode {
             targets,
             iterable,
-            body,
+            unit_block,
             loc,
         } = for_loop;
 
@@ -327,19 +323,19 @@ impl Interpreter {
                             loop_ctx
                                 .bindings
                                 .insert(name.clone(), Value::String(s.to_string()));
-                            self.evaluate_expression(&body, &mut loop_ctx)?;
+                            self.evaluate_unit_block(&unit_block, &mut loop_ctx)?;
                         }
                     }
                     Value::Array(Array(elements)) => {
                         for el in elements {
                             loop_ctx.bindings.insert(name.clone(), el);
-                            self.evaluate_expression(&body, &mut loop_ctx)?;
+                            self.evaluate_unit_block(&unit_block, &mut loop_ctx)?;
                         }
                     }
                     Value::Object(obj) => {
                         for (_, value) in obj.properties {
                             loop_ctx.bindings.insert(name.clone(), value);
-                            self.evaluate_expression(&body, &mut loop_ctx)?;
+                            self.evaluate_unit_block(&unit_block, &mut loop_ctx)?;
                         }
                     }
                     _ => return Err(RuntimeError::type_error(loc)),
@@ -357,7 +353,7 @@ impl Interpreter {
                         loop_ctx
                             .bindings
                             .insert(second.clone(), Value::String(s.to_string()));
-                        self.evaluate_expression(&body, &mut loop_ctx)?;
+                        self.evaluate_unit_block(&unit_block, &mut loop_ctx)?;
                     }
                 }
                 Value::Array(elements) => {
@@ -366,14 +362,14 @@ impl Interpreter {
                             .bindings
                             .insert(first.clone(), Value::Int(i as i64));
                         loop_ctx.bindings.insert(second.clone(), el.clone());
-                        self.evaluate_expression(&body, &mut loop_ctx)?;
+                        self.evaluate_unit_block(&unit_block, &mut loop_ctx)?;
                     }
                 }
                 Value::Object(obj) => {
                     for (key, value) in obj.properties {
                         loop_ctx.bindings.insert(first.clone(), Value::String(key));
                         loop_ctx.bindings.insert(second.clone(), value.clone());
-                        self.evaluate_expression(&body, &mut loop_ctx)?;
+                        self.evaluate_unit_block(&unit_block, &mut loop_ctx)?;
                     }
                 }
                 _ => return Err(RuntimeError::type_error(loc)),
@@ -697,6 +693,17 @@ impl Interpreter {
         };
 
         Ok(result)
+    }
+
+    fn evaluate_unit_block(
+        &self,
+        node: &UnitBlockNode,
+        ctx: &mut EvaluationContext,
+    ) -> Result<Value, RuntimeError> {
+        for exp in &node.statements {
+            self.evaluate_expression(exp, ctx)?;
+        }
+        Ok(Value::Unit)
     }
 }
 

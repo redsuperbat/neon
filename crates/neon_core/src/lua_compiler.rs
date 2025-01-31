@@ -19,7 +19,6 @@ impl LuaCompiler {
             Expression::Fn(node) => self.compile_fn(node),
             Expression::If(node) => self.compile_if(node),
             Expression::ForLoop(node) => self.compile_for_loop(node),
-            Expression::Else(node) => todo!("{:?}", node),
             Expression::StructInstantiation(node) => self.compile_struct_instantiation(node),
             Expression::PropertyAccess(node) => self.compile_property_access(node),
             Expression::IndexAccess(node) => self.compile_index_access(node),
@@ -28,10 +27,11 @@ impl LuaCompiler {
             Expression::String(string_node) => format!("\"{}\"", string_node.value),
             Expression::Empty(..) => "".to_string(),
             Expression::StructDefinitionNode(..) => "".to_string(),
+            Expression::UnitBlock(node) => self.compile_unit_block(node),
 
+            Expression::Else(node) => todo!("{:?}", node),
             Expression::Builtin(node) => todo!("{:?}", node),
             Expression::Use(node) => todo!("{:?}", node),
-            _ => panic!("not implemented {:?}", expression),
         }
     }
 
@@ -139,7 +139,13 @@ impl LuaCompiler {
         };
         let iterable = self.compile_expression(&node.iterable);
         code += &format!("{} in ipairs({}) do\n", &targets, iterable);
-        code += &self.compile_expression(&node.body);
+        code += &node
+            .unit_block
+            .statements
+            .iter()
+            .map(|s| self.compile_expression(s))
+            .collect::<Vec<String>>()
+            .join("\n");
         code += "end";
         code
     }
@@ -170,6 +176,14 @@ impl LuaCompiler {
         let collection = self.compile_expression(&node.indexee);
         let index = self.compile_expression(&node.index);
         format!("{}[{}]", collection, index)
+    }
+
+    fn compile_unit_block(&self, node: &UnitBlockNode) -> String {
+        node.statements
+            .iter()
+            .map(|s| self.compile_expression(s))
+            .collect::<Vec<String>>()
+            .join("\n")
     }
 }
 

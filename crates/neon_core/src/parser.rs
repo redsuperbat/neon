@@ -211,11 +211,17 @@ pub enum ForLoopTarget {
 }
 
 #[derive(Debug, Clone)]
+pub struct UnitBlockNode {
+    pub loc: Location,
+    pub statements: Vec<Expression>,
+}
+
+#[derive(Debug, Clone)]
 pub struct ForLoopNode {
     pub loc: Location,
     pub targets: ForLoopTarget,
     pub iterable: Box<Expression>,
-    pub body: Box<Expression>,
+    pub unit_block: Box<UnitBlockNode>,
 }
 
 #[derive(Debug, Clone)]
@@ -331,6 +337,7 @@ pub enum Expression {
     String(StringNode),
     StructDefinitionNode(StructDefinitionNode),
     Use(UseNode),
+    UnitBlock(UnitBlockNode),
 }
 
 impl Expression {
@@ -362,6 +369,7 @@ impl WithLocation for Expression {
             Expression::Assignment(n) => n.loc,
             Expression::Use(n) => n.loc,
             Expression::StructDefinitionNode(n) => n.loc,
+            Expression::UnitBlock(n) => n.loc,
 
             Expression::Empty(loc) => *loc,
         }
@@ -936,6 +944,22 @@ impl Parser {
         }))
     }
 
+    fn parse_unit_block(&mut self) -> Result<UnitBlockNode, SyntaxError> {
+        let mut statements = vec![];
+        let Token { start, .. } = self.assert_next(TokenKind::OpenCurlyBrace)?;
+        loop {
+            if self.next_is(TokenKind::ClosedCurlyBrace) {
+                break;
+            }
+            statements.push(self.parse_expression()?);
+        }
+        let Token { end, .. } = self.assert_next(TokenKind::ClosedCurlyBrace)?;
+        Ok(UnitBlockNode {
+            loc: Location::new(start, end),
+            statements,
+        })
+    }
+
     fn parse_for_loop(&mut self) -> Result<Expression, SyntaxError> {
         let Token { start, .. } = self.assert_next(TokenKind::ForKeyword)?;
 
@@ -944,13 +968,13 @@ impl Parser {
         self.state.push(ParserState::For);
         let iterable = self.parse_expression()?.boxed();
         self.state.pop();
-        let body = self.parse_block()?.boxed();
+        let unit_block = self.parse_unit_block()?;
 
         Ok(Expression::ForLoop(ForLoopNode {
-            loc: Location::new(start, Pos::start()),
+            loc: Location::new(start, unit_block.loc.end),
             targets,
             iterable,
-            body,
+            unit_block: Box::new(unit_block),
         }))
     }
 

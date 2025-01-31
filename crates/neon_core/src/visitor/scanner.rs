@@ -33,6 +33,8 @@ impl<'a, V: Visitor + ?Sized> Scanner<'a, V> {
             Expression::String(n) => self.visitor.visit_string(n),
             Expression::Use(n) => self.visitor.visit_use(n),
             Expression::StructDefinitionNode(n) => self.scan_struct_definition(n),
+            Expression::UnitBlock(n) => self.scan_unit_block(n),
+
             Expression::Builtin(_) => todo!(),
             Expression::Empty(_) => {}
         }
@@ -103,7 +105,7 @@ impl<'a, V: Visitor + ?Sized> Scanner<'a, V> {
             }
         }
         self.scan_expression(&n.iterable);
-        self.scan_expression(&n.body);
+        self.scan_unit_block(&n.unit_block);
         self.visitor.leave_for_loop(n);
     }
 
@@ -168,5 +170,13 @@ impl<'a, V: Visitor + ?Sized> Scanner<'a, V> {
             self.visitor.visit_type_expression(&property.type_expr);
         }
         self.visitor.leave_struct_definition(n);
+    }
+
+    fn scan_unit_block(&mut self, n: &UnitBlockNode) {
+        self.visitor.enter_unit_block(n);
+        n.statements
+            .iter()
+            .for_each(|statement| self.scan_expression(statement));
+        self.visitor.leave_unit_block(n);
     }
 }

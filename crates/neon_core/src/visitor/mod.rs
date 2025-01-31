@@ -6,6 +6,9 @@ pub trait Visitor {
     fn enter_expression(&mut self, _expression: &Expression) {}
     fn leave_expression(&mut self, _expression: &Expression) {}
 
+    fn enter_unit_block(&mut self, _expression: &UnitBlockNode) {}
+    fn leave_unit_block(&mut self, _expression: &UnitBlockNode) {}
+
     fn enter_block(&mut self, _block: &BlockNode) {}
     fn leave_block(&mut self, _block: &BlockNode) {}
 

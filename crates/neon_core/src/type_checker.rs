@@ -125,6 +125,7 @@ impl TypeChecker<'_> {
             Expression::Use(node) => self.typeof_identifier(&node.identifier, env),
             Expression::StructDefinitionNode(node) => self.typeof_struct_definition(node, env),
             Expression::StructInstantiation(node) => self.typeof_struct_instantiation(node, env),
+            Expression::UnitBlock(node) => self.typeof_unit_block(node, env),
 
             Expression::Bool(..) => Type::Bool,
             Expression::Empty(..) => Type::Unit,
@@ -318,7 +319,7 @@ impl TypeChecker<'_> {
             }
         }
 
-        self.typeof_expression(&node.body, &mut env);
+        self.typeof_unit_block(&node.unit_block, &mut env);
         Type::Unit
     }
 
@@ -379,9 +380,6 @@ impl TypeChecker<'_> {
         let callee = self.typeof_expression(&node.callee, env);
 
         let Type::Fn(fn_type) = callee else {
-            println!("bindings: {:?}", env.bindings);
-            println!("callee: {:?}", node.callee);
-            println!("typeof_callee: {:?}", callee);
             return self.error(
                 DiagnosticKind::ExpressionNotInvocable {
                     callee_type: callee,
@@ -596,6 +594,13 @@ impl TypeChecker<'_> {
             loc,
         );
         Type::Never
+    }
+
+    fn typeof_unit_block(&mut self, node: &UnitBlockNode, env: &mut TypeEnvironment) -> Type {
+        for e in &node.statements {
+            self.typeof_expression(e, env);
+        }
+        Type::Unit
     }
 }
 
