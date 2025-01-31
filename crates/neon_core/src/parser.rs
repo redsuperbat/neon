@@ -550,6 +550,8 @@ impl Parser {
         self.peek().is_none()
     }
 
+    /// Assert the next token is of the given kind
+    /// Does not consume the token if it's incorrect
     fn assert_next(&mut self, kind: TokenKind) -> Result<Token, SyntaxError> {
         let next = self.peek().ok_or(self.eof())?;
         if next.kind == kind {
@@ -948,7 +950,7 @@ impl Parser {
         let mut statements = vec![];
         let Token { start, .. } = self.assert_next(TokenKind::OpenCurlyBrace)?;
         loop {
-            if self.next_is(TokenKind::ClosedCurlyBrace) {
+            if self.next_is(TokenKind::ClosedCurlyBrace) || self.is_at_end() {
                 break;
             }
             statements.push(self.parse_expression()?);
@@ -1131,7 +1133,10 @@ impl Parser {
         let predicate = self.parse_expression()?;
 
         let consequent = self.parse_block()?;
-        let alternate = self.parse_else().ok();
+        let mut alternate = None;
+        if self.next_is(TokenKind::ElseKeyword) {
+            alternate = Some(self.parse_else()?);
+        };
 
         let end = alternate
             .as_ref()
@@ -1149,7 +1154,11 @@ impl Parser {
     fn parse_else(&mut self) -> Result<Expression, SyntaxError> {
         let Token { start, .. } = self.assert_next(TokenKind::ElseKeyword)?;
 
-        let consequent = self.parse_if().ok().unwrap_or(self.parse_block()?);
+        let consequent = if self.next_is(TokenKind::IfKeyword) {
+            self.parse_if()?
+        } else {
+            self.parse_block()?
+        };
 
         Ok(Expression::Else(ElseNode {
             loc: Location::new(start, consequent.loc().end),
@@ -1261,13 +1270,44 @@ impl Parser {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::lexer::Lexer;
+    use crate::{
+        lexer::Lexer,
+        visitor::{
+            test_visitor::{ExpressionCheck, TestVisitor},
+            Visitor,
+        },
+    };
 
     fn parse(str: &str) -> Expression {
         let tokens = Lexer::new(str).collect::<Vec<_>>();
         Parser::new(tokens)
             .parse_program()
             .expect(&format!("{str}"))
+    }
+
+    #[test]
+    fn parse_else_block() {
+        let str = "fn print(s: string, i: int) {}
+
+fn fizz_buzz(n: int) {
+  fn helper(i: int) {
+    if i < n + 1 {
+      if 0 == i % 15 {
+      } else if 0 == i % 3 {
+      } else if 0 == i % 5 {
+      }
+      helper(i + 1)
+    }
+  }
+  helper(1)
+}
+
+fizz_buzz(15)";
+        let tokens = Lexer::new(str).collect::<Vec<_>>();
+        let ast = Parser::new(tokens).parse_program().expect("Should work");
+        let mut visitor = TestVisitor::new();
+        visitor.scanner().scan_expression(&ast);
+        assert_eq!(visitor.num_expressions(ExpressionCheck::Else), 2);
     }
 
     #[test]

@@ -28,8 +28,8 @@ impl LuaCompiler {
             Expression::Empty(..) => "".to_string(),
             Expression::StructDefinitionNode(..) => "".to_string(),
             Expression::UnitBlock(node) => self.compile_unit_block(node),
+            Expression::Else(node) => self.compile_else(node),
 
-            Expression::Else(node) => todo!("{:?}", node),
             Expression::Builtin(node) => todo!("{:?}", node),
             Expression::Use(node) => todo!("{:?}", node),
         }
@@ -40,6 +40,9 @@ impl LuaCompiler {
         if_str += &self.compile_expression(&node.predicate);
         if_str += " then\n";
         if_str += &self.compile_expression(&node.consequent);
+        if let Some(alternate) = node.alternate.as_ref() {
+            if_str += &self.compile_expression(alternate);
+        }
         if_str += "end\nend)()";
         if_str
     }
@@ -184,6 +187,10 @@ impl LuaCompiler {
             .map(|s| self.compile_expression(s))
             .collect::<Vec<String>>()
             .join("\n")
+    }
+
+    fn compile_else(&self, node: &ElseNode) -> String {
+        format!("else\n{}\nend", self.compile_expression(&node.consequent))
     }
 }
 

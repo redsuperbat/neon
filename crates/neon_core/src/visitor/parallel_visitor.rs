@@ -16,6 +16,17 @@ impl Visitor for ParallelVisitor {
             visitor.leave_expression(n);
         }
     }
+    fn enter_unit_block(&mut self, _expression: &UnitBlockNode) {
+        for visitor in &mut self.visitors {
+            visitor.enter_unit_block(_expression);
+        }
+    }
+    fn leave_unit_block(&mut self, _expression: &UnitBlockNode) {
+        for visitor in &mut self.visitors {
+            visitor.leave_unit_block(_expression);
+        }
+    }
+
     fn enter_block(&mut self, n: &BlockNode) {
         for visitor in &mut self.visitors {
             visitor.enter_block(n);
@@ -64,6 +75,11 @@ impl Visitor for ParallelVisitor {
     fn leave_let_binding(&mut self, n: &LetBindingNode) {
         for visitor in &mut self.visitors {
             visitor.leave_let_binding(n)
+        }
+    }
+    fn enter_binary_operation(&mut self, n: &BinaryOperationNode) {
+        for visitor in &mut self.visitors {
+            visitor.enter_binary_operation(n)
         }
     }
     fn leave_binary_operation(&mut self, n: &BinaryOperationNode) {
@@ -254,6 +270,11 @@ impl Visitor for ParallelVisitor {
     fn visit_use(&mut self, n: &UseNode) {
         for visitor in &mut self.visitors {
             visitor.visit_use(n)
+        }
+    }
+    fn visit_struct_name(&mut self, n: &StructNameNode) {
+        for visitor in &mut self.visitors {
+            visitor.visit_struct_name(n);
         }
     }
 }

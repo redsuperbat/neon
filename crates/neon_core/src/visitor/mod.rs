@@ -86,3 +86,4 @@ pub trait Visitor {
 
 pub mod parallel_visitor;
 pub mod scanner;
+pub mod test_visitor;
