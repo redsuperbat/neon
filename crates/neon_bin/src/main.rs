@@ -79,7 +79,7 @@ fn file(path: &str) {
 }
 
 fn compile_to_lua(path: &str) -> Option<String> {
-    let src = fs::read_to_string(path).expect("File not found");
+    let src = fs::read_to_string(path).expect(&format!("File {path} not found"));
     let mut compiler = Compiler::new();
     compiler.register_libraries();
     match compiler.compile_lua(&src) {

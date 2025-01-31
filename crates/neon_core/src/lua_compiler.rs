@@ -1,7 +1,4 @@
-use crate::parser::{
-    ArrayNode, AssignmentNode, BinaryOp, BinaryOperationNode, BlockNode, Expression, FnNode,
-    IfNode, InvocationNode, LetBindingNode,
-};
+use crate::parser::*;
 
 pub struct LuaCompiler {}
 
@@ -21,19 +18,18 @@ impl LuaCompiler {
             Expression::Invocation(node) => self.compile_invocation(node),
             Expression::Fn(node) => self.compile_fn(node),
             Expression::If(node) => self.compile_if(node),
-
-            Expression::ForLoop(node) => todo!("{:?}", node),
-
-            Expression::Builtin(node) => todo!("{:?}", node),
+            Expression::ForLoop(node) => self.compile_for_loop(node),
             Expression::Else(node) => todo!("{:?}", node),
-            Expression::StructInstantiation(node) => todo!("{:?}", node),
-            Expression::PropertyAccess(node) => todo!("{:?}", node),
-            Expression::IndexAccess(node) => todo!("{:?}", node),
-
+            Expression::StructInstantiation(node) => self.compile_struct_instantiation(node),
+            Expression::PropertyAccess(node) => self.compile_property_access(node),
+            Expression::IndexAccess(node) => self.compile_index_access(node),
             Expression::Int(node) => format!("{}", node.value),
             Expression::Bool(node) => format!("{}", node.value),
             Expression::String(string_node) => format!("\"{}\"", string_node.value),
             Expression::Empty(..) => "".to_string(),
+            Expression::StructDefinitionNode(..) => "".to_string(),
+
+            Expression::Builtin(node) => todo!("{:?}", node),
             Expression::Use(node) => todo!("{:?}", node),
             _ => panic!("not implemented {:?}", expression),
         }
@@ -132,6 +128,48 @@ impl LuaCompiler {
         }
         arr += "}";
         arr
+    }
+
+    fn compile_for_loop(&self, node: &ForLoopNode) -> String {
+        let mut code = String::from("for");
+
+        let targets = match &node.targets {
+            ForLoopTarget::Single(i) => format!(" _,{} ", i.name),
+            ForLoopTarget::Tuple(a, b) => format!(" {},{} ", a.name, b.name),
+        };
+        let iterable = self.compile_expression(&node.iterable);
+        code += &format!("{} in ipairs({}) do\n", &targets, iterable);
+        code += &self.compile_expression(&node.body);
+        code += "end";
+        code
+    }
+
+    fn compile_struct_instantiation(&self, node: &StructInstantiationNode) -> String {
+        let mut code = String::from("{");
+
+        let fields: Vec<String> = node
+            .arguments
+            .iter()
+            .map(|a| {
+                let value = self.compile_expression(&a.value);
+                format!("{} = {}", &a.name.value, value)
+            })
+            .collect();
+
+        code += &fields.join(", ");
+        code += "}";
+        code
+    }
+
+    fn compile_property_access(&self, node: &PropertyAccessNode) -> String {
+        let base = self.compile_expression(&node.object);
+        format!("{}.{}", base, &node.property.value)
+    }
+
+    fn compile_index_access(&self, node: &IndexAccessNode) -> String {
+        let collection = self.compile_expression(&node.indexee);
+        let index = self.compile_expression(&node.index);
+        format!("{}[{}]", collection, index)
     }
 }
 
