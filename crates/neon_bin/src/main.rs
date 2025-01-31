@@ -1,10 +1,10 @@
+use clap::{Parser as ClapParser, Subcommand, ValueEnum};
 use neon_core::compiler::Compiler;
+use rustyline::{error::ReadlineError, DefaultEditor, Editor};
 use std::{
     fs,
-    io::{self, BufRead, Write},
+    io::{self, Write},
 };
-
-use clap::{Parser as ClapParser, Subcommand, ValueEnum};
 
 /// Neon CLI
 #[derive(ClapParser, Debug)]
@@ -43,20 +43,36 @@ fn print(str: &str) -> () {
 }
 
 fn repl() {
-    let handle = io::stdin().lock();
+    let mut rl = DefaultEditor::new().expect("Could not get cmd editor");
     let mut compiler = Compiler::new();
     compiler.register_libraries();
 
-    print("> ");
-    for line in handle.lines() {
-        let line = line.expect("Failed to read line");
-
-        match compiler.run(&line) {
-            Ok(v) => println!("{}", v),
-            Err(e) => println!("{}", e),
-        };
-
-        print("> ");
+    let mut ctrl_c = false;
+    loop {
+        let readline = rl.readline("> ");
+        match readline {
+            Ok(line) => {
+                let _ = rl.add_history_entry(line.as_str());
+                match compiler.run(&line) {
+                    Ok(v) => println!("{}", v),
+                    Err(e) => println!("{}", e),
+                };
+                ctrl_c = false;
+            }
+            Err(ReadlineError::Interrupted) => {
+                if ctrl_c {
+                    break;
+                } else {
+                    println!("(To exit, press Ctrl+C again or Ctrl+D)");
+                    ctrl_c = true;
+                }
+            }
+            Err(ReadlineError::Eof) => break,
+            Err(err) => {
+                println!("Error: {:?}", err);
+                break;
+            }
+        }
     }
 }
 
