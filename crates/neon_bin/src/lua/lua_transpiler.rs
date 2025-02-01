@@ -1,10 +1,10 @@
-use crate::parser::*;
+use neon_core::parser::*;
 
-pub struct LuaCompiler {}
+pub struct LuaTranspiler {}
 
-impl LuaCompiler {
-    pub fn new() -> LuaCompiler {
-        LuaCompiler {}
+impl LuaTranspiler {
+    pub fn new() -> Self {
+        Self {}
     }
 
     pub fn compile_expression(&self, expression: &Expression) -> String {
@@ -197,7 +197,7 @@ impl LuaCompiler {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{lexer::Lexer, parser::Parser};
+    use neon_core::{lexer::Lexer, parser::Parser};
 
     #[test]
     fn compile_lua() {
@@ -210,7 +210,7 @@ a
         );
         let tokens = Lexer::new(code).collect::<Vec<_>>();
         let ast = Parser::new(tokens).parse_program().expect("Should work");
-        let c = LuaCompiler::new();
+        let c = LuaTranspiler::new();
         let lua = c.compile_expression(&ast);
         println!("{}", lua);
     }

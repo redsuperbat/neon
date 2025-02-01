@@ -2,7 +2,6 @@ use crate::{
     diagnostic::{DiagnosticsList, ToDiagnostic},
     interpreter::{EvaluationContext, Interpreter, Value},
     lexer::Lexer,
-    lua_compiler::LuaCompiler,
     parser::{Expression, Parser},
     std::io::IO,
     symbol_table::{Scope, SymbolTable},
@@ -11,7 +10,6 @@ use crate::{
 };
 
 pub struct Compiler {
-    lua_compiler: LuaCompiler,
     interpreter: Interpreter,
 
     // Mutates during parsing and evaluating
@@ -24,7 +22,6 @@ impl Compiler {
     pub fn new() -> Self {
         Self {
             interpreter: Interpreter::new(),
-            lua_compiler: LuaCompiler::new(),
 
             scope: Scope::global(),
             type_env: TypeEnvironment::new(),
@@ -32,7 +29,7 @@ impl Compiler {
         }
     }
 
-    fn parse_source(&self, src: &str) -> Result<Expression, DiagnosticsList> {
+    pub fn parse_source(&self, src: &str) -> Result<Expression, DiagnosticsList> {
         let tokens = Lexer::new(src).collect();
         let mut diagnostics = DiagnosticsList::new();
         match Parser::new(tokens)
@@ -64,11 +61,6 @@ impl Compiler {
 
     pub fn register_libraries(&mut self) {
         self.register_library(IO);
-    }
-
-    pub fn compile_lua(&self, src: &str) -> Result<String, DiagnosticsList> {
-        let ast = self.parse_source(src)?;
-        Ok(self.lua_compiler.compile_expression(&ast))
     }
 
     pub fn check(&mut self, src: &str) -> DiagnosticsList {
