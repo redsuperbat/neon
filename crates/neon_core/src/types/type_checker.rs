@@ -124,7 +124,7 @@ impl TypeChecker<'_> {
         node: &StructInstantiationNode,
         env: &mut TypeEnvironment,
     ) -> Type {
-        let defined_type = env.get_by_name(&node.identifier.name);
+        let defined_type = env.get(&node.identifier.name);
 
         // Symbol table should have produced a diagnostic already of we branch in the else clause
         // here
@@ -265,33 +265,33 @@ impl TypeChecker<'_> {
     fn typeof_for_loop(&mut self, node: &ForLoopNode, env: &mut TypeEnvironment) -> Type {
         let typeof_iterable = self.typeof_expression(&node.iterable, env);
 
-        let mut env = env.clone();
+        env.enter();
         match typeof_iterable {
             Type::Struct(..) => match &node.targets {
                 ForLoopTarget::Single(node) => {
-                    env.declare(&node.name, Type::Any, None);
+                    env.declare(&node.name, Type::Any);
                 }
                 ForLoopTarget::Tuple(a, b) => {
-                    env.declare(&a.name, Type::String, None);
-                    env.declare(&b.name, Type::Any, None);
+                    env.declare(&a.name, Type::String);
+                    env.declare(&b.name, Type::Any);
                 }
             },
             Type::Array(array_type) => match &node.targets {
                 ForLoopTarget::Single(node) => {
-                    env.declare(&node.name, *array_type.elements, None);
+                    env.declare(&node.name, *array_type.elements);
                 }
                 ForLoopTarget::Tuple(a, b) => {
-                    env.declare(&a.name, Type::Int, None);
-                    env.declare(&b.name, *array_type.elements, None);
+                    env.declare(&a.name, Type::Int);
+                    env.declare(&b.name, *array_type.elements);
                 }
             },
             Type::String => match &node.targets {
                 ForLoopTarget::Single(node) => {
-                    env.declare(&node.name, Type::String, None);
+                    env.declare(&node.name, Type::String);
                 }
                 ForLoopTarget::Tuple(a, b) => {
-                    env.declare(&a.name, Type::Int, None);
-                    env.declare(&b.name, Type::String, None);
+                    env.declare(&a.name, Type::Int);
+                    env.declare(&b.name, Type::String);
                 }
             },
             _ => {
@@ -304,7 +304,8 @@ impl TypeChecker<'_> {
             }
         }
 
-        self.typeof_unit_block(&node.unit_block, &mut env);
+        self.typeof_unit_block(&node.unit_block, env);
+        env.exit();
         Type::Unit
     }
 
@@ -325,14 +326,14 @@ impl TypeChecker<'_> {
             return_type: Box::new(return_type.clone()),
         });
 
-        env.declare(&node.identifier.name, fn_type.clone(), Some(node));
+        env.declare(&node.identifier.name, fn_type.clone());
 
-        let mut inner_env = env.clone();
+        env.enter();
         parameters.iter().for_each(|(name, t)| {
-            inner_env.declare(name, t.clone(), None);
+            env.declare(name, t.clone());
         });
 
-        let inferred_return_type = self.typeof_block(&node.body, &mut inner_env);
+        let inferred_return_type = self.typeof_block(&node.body, env);
 
         if self.unify(&inferred_return_type, &return_type) == Type::Never {
             return self.error(
@@ -343,6 +344,7 @@ impl TypeChecker<'_> {
                 node.identifier.loc,
             );
         }
+        env.exit();
         fn_type
     }
 
@@ -430,7 +432,7 @@ impl TypeChecker<'_> {
             TypeExpression::Array(node) => Type::Array(ArrayType {
                 elements: Box::new(self.typeof_type_expression(&node.elements, env)),
             }),
-            TypeExpression::Identifier(node) => match env.get_by_name(&node.name) {
+            TypeExpression::Identifier(node) => match env.get(&node.name) {
                 Some(t) => t.clone(),
                 None => self.error(
                     DiagnosticKind::UndefinedType {
@@ -462,7 +464,7 @@ impl TypeChecker<'_> {
             rhs
         };
 
-        env.declare(&node.binding.identifier.name, t, Some(node));
+        env.declare(&node.binding.identifier.name, t);
         Type::Unit
     }
 
@@ -483,7 +485,7 @@ impl TypeChecker<'_> {
             properties,
             name: node.name.value.clone(),
         });
-        env.declare(&node.name.value, t, Some(node));
+        env.declare(&node.name.value, t);
         Type::Unit
     }
 
@@ -498,7 +500,7 @@ impl TypeChecker<'_> {
 
         let t = self.check_type_match(&lhs, &rhs, node.identifier.loc);
         if t != Type::Never {
-            env.declare(&node.identifier.name, t, Some(node));
+            env.declare(&node.identifier.name, t);
         }
         Type::Unit
     }
@@ -528,7 +530,7 @@ impl TypeChecker<'_> {
     }
 
     fn typeof_identifier(&mut self, node: &IdentifierNode, env: &mut TypeEnvironment) -> Type {
-        match env.get_by_name(&node.name) {
+        match env.get(&node.name) {
             Some(t) => t.clone(),
             None => Type::Never,
         }

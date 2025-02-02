@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use super::{ElseNode, Visitor};
+use super::*;
 
 pub struct TestVisitor {
     expression_count: HashMap<ExpressionCheck, usize>,
@@ -9,6 +9,7 @@ pub struct TestVisitor {
 #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq)]
 pub enum ExpressionCheck {
     Else,
+    Fn,
 }
 
 impl TestVisitor {
@@ -23,11 +24,17 @@ impl TestVisitor {
 }
 
 impl Visitor for TestVisitor {
-    fn enter_else(&mut self, else_node: &ElseNode) {
-        println!("else {:?}", else_node);
+    fn enter_else(&mut self, _n: &ElseNode) {
         *self
             .expression_count
             .entry(ExpressionCheck::Else)
+            .or_insert(0) += 1;
+    }
+
+    fn enter_fn(&mut self, _n: &FnNode) {
+        *self
+            .expression_count
+            .entry(ExpressionCheck::Fn)
             .or_insert(0) += 1;
     }
 }

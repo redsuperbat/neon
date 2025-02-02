@@ -158,7 +158,6 @@ impl Visitor for SymbolTable<'_> {
                 },
                 loc: node.loc,
             });
-            return;
         };
 
         let FnNode {
@@ -171,7 +170,7 @@ impl Visitor for SymbolTable<'_> {
         self.scope.enter(&identifiers);
     }
 
-    fn leave_fn(&mut self, _function: &FnNode) {
+    fn leave_fn(&mut self, _n: &FnNode) {
         self.scope.exit();
     }
 

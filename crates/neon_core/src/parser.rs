@@ -1292,6 +1292,36 @@ fizz_buzz(15)";
     }
 
     #[test]
+    fn parse_fn() {
+        let str = "
+fn print(s: string, i: int) {}
+
+fn fizz_buzz(n: int) {
+  fn helper(i: int) {
+    if i < n + 1 {
+      if 0 == i % 15 {
+        print(\"FizzBuzz\", i)
+      } else if 0 == i % 3 {
+        print(\"Fizz\", i)
+      } else if 0 == i % 5 {
+        print(\"Buzz\", i)
+      }
+      helper(i + 1)
+    }
+  }
+  helper(1)
+}
+
+fizz_buzz(15)
+";
+        let tokens = Lexer::new(str).collect::<Vec<_>>();
+        let ast = Parser::new(tokens).parse_program().expect("Should work");
+        let mut visitor = TestVisitor::new();
+        visitor.scanner().scan_expression(&ast);
+        assert_eq!(visitor.num_expressions(ExpressionCheck::Fn), 3);
+    }
+
+    #[test]
     fn parsing() {
         let ast = parse("let a = 3 let b = 4 fn test() { a + b }");
         assert!(matches!(ast, Expression::Block { .. }));
