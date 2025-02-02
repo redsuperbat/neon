@@ -1,4 +1,4 @@
-use crate::{location::Location, type_checker::Type};
+use crate::{location::Location, types::type_checker::Type};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum DiagnosticKind {

@@ -5,7 +5,7 @@ pub mod lexer;
 pub mod location;
 pub mod parser;
 pub mod symbol_table;
-pub mod type_checker;
+pub mod types;
 pub mod visitor;
 
 mod std;

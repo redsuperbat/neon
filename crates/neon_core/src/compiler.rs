@@ -5,7 +5,7 @@ use crate::{
     parser::{Expression, Parser},
     std::io::IO,
     symbol_table::{Scope, SymbolTable},
-    type_checker::{TypeChecker, TypeEnvironment},
+    types::{type_checker::TypeChecker, type_env::TypeEnvironment},
     visitor::Visitor,
 };
 
@@ -29,6 +29,10 @@ impl Compiler {
         }
     }
 
+    pub fn cloned_type_env(&self) -> TypeEnvironment {
+        self.type_env.clone()
+    }
+
     pub fn parse_source(&self, src: &str) -> Result<Expression, DiagnosticsList> {
         let tokens = Lexer::new(src).collect();
         let mut diagnostics = DiagnosticsList::new();
@@ -42,6 +46,16 @@ impl Compiler {
                 Err(diagnostics)
             }
         }
+    }
+
+    pub fn check_and_parse(&mut self, src: &str) -> Result<Expression, DiagnosticsList> {
+        let ast = self.parse_source(src)?;
+        let mut dl = DiagnosticsList::new();
+        TypeChecker::new(&mut dl).typeof_expression(&ast, &mut self.type_env);
+        SymbolTable::new(&mut dl, &mut self.scope)
+            .scanner()
+            .scan_expression(&ast);
+        Ok(ast)
     }
 
     fn register_library(&mut self, lib: &str) {
