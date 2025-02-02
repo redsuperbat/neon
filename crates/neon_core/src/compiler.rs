@@ -30,7 +30,7 @@ impl Compiler {
     }
 
     pub fn cloned_type_env(&self) -> TypeEnvironment {
-        self.type_env.clone()
+        self.type_env.clone_with_bindings()
     }
 
     pub fn parse_source(&self, src: &str) -> Result<Expression, DiagnosticsList> {

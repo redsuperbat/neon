@@ -16,6 +16,13 @@ impl TypeEnvironment {
         }
     }
 
+    pub fn clone_with_bindings(&self) -> TypeEnvironment {
+        TypeEnvironment {
+            bindings: self.bindings.clone(),
+            current_scope: 0,
+        }
+    }
+
     fn bindings_mut(&mut self) -> &mut HashMap<String, Type> {
         self.bindings
             .get_mut(self.current_scope)
@@ -26,19 +33,19 @@ impl TypeEnvironment {
         self.bindings_mut().insert(name.to_string(), t);
     }
 
-    pub fn enter(&mut self) {
+    pub fn enter_scope(&mut self) {
         self.current_scope += 1;
         self.bindings.push(HashMap::new());
     }
 
-    pub fn exit(&mut self) {
+    pub fn exit_scope(&mut self) {
         if self.current_scope == 0 {
             panic!("Cannot exit root scope")
         }
         self.current_scope -= 1;
     }
 
-    pub fn get(&mut self, name: &str) -> Option<&Type> {
+    pub fn get(&self, name: &str) -> Option<&Type> {
         let mut scope = self.current_scope;
         loop {
             let bindings = self.bindings.get(scope);
@@ -49,7 +56,7 @@ impl TypeEnvironment {
             if let Some(t) = bindings.get(name) {
                 return Some(t);
             }
-            scope += 1;
+            scope -= 1;
         }
     }
 }

@@ -31,7 +31,13 @@ enum Commands {
         out: String,
     },
     /// Build the neon application
-    Build {},
+    Build {
+        /// Path to neon file to build
+        path: String,
+        #[arg(short, long)]
+        /// Set the output file path
+        out: String,
+    },
     /// Run the neon application
     Run {},
 }
@@ -56,7 +62,7 @@ fn main() {
                     };
                     fs::write(out, result).expect("Should be able to write");
                 }
-                Commands::Build {} => build::run(),
+                Commands::Build { path, out } => build::run(&path, &out),
                 Commands::Run {} => todo!(),
             }
             // If we hit a command we should not do anything else

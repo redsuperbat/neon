@@ -31,7 +31,6 @@ impl LuaTranspiler {
             Expression::Else(node) => self.compile_else(node),
 
             Expression::Builtin(node) => todo!("{:?}", node),
-            Expression::Use(node) => todo!("{:?}", node),
         }
     }
 

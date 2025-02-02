@@ -265,7 +265,7 @@ impl TypeChecker<'_> {
     fn typeof_for_loop(&mut self, node: &ForLoopNode, env: &mut TypeEnvironment) -> Type {
         let typeof_iterable = self.typeof_expression(&node.iterable, env);
 
-        env.enter();
+        env.enter_scope();
         match typeof_iterable {
             Type::Struct(..) => match &node.targets {
                 ForLoopTarget::Single(node) => {
@@ -305,7 +305,7 @@ impl TypeChecker<'_> {
         }
 
         self.typeof_unit_block(&node.unit_block, env);
-        env.exit();
+        env.exit_scope();
         Type::Unit
     }
 
@@ -328,7 +328,7 @@ impl TypeChecker<'_> {
 
         env.declare(&node.identifier.name, fn_type.clone());
 
-        env.enter();
+        env.enter_scope();
         parameters.iter().for_each(|(name, t)| {
             env.declare(name, t.clone());
         });
@@ -344,7 +344,7 @@ impl TypeChecker<'_> {
                 node.identifier.loc,
             );
         }
-        env.exit();
+        env.exit_scope();
         fn_type
     }
 
