@@ -108,7 +108,6 @@ impl TypeChecker<'_> {
             Expression::PropertyAccess(node) => self.typeof_property_access(node, env),
             Expression::IndexAccess(node) => self.typeof_index_access(node, env),
             Expression::Builtin(node) => self.typeof_builtin(node, env),
-            Expression::Use(node) => self.typeof_identifier(&node.identifier, env),
             Expression::StructDefinitionNode(node) => self.typeof_struct_definition(node, env),
             Expression::StructInstantiation(node) => self.typeof_struct_instantiation(node, env),
             Expression::UnitBlock(node) => self.typeof_unit_block(node, env),

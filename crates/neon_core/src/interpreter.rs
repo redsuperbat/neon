@@ -231,7 +231,6 @@ impl Interpreter {
             Expression::PropertyAccess(node) => self.evaluate_property_access(node, ctx),
             Expression::StructInstantiation(node) => self.evaluate_object(node, ctx),
             Expression::Assignment(node) => self.evaluate_assignment(node, ctx),
-            Expression::Use(node) => self.evaluate_use(node, ctx),
 
             Expression::UnitBlock(node) => self.evaluate_unit_block(node, ctx),
             Expression::Builtin(node) => self.evaluate_builtin(node, ctx),
@@ -240,14 +239,6 @@ impl Interpreter {
             Expression::Empty(..) => Ok(Value::Unit),
             Expression::StructDefinitionNode(..) => Ok(Value::Unit),
         }
-    }
-
-    fn evaluate_use(
-        &self,
-        _node: &UseNode,
-        _ctx: &mut EvaluationContext,
-    ) -> Result<Value, RuntimeError> {
-        todo!()
     }
 
     fn evaluate_assignment(

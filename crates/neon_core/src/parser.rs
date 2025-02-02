@@ -309,12 +309,6 @@ pub struct AssignmentNode {
 }
 
 #[derive(Debug, Clone)]
-pub struct UseNode {
-    pub loc: Location,
-    pub identifier: IdentifierNode,
-}
-
-#[derive(Debug, Clone)]
 pub enum Expression {
     Array(ArrayNode),
     Assignment(AssignmentNode),
@@ -336,7 +330,6 @@ pub enum Expression {
     PropertyAccess(PropertyAccessNode),
     String(StringNode),
     StructDefinitionNode(StructDefinitionNode),
-    Use(UseNode),
     UnitBlock(UnitBlockNode),
 }
 
@@ -367,7 +360,6 @@ impl WithLocation for Expression {
             Expression::PropertyAccess(n) => n.loc,
             Expression::String(n) => n.loc,
             Expression::Assignment(n) => n.loc,
-            Expression::Use(n) => n.loc,
             Expression::StructDefinitionNode(n) => n.loc,
             Expression::UnitBlock(n) => n.loc,
 
@@ -852,7 +844,6 @@ impl Parser {
                     TokenKind::FnKeyword => self.parse_fn(),
                     TokenKind::StructKeyword => self.parse_struct_definition(),
                     TokenKind::LetKeyword => self.parse_let(),
-                    TokenKind::UseKeyword => self.parse_use(),
                     TokenKind::ForKeyword => self.parse_for_loop(),
 
                     _ => self.parse_stateless_expression(),
@@ -933,16 +924,6 @@ impl Parser {
                 value: identifier.name,
             },
             properties,
-        }))
-    }
-
-    fn parse_use(&mut self) -> Result<Expression, SyntaxError> {
-        let Token { start, .. } = self.assert_next(TokenKind::UseKeyword)?;
-        let identifier = self.parse_identifier_node()?;
-
-        Ok(Expression::Use(UseNode {
-            loc: Location::new(start, identifier.loc.end),
-            identifier,
         }))
     }
 

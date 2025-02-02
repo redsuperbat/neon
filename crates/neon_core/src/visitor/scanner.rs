@@ -31,7 +31,6 @@ impl<'a, V: Visitor + ?Sized> Scanner<'a, V> {
             Expression::StructInstantiation(n) => self.scan_struct_instantiation(n),
             Expression::PropertyAccess(n) => self.scan_property_access(n),
             Expression::String(n) => self.visitor.visit_string(n),
-            Expression::Use(n) => self.visitor.visit_use(n),
             Expression::StructDefinitionNode(n) => self.scan_struct_definition(n),
             Expression::UnitBlock(n) => self.scan_unit_block(n),
 

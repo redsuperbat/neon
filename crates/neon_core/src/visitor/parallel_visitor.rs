@@ -267,11 +267,6 @@ impl Visitor for ParallelVisitor {
             visitor.visit_int(n)
         }
     }
-    fn visit_use(&mut self, n: &UseNode) {
-        for visitor in &mut self.visitors {
-            visitor.visit_use(n)
-        }
-    }
     fn visit_struct_name(&mut self, n: &StructNameNode) {
         for visitor in &mut self.visitors {
             visitor.visit_struct_name(n);

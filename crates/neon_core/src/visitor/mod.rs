@@ -74,7 +74,6 @@ pub trait Visitor {
     fn visit_bool(&mut self, _bool_node: &BoolNode) {}
     fn visit_string(&mut self, _string_node: &StringNode) {}
     fn visit_int(&mut self, _int_node: &IntNode) {}
-    fn visit_use(&mut self, _use_node: &UseNode) {}
 
     fn scanner(&mut self) -> Scanner<Self>
     where
