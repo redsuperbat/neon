@@ -64,6 +64,7 @@ pub enum TokenKind {
     Ampersand,           // &
     Asterisk,            // *
     Bang,                // !
+    SingleQuote,         // '
     ClosedAngleBracket,  // >
     ClosedCurlyBrace,    // }
     ClosedParen,         // )
@@ -147,6 +148,7 @@ impl ToString for TokenKind {
             TokenKind::Unknown(lexeme) => lexeme,
             TokenKind::Dot => ".",
             TokenKind::DollarSign => "$",
+            TokenKind::SingleQuote => "'",
         };
         s.to_string()
     }
@@ -184,6 +186,7 @@ impl Lexer {
         match next_char {
             '=' => self.single_char(TokenKind::Equals),
             '!' => self.single_char(TokenKind::Bang),
+            '\'' => self.single_char(TokenKind::SingleQuote),
 
             '<' => self.single_char(TokenKind::OpenAngleBracket),
             '>' => self.single_char(TokenKind::ClosedAngleBracket),
