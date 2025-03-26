@@ -2,7 +2,7 @@ use crate::location::{Location, Pos};
 
 #[derive(Debug)]
 pub struct Lexer {
-    text: String,
+    text: Vec<char>,
     col: usize,
     line: usize,
     offset: usize,
@@ -165,7 +165,7 @@ impl Iterator for Lexer {
 impl Lexer {
     pub fn new<T: AsRef<str>>(text: T) -> Lexer {
         return Lexer {
-            text: text.as_ref().to_string(),
+            text: text.as_ref().chars().collect(),
             col: 1,
             line: 1,
             offset: 0,
@@ -275,7 +275,7 @@ impl Lexer {
     }
 
     fn peek(&self) -> Option<char> {
-        self.text.chars().nth(self.offset)
+        self.text.get(self.offset).map(|c| *c)
     }
 
     fn whitespace(&mut self) -> Option<Token> {
