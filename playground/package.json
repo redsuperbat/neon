@@ -11,10 +11,16 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@picocss/pico": "2.0.6",
+    "@kobalte/core": "^0.13.9",
+    "@tailwindcss/vite": "^4.1.7",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
     "monaco-editor": "0.51.0",
     "neon-web": "link:../crates/neon_web/pkg",
-    "solid-js": "1.8.22"
+    "solid-js": "1.8.22",
+    "tailwind-merge": "^3.3.0",
+    "tailwindcss": "^4.1.7",
+    "tailwindcss-animate": "^1.0.7"
   },
   "devDependencies": {
     "gh-pages": "6.1.1",

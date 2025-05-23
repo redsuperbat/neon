@@ -55,6 +55,9 @@ impl Compiler {
         SymbolTable::new(&mut dl, &mut self.scope)
             .scanner()
             .scan_expression(&ast);
+        if dl.has_errors() {
+            return Err(dl);
+        }
         Ok(ast)
     }
 

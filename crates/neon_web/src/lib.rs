@@ -54,6 +54,16 @@ pub fn tokenize(src: &str) -> Array {
 }
 
 #[wasm_bindgen]
+pub fn print_ast(src: &str) -> Result<String, CompilationDiagnostics> {
+    let mut compiler = Compiler::new();
+    compiler.register_libraries();
+    match compiler.check_and_parse(src) {
+        Ok(ast) => Ok(format!("{:?}", ast)),
+        Err(dl) => Err(dl.into()),
+    }
+}
+
+#[wasm_bindgen]
 pub fn compile(src: &str) -> Result<(), CompilationDiagnostics> {
     let mut compiler = Compiler::new();
     compiler.register_libraries();

@@ -12,9 +12,9 @@ import init, {
   type JsPos,
   type JsToken,
   tokenize,
+  print_ast,
 } from "neon-web";
 import {
-  For,
   Match,
   Show,
   Switch,
@@ -23,16 +23,8 @@ import {
   onCleanup,
   onMount,
 } from "solid-js";
-import array from "./assets/examples/arrays.neon?raw";
-import fib from "./assets/examples/fib.neon?raw";
-import fizzbuzz from "./assets/examples/fizz-buzz.neon?raw";
-import helloWorld from "./assets/examples/hello-world.neon?raw";
-import higherOrderFunctions from "./assets/examples/higher-order-functions.neon?raw";
-import iife from "./assets/examples/iife.neon?raw";
-import math from "./assets/examples/math.neon?raw";
-import recursion from "./assets/examples/recursion.neon?raw";
-import typeErrors from "./assets/examples/type-errors.neon?raw";
 import initScript from "./assets/init.neon?raw";
+import { ProgramSelect } from "./ProgramSelect";
 
 function LoadingPage() {
   return <div aria-busy="true" />;
@@ -41,45 +33,6 @@ function LoadingPage() {
 function ErrorPage({ error }: { error: string }) {
   return <article>{error}</article>;
 }
-
-const examples: { label: string; value: string }[] = [
-  {
-    label: "Math",
-    value: math,
-  },
-  {
-    label: "Array",
-    value: array,
-  },
-  {
-    label: "Recursion",
-    value: recursion,
-  },
-  {
-    label: "Higher order functions",
-    value: higherOrderFunctions,
-  },
-  {
-    label: "Fibbonachi",
-    value: fib,
-  },
-  {
-    label: "Fizz Buzz",
-    value: fizzbuzz,
-  },
-  {
-    label: "Type errors",
-    value: typeErrors,
-  },
-  {
-    label: "Hello world 👋",
-    value: helloWorld,
-  },
-  {
-    label: "iife (Immediately invoked function expression)",
-    value: iife,
-  },
-];
 
 const rangeFromLocation = ({
   end,
@@ -104,7 +57,6 @@ type Output =
 function ExecutionPage() {
   const [output, setOutput] = createSignal<Output>();
   const [disabled, setDisabled] = createSignal(false);
-  const [logs, setLogs] = createSignal<string[]>();
   let monacoEl: HTMLDivElement | undefined;
   let editor: monaco.editor.IStandaloneCodeEditor | undefined;
 
@@ -163,10 +115,6 @@ function ExecutionPage() {
       if (!value) return;
       onContentChange(value);
     });
-
-    // This will be called by rust code
-    window.on_print = (...args) =>
-      setLogs((prev) => [...(prev ?? []), ...args.map((it) => String(it))]);
   });
 
   onCleanup(() => {
@@ -227,7 +175,6 @@ function ExecutionPage() {
   }
 
   function exec() {
-    setLogs(undefined);
     runtimeDecorations?.clear();
     const src = editor?.getValue();
     if (!src) return;
@@ -249,89 +196,44 @@ function ExecutionPage() {
   }
 
   return (
-    <main class="container">
-      <h1>Neon Playground</h1>
-      <div
-        style={{
-          height: "50vh",
-          "border-radius": "5px",
-          "margin-bottom": "10px",
-        }}
-        ref={monacoEl}
-      />
-
-      <div
-        style={{
-          display: "grid",
-          "grid-template-columns": "1fr auto",
-          gap: "10px",
-        }}
-      >
-        <div>
-          <select
-            onchange={(e) => setEditorContent(e.target.value)}
-            style={{ height: "60px" }}
-            aria-invalid={disabled()}
-            name="select"
-            aria-label="Select"
-            aria-describedby="invalid-diagnostics"
-            required
-          >
-            <option selected disabled value="">
-              Examples
-            </option>
-            <For each={examples}>
-              {({ value, label }) => <option value={value}>{label}</option>}
-            </For>
-          </select>
-          <Show when={disabled()}>
-            <small id="invalid-diagnostics">
-              Cannot execute when there are diagnostics errors
-            </small>
-          </Show>
-        </div>
+    <main
+      class="grid h-screen"
+      style={{
+        "grid-template-rows": "1fr auto",
+      }}
+    >
+      <div class="relative" ref={monacoEl}>
         <button
           type="button"
-          style={{ height: "60px" }}
-          disabled={disabled()}
-          onclick={() => exec()}
+          class="absolute bottom-0 right-0 text-white z-10 p-3"
         >
-          Execute
+          AST View
         </button>
       </div>
 
       <div
+        class="grid p-2"
         style={{
-          "margin-bottom": "5px",
+          "grid-template-columns": "auto 1fr auto",
         }}
       >
-        <span
-          style={{
-            "margin-right": "5px",
-          }}
-        >
-          Script evaluated to:
-        </span>
-        <span
-          style={{
-            color: output()?.type === "error" ? "red" : "green",
-          }}
-        >
-          {output()?.message}
-        </span>
+        <ProgramSelect onSelect={(e) => setEditorContent(e.value)} />
+        <Show when={output()?.message} fallback={<div />}>
+          <div class="flex gap-3">
+            <span>Script evaluated to:</span>
+            <span
+              style={{
+                color: output()?.type === "error" ? "red" : "green",
+              }}
+            >
+              {output()?.message}
+            </span>
+          </div>
+        </Show>
+        <button type="button" disabled={disabled()} onclick={() => exec()}>
+          Execute
+        </button>
       </div>
-
-      <h3>Logs</h3>
-      <pre>
-        <code
-          style={{
-            display: "flex",
-            "flex-direction": "column",
-          }}
-        >
-          <For each={logs()}>{(item) => <div>{item}</div>}</For>
-        </code>
-      </pre>
     </main>
   );
 }
@@ -340,15 +242,13 @@ export function App() {
   const [resource] = createResource(() => init({}));
 
   return (
-    <div style={{ padding: "20px" }}>
-      <Switch fallback={<ExecutionPage />}>
-        <Match when={resource.loading}>
-          <LoadingPage />
-        </Match>
-        <Match when={resource.error}>
-          <ErrorPage error={JSON.stringify(resource.error)} />
-        </Match>
-      </Switch>
-    </div>
+    <Switch fallback={<ExecutionPage />}>
+      <Match when={resource.loading}>
+        <LoadingPage />
+      </Match>
+      <Match when={resource.error}>
+        <ErrorPage error={JSON.stringify(resource.error)} />
+      </Match>
+    </Switch>
   );
 }
