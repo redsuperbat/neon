@@ -8,10 +8,15 @@ import iife from "./assets/examples/iife.neon?raw";
 import math from "./assets/examples/math.neon?raw";
 import recursion from "./assets/examples/recursion.neon?raw";
 import typeErrors from "./assets/examples/type-errors.neon?raw";
+import initScript from "./assets/init.neon?raw";
 import { createSignal } from "solid-js";
 
 type Program = { name: string; value: string };
 const examples: Program[] = [
+  {
+    name: "Getting started",
+    value: initScript,
+  },
   {
     name: "Math",
     value: math,
