@@ -58,7 +58,7 @@ pub fn print_ast(src: &str) -> Result<String, CompilationDiagnostics> {
     let mut compiler = Compiler::new();
     compiler.register_libraries();
     match compiler.check_and_parse(src) {
-        Ok(ast) => Ok(format!("{:?}", ast)),
+        Ok(ast) => Ok(format!("{:#?}", ast)),
         Err(dl) => Err(dl.into()),
     }
 }

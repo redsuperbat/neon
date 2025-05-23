@@ -4,8 +4,9 @@ import {
   type JsPos,
   type JsToken,
   tokenize,
+  print_ast,
 } from "neon-web";
-import { createEffect, onCleanup, onMount } from "solid-js";
+import { createEffect, createSignal, onCleanup, onMount, Show } from "solid-js";
 import * as monaco from "monaco-editor";
 
 const rangeFromLocation = ({
@@ -22,6 +23,7 @@ export function Editor(props: {
   onContentChange: (val: string) => void;
   content: string;
 }) {
+  const [astView, setAstView] = createSignal(false);
   let monacoEl: HTMLDivElement | undefined;
   let editor: monaco.editor.IStandaloneCodeEditor | undefined;
 
@@ -48,12 +50,6 @@ export function Editor(props: {
         { open: "[", close: "]" },
         { open: "(", close: ")" },
       ],
-    });
-
-    monaco.languages.registerHoverProvider("neon", {
-      provideHover() {
-        return undefined;
-      },
     });
 
     editor = monaco.editor.create(monacoEl, {
@@ -83,6 +79,7 @@ export function Editor(props: {
   onCleanup(() => editor?.dispose());
 
   createEffect(() => editor?.setValue(props.content));
+  createEffect(() => {});
 
   function diagnosticsToDecorations(
     e: CompilationDiagnostics,
@@ -125,9 +122,30 @@ export function Editor(props: {
     syntaxDecorations.append(highlights);
   }
 
+  const astString = () => {
+    if (!astView()) return;
+    return print_ast(props.content);
+  };
+
   return (
-    <div class="relative" ref={monacoEl}>
+    <div class="relative w-full h-full">
+      <div
+        style={{
+          "grid-template-columns": astView()
+            ? "minmax(0px, 1fr) 1fr"
+            : "minmax(0px, 1fr)",
+        }}
+        class="grid h-full w-full"
+      >
+        <div ref={monacoEl} />
+        <Show when={astView()}>
+          <code class="overflow-y-auto p-5 max-h-[90vh]">
+            <pre>{astString()}</pre>
+          </code>
+        </Show>
+      </div>
       <button
+        onClick={() => setAstView(!astView())}
         type="button"
         class="absolute bottom-0 right-0 text-white z-10 p-3"
       >
