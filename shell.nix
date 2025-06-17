@@ -11,5 +11,6 @@ pkgs.mkShell {
     pkgs.rust-analyzer
     pkgs.nodejs
     pkgs.yarn
+    pkgs.wasm-pack
   ];
 }
