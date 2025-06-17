@@ -12,5 +12,6 @@ pkgs.mkShell {
     pkgs.nodejs
     pkgs.yarn
     pkgs.wasm-pack
+    pkgs.llvmPackages.lld
   ];
 }
