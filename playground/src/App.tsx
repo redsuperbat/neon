@@ -1,5 +1,5 @@
 import initScript from "./assets/init.neon?raw";
-import init, { CompilationDiagnostics, interpret_src } from "neon-web";
+import init, { interpret_src } from "neon-web";
 import { Match, Show, Switch, createResource, createSignal } from "solid-js";
 import EditorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker";
 
@@ -18,38 +18,13 @@ function ErrorPage({ error }: { error: string }) {
   return <div>{error}</div>;
 }
 
-type Output =
-  | {
-      type: "error";
-      message: string;
-    }
-  | {
-      type: "ok";
-      message: string;
-    };
-
 function ExecutionPage() {
   const [content, setContent] = createSignal(initScript);
-  const [output, setOutput] = createSignal<Output>();
+  const [output, setOutput] = createSignal<string>();
 
-  function exec() {
+  function executeProgram() {
     const src = content();
-    if (!src) return;
-    try {
-      const res = interpret_src(src);
-      setOutput({
-        type: "ok",
-        message: res.result,
-      });
-    } catch (e) {
-      if (!(e instanceof CompilationDiagnostics)) return;
-      setOutput({
-        type: "error",
-        message: e.errors
-          .map((e) => `${e.loc.start.line}:${e.loc.start.col} ${e.message}`)
-          .join("\n"),
-      });
-    }
+    setOutput(interpret_src(src).result);
   }
 
   return (
@@ -62,26 +37,24 @@ function ExecutionPage() {
       <Editor onContentChange={(s) => setContent(s)} content={content()} />
 
       <div
-        class="grid p-2"
+        class="grid p-2 items-center"
         style={{
           "grid-template-columns": "auto 1fr auto",
         }}
       >
         <ProgramSelect onSelect={(e) => setContent(e.value)} />
-        <Show when={output()?.message} fallback={<div />}>
+        <Show when={output()} fallback={<div />}>
           <div class="flex gap-3">
-            <span>Script evaluated to:</span>
-            <span
-              style={{
-                color: output()?.type === "error" ? "red" : "green",
-              }}
-            >
-              {output()?.message}
-            </span>
+            <span>Program evaluated to:</span>
+            <span>{output()}</span>
           </div>
         </Show>
-        <button type="button" onclick={() => exec()}>
-          Execute
+        <button
+          type="button"
+          onclick={() => executeProgram()}
+          class="inline-flex items-center gap-2 bg-white border border-neutral-300 rounded-md px-3 py-1.5 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-400 focus:border-blue-400 transition-all"
+        >
+          Execute program
         </button>
       </div>
     </main>

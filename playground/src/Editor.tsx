@@ -124,7 +124,11 @@ export function Editor(props: {
 
   const astString = () => {
     if (!astView()) return;
-    return print_ast(props.content);
+    try {
+      return print_ast(props.content);
+    } catch {
+      return null;
+    }
   };
 
   return (
@@ -147,7 +151,7 @@ export function Editor(props: {
       <button
         onClick={() => setAstView(!astView())}
         type="button"
-        class="absolute bottom-0 right-0 text-white z-10 p-3"
+        class="absolute bottom-0 right-0 text-white z-10 p-2 m-2 bg-gray-700 rounded-3xl"
       >
         AST View
       </button>

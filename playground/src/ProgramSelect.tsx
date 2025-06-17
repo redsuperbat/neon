@@ -62,28 +62,35 @@ export function ProgramSelect({
   return (
     <Select
       options={examples}
-      optionValue="value"
+      optionValue="name"
       optionTextValue="name"
       value={value()}
       itemComponent={(props) => (
-        <Select.Item item={props.item}>{props.item.rawValue.name}</Select.Item>
+        <Select.Item
+          class="px-3 py-1.5 text-sm hover:bg-neutral-100 data-[highlighted]:bg-blue-500 data-[highlighted]:text-white cursor-pointer rounded"
+          item={props.item}
+          data-key={props.item.rawValue.name}
+        >
+          {props.item.rawValue.name}
+        </Select.Item>
       )}
       onChange={(e) => {
-        if (e) {
-          setValue(e);
-          onSelect(e);
-        }
+        if (!e) return;
+        setValue(e);
+        onSelect(e);
       }}
       class="px-2"
     >
-      <Select.Trigger>
+      <Select.Trigger class="inline-flex items-center gap-2 bg-white border border-neutral-300 rounded-md px-3 py-1.5 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-400 focus:border-blue-400 transition-all">
         <Select.Value<Program>>
-          {(state) => `Program: ${state.selectedOption().name}`}
+          {(state) => (
+            <span class="bg-white">Program: {state.selectedOption().name}</span>
+          )}
         </Select.Value>
       </Select.Trigger>
       <Select.Portal>
-        <Select.Content>
-          <Select.Listbox />
+        <Select.Content class="bg-white border border-neutral-200 rounded-md shadow-md text-sm z-50">
+          <Select.Listbox class="max-h-48 overflow-y-auto" />
         </Select.Content>
       </Select.Portal>
     </Select>
